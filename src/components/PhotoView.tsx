@@ -2,6 +2,8 @@
 // what the user has marked (Card corners, the patch or Chip positions, Spots) over the Photo.
 import * as React from "react"
 import { pageModel, pageSites, patchSites, spotRadius, type Corners, type PageHue, type Site, type XY } from "@/engine"
+import { Magnifier } from "@/components/Magnifier"
+import { usePlacement } from "@/lib/placement"
 import { CORNER_COUNT, type CardKind } from "@/lib/session"
 
 interface Props {
@@ -111,6 +113,7 @@ const NONE: string[] = []
 export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, leftOut = NONE, onTap }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
+  const { placing, handlers } = usePlacement(onTap)
 
   React.useEffect(() => {
     const canvas = canvasRef.current
@@ -133,25 +136,21 @@ export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, le
     )
   }
 
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = e.currentTarget
-    const rect = canvas.getBoundingClientRect()
-    onTap({
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height),
-    })
-  }
-
+  // touch-pinch-zoom: the page keeps pinch-zoom, but a finger on the Photo never pans it by
+  // itself; usePlacement scrolls the page when the finger swipes.
   return (
-    <canvas
-      ref={canvasRef}
-      width={pixels.width}
-      height={pixels.height}
-      onClick={handleClick}
-      role="img"
-      aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
-      data-testid="photo"
-      className="block h-auto w-full cursor-crosshair bg-muted"
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={pixels.width}
+        height={pixels.height}
+        {...handlers}
+        role="img"
+        aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
+        data-testid="photo"
+        className="block h-auto w-full cursor-crosshair touch-pinch-zoom bg-muted select-none"
+      />
+      {placing && <Magnifier placing={placing} />}
+    </>
   )
 }

@@ -257,3 +257,32 @@ the 23 raises a warning on a clean Photo.
 - A shadow confined to the outer ring of patches does not reach the black frame inside.
 - One warning per kind per place. When the light is both blown and crushed the Card gets one
   clipped warning that says both.
+
+## The Page Card
+
+The same checks run on a Page of the soil book (`pageQuality` in `src/engine/readPhoto.ts`). The
+Page describes itself the way the ColorChecker does: its 36 or so Chips are the references, with
+the /1 column as the tonal ladder (8/1 is the white, the bottom /1 the black); the spacing is the
+column pitch in the Photo, the median over the four taps' pairs (a column is 0.66 of a row); and the
+evenness samples are the bare white paper, spread over the whole Page.
+
+- **Evenness samples.** The gutters between the columns, down every row (35). A gutter is a fifth
+  of a column wide, so its read circle is 0.35 of a Chip's, and it is paper on every hue Page. The
+  empty cells at the bottom right are not (they are Chips on another Page), and with them a Page
+  read as the wrong hue raised a false "uneven light" over a failed Card check. Before the gutters
+  there were 5 samples on 2.5YR, below `MIN_EVEN_SAMPLES` (6), and 6 crowded into one corner on
+  10YR, which a plane fit cannot read a shadow across.
+- **Limits.** 0.45 stops where the frame's is 0.3, and 3 stops for off the Page. A Page fills most
+  of the Photo, so the light falls off across it: the plane fit over the gutters reads 0.11, 0.16,
+  0.27 and 0.33 stops on Jon's four real Pages (10YR, 7.5YR, 2.5Y, 5Y: top to bottom the paper is
+  0.2 to 0.3 stops darker), and 0.3 raised a false "uneven light" on the 5Y Page. A shadow of half
+  the light across the top or left half (one stop) is well over 0.45. Provisional until the real
+  Photos run (#15).
+- **Spots.** Each Spot is scanned at the radius it was read at, which on a Page is cut to fit a hole
+  (`Reading.radius`); scanned at the Photo's usual radius, a Spot in a hole took in the bright Chips
+  around it and raised a false "Glare on this Spot".
+- **Checked.** No warning on a clean 10YR, 2.5YR or 5Y Page in warm, dim and shift light, flat or
+  tilted, noisy and JPEG-compressed, with a Spot beside the Page and one in every hole; no warning
+  on any of Jon's four real Pages (with a Spot in two holes and one on the wood beside the Page); a
+  shadow over the top half or the left half of a 10YR and a 2.5YR Page is flagged as uneven light; a
+  Page 2600 units away (a column under 24 pixels) is flagged small.

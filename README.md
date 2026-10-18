@@ -24,11 +24,23 @@ npm run test:e2e         # browser tests (Playwright): builds, serves, drives Ch
 
 CI runs typecheck, `npm test` and `npm run test:e2e` on every pull request.
 
+## Deploys
+
+Every push to `main` deploys to <https://soil.joncackler.com/> through
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): typecheck, `npm test`,
+`npm run test:e2e`, `npm run build`, then GitHub Pages publishes `dist/`. If a test fails,
+nothing is deployed and the live site stays on the last good build. To redeploy without a
+commit, run the Deploy workflow from the Actions tab.
+
+The repository's Pages source is "GitHub Actions". The custom domain and enforced HTTPS are
+Pages settings, not part of the build; `public/CNAME` is copied into `dist/` and holds the
+same domain. The old `gh-pages` branch is no longer deployed from and is kept only as a backup.
+
 ## How it is built
 
 - Vite, React, TypeScript (strict), Tailwind CSS and shadcn/ui. The interface is neutral gray
   in light and dark, so it does not tint how you judge a color; color on screen comes only from
-  the Photo and from the Soil and Chip color blocks.
+  the Photo and from the Reading and Chip color blocks.
 - `src/engine/`: the reading engine. Pure TypeScript with no DOM and no React; the one main
   call is `readPhoto({ pixels, card, spots })`.
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
@@ -46,8 +58,15 @@ How a Reading is made: the median of the tapped pixels, a white balance and then
 correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
 then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 of the corrected
-patches; below 3 is good. The Chip grid (10R to 5Y, values 2.5 to 8, chromas 1 to 8) still
-approximates the soil book; it is not the official Chip list and has no color names yet.
+patches; below 3 is good. The engine knows 359 Chips with their color names, gley, neutral and
+the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
+what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
+list is only as complete as the checking, which is against one copy (Soil-Color Charts, 2009
+Revision, 2015 Production). Checked, Chips and names: 2.5YR, 5YR, 7.5YR, 10YR, 10Y-5GY, Gley 1,
+Gley 2 and WHITE. Chips checked, names pending: 2.5Y and 5Y. Not checked: 10R, whose Page the
+binder's tabs do not show (they start at 2.5YR). Not known: whether the book has 5R or 7.5R Pages.
+Each Chip's color is computed from its notation, matching happens in Lab, and only the
+on-screen swatch is clamped to sRGB.
 
 ## Tests
 

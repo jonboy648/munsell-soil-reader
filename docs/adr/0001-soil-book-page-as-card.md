@@ -4,6 +4,6 @@ The people this tool is for already own the Munsell soil book, and most don't ow
 
 ## Consequences
 
-- One page holds one hue. The correction is strongest near that hue, so the user should lay down the page closest to the soil, as they would when reading by eye.
+- Most pages hold one hue; the 10Y-5GY, Gley and White pages mix hues (corrected 2026-10-18 from photos of a 2009 Revision, 2015 Production book). The correction is strongest near the page's own colors, so the user should lay down the page closest to the soil, as they would when reading by eye.
 - Books fade and get dirty over the years. A worn page shifts every reading, and the card check can't detect a uniformly faded page. The ColorChecker stays supported as the independent reference.
 - Page layouts belong to an edition: chips sit in value rows and chroma columns, with gaps. We build to the 2009 and later edition.

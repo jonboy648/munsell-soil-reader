@@ -4,11 +4,14 @@ export { deltaE2000 } from "./color"
 export { patchSites } from "./colorchecker"
 export { gridMap, gridSites } from "./grid"
 export { spotRadius } from "./sampling"
+export { CHIP_LIST } from "./chipList"
+export { SOIL_BOOK_CHIPS } from "./chips"
 export type { Four, GridMap, GridPoint, Site } from "./grid"
 export type {
   Card,
   CardCheck,
   Chip,
+  ChipPage,
   ChipReading,
   Corners,
   Pixels,

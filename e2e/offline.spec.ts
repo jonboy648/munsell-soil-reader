@@ -6,7 +6,7 @@ import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { chromium, devices, expect, test as base, type Page } from "@playwright/test"
+import { chromium, devices, expect, test as base, type BrowserContext, type Page } from "@playwright/test"
 import type { XY } from "../src/engine"
 import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
 
@@ -19,16 +19,45 @@ type Site = {
    * installs badly and is thrown away.
    */
   deploy: (version: number, options?: { failInstall?: boolean }) => void
+  /** Make a precached file answer 503 (or stop), as on a weak signal. */
+  failPrecache: (on: boolean) => void
+  /** How many times a precached file has answered 503. */
+  precacheFailures: () => number
 }
 
 // Playwright cannot swap files mid-test, so the app is served through a small proxy to the
 // preview server (on a dynamic port, so parallel runs never collide).
-const test = base.extend<{ site: Site }>({
+const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
+  // A persistent profile in full Chromium, for the installability check (see below). Its folder is
+  // short and in the OS temp folder: under the long test output path, Chromium's cache folders
+  // pass Windows' path limit and the service worker never installs. Fixture teardown also runs
+  // after a timeout, so neither the browser nor the folder is left behind.
+  fullChromium: async ({ baseURL }, use) => {
+    const profile = mkdtempSync(join(tmpdir(), "munsell-"))
+    const context = await chromium.launchPersistentContext(profile, {
+      channel: "chromium",
+      ...devices["Pixel 7"],
+      baseURL,
+    })
+    try {
+      await use(context)
+    } finally {
+      await context.close()
+      rmSync(profile, { recursive: true, force: true })
+    }
+  },
   site: async ({ baseURL }, use) => {
     let version = 1
     let failInstall = false
+    let failPrecache = false
+    let failures = 0
     const proxy = createServer(async (req, res) => {
       const target = new URL(req.url ?? "/", baseURL)
+      if (failPrecache && target.pathname === "/icon-512.png") {
+        failures++
+        res.writeHead(503).end()
+        return
+      }
       const upstream = await fetch(target)
       let body = Buffer.from(await upstream.arrayBuffer())
       if (version > 1 && (target.pathname === "/" || target.pathname === "/index.html")) {
@@ -55,6 +84,10 @@ const test = base.extend<{ site: Site }>({
         version = next
         failInstall = options?.failInstall ?? false
       },
+      failPrecache: (on) => {
+        failPrecache = on
+      },
+      precacheFailures: () => failures,
     })
     proxy.close()
   },
@@ -134,43 +167,32 @@ test("the manifest is linked and has what installing needs", async ({ page }) =>
   }
 })
 
-// Chromium's own installability check. It only does its work in a real (non-incognito) profile,
-// and Playwright's default contexts are incognito, where it answers "in-incognito" and nothing
-// else. So these two tests run a persistent profile in full Chromium. The second one is the
-// guard: a page with no manifest must be reported, or the first test could never fail.
-async function installabilityErrors(baseURL: string, open: (page: Page) => Promise<void>) {
-  const profile = mkdtempSync(join(tmpdir(), "munsell-install-"))
-  const context = await chromium.launchPersistentContext(profile, {
-    channel: "chromium",
-    ...devices["Pixel 7"],
-    baseURL,
-  })
-  try {
-    const page = await context.newPage()
-    await open(page)
-    const cdp = await context.newCDPSession(page)
-    const { installabilityErrors } = await cdp.send("Page.getInstallabilityErrors")
-    return installabilityErrors.map((error) => error.errorId)
-  } finally {
-    await context.close()
-    rmSync(profile, { recursive: true, force: true })
-  }
+// Chromium's own installability check, which is about the manifest and the icons; that the app
+// has a service worker and works offline is what the tests after these two cover. The check only
+// does its work in a real (non-incognito) profile, and Playwright's default contexts are
+// incognito, where it answers "in-incognito" and nothing else; hence the fullChromium fixture.
+// The second test is the guard: a page with no manifest must be reported, or the first test
+// could never fail.
+async function installabilityErrors(page: Page) {
+  const cdp = await page.context().newCDPSession(page)
+  const { installabilityErrors } = await cdp.send("Page.getInstallabilityErrors")
+  return installabilityErrors.map((error) => error.errorId)
 }
 
-test("Chromium finds nothing in the way of installing the app", async ({ baseURL }) => {
-  const errors = await installabilityErrors(baseURL!, (page) => openControlled(page))
-  expect(errors).toEqual([])
+test("Chromium finds nothing in the way of installing the app", async ({ fullChromium }) => {
+  const page = await fullChromium.newPage()
+  await openControlled(page)
+  expect(await installabilityErrors(page)).toEqual([])
 })
 
-test("the installability check does report a page with no manifest", async ({ baseURL }) => {
-  const errors = await installabilityErrors(baseURL!, async (page) => {
-    // Its own origin, so the app's service worker does not answer for it.
-    await page.context().route("http://127.0.0.1:1/", (route) =>
-      route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Bare</title>" }),
-    )
-    await page.goto("http://127.0.0.1:1/")
-  })
-  expect(errors).toContain("no-manifest")
+test("the installability check does report a page with no manifest", async ({ fullChromium }) => {
+  // Its own origin, so the app's service worker does not answer for it.
+  await fullChromium.route("http://127.0.0.1:1/", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Bare</title>" }),
+  )
+  const page = await fullChromium.newPage()
+  await page.goto("http://127.0.0.1:1/")
+  expect(await installabilityErrors(page)).toContain("no-manifest")
 })
 
 test("a service worker is registered at the site root and controls the page", async ({ page }) => {
@@ -260,6 +282,12 @@ test.describe("iPhone and iPad", () => {
     await page.goto("/")
     await expect(page.getByTestId("install-hint")).toContainText("Add to Home Screen")
     await expect(page.getByTestId("install-hint")).toContainText("once with signal")
+    await expect(page.getByTestId("install-hint")).toContainText("open this page in Safari")
+  })
+
+  test("the ready-offline notice carries the Home Screen caveat", async ({ page, site }) => {
+    await openFirstVisit(page, site.url)
+    await expect(page.getByTestId("offline-notice")).toContainText("open the icon once with signal")
   })
 
   test("the installed app does not show the hint", async ({ page }) => {
@@ -346,28 +374,107 @@ test.describe("a page that has been open for more than a minute", () => {
   })
 })
 
-test("with a Photo open the notice asks to finish first, and a cold reopen has the new version", async ({
+test("with a Photo open, resuming the app offers Reload (clears this Photo), and Later hides it until the next resume", async ({
+  page,
+  site,
+}) => {
+  await openControlled(page, site.url)
+  await pickExample(page)
+  await expect(page.getByTestId("photo-name")).toBeVisible()
+  await page.evaluate(() => Object.assign(window, { stayed: true })) // survives a resume, not a reload
+
+  // Coming back to the front is a resume, not a navigation.
+  site.deploy(2)
+  await lookForUpdate(page)
+  const notice = page.getByTestId("update-notice")
+  await expect(notice.getByRole("button", { name: "Reload (clears this Photo)" })).toBeVisible()
+  await expect(page.getByTestId("photo-name")).toBeVisible()
+
+  await notice.getByRole("button", { name: "Later" }).click()
+  await expect(notice).toHaveCount(0)
+  await expect(page.getByTestId("photo-name")).toBeVisible()
+  await lookForUpdate(page) // the next resume
+  await expect(page.getByTestId("update-notice")).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { stayed?: boolean }).stayed)).toBe(true)
+
+  await tapReload(page)
+  await expect(page.locator("html")).toHaveAttribute("data-deploy", "2")
+  await expect(page.getByTestId("photo-name")).toHaveCount(0)
+  await expect(page.getByTestId("update-notice")).toHaveCount(0)
+})
+
+test("with a Photo open, closing the app and opening it again has the new version", async ({
   page,
   context,
   site,
 }) => {
   await openControlled(page, site.url)
   await pickExample(page)
-  await expect(page.getByTestId("photo-name")).toBeVisible()
-
   site.deploy(2)
   await lookForUpdate(page)
-  const notice = page.getByTestId("update-notice")
-  await expect(notice).toContainText("Reload clears the current Photo")
-  await expect(notice.getByRole("button", { name: "Reload" })).toHaveCount(0)
-  await expect(page.getByTestId("photo-name")).toBeVisible()
+  await expect(page.getByTestId("update-notice")).toBeVisible()
 
-  // The user finishes, closes the app and opens it again.
   await page.close()
   const reopened = await context.newPage()
   await reopened.goto(site.url)
   await expect(reopened.locator("html")).toHaveAttribute("data-deploy", "2")
   await expect(reopened.getByTestId("update-notice")).toHaveCount(0)
+})
+
+test.describe("on a 320 x 568 phone", () => {
+  test.use({ viewport: { width: 320, height: 568 } })
+
+  test("the update notice does not cover the Photo or block a tap on it", async ({ page, site }) => {
+    await openControlled(page, site.url)
+    await pickExample(page)
+    site.deploy(2)
+    await lookForUpdate(page)
+    const notice = page.getByTestId("update-notice")
+    await expect(notice).toBeVisible()
+    await expect(page.getByTestId("corner-prompt")).toContainText("brown patch (top left)")
+
+    const [noticeBox, photoBox] = await Promise.all([notice.boundingBox(), page.getByTestId("photo").boundingBox()])
+    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(photoBox!.y)
+    await tapPhoto(page, SIM_CORNERS[0])
+    await expect(page.getByTestId("corner-prompt")).toContainText("bluish-green patch (top right)")
+  })
+})
+
+test("a first install that fails is tried again when the app comes back to the front", async ({ page, site }) => {
+  // The first visit on a weak signal: one precached file answers 503, so the install fails and
+  // the browser drops the registration.
+  site.failPrecache(true)
+  await page.goto(site.url)
+  // Wait for the install to really have failed, not just for there to be no registration yet.
+  await expect.poll(() => site.precacheFailures()).toBeGreaterThan(0)
+  await expect
+    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()) === undefined))
+    .toBe(true)
+  await expect(page.getByTestId("offline-notice")).toHaveCount(0)
+
+  // Signal comes back; no reload.
+  site.failPrecache(false)
+  await lookForUpdate(page)
+  await expect(page.getByTestId("offline-notice")).toContainText("Ready to work offline")
+})
+
+test("an update reaches a window no worker controls while another window holds it waiting", async ({
+  page,
+  context,
+  site,
+}) => {
+  await openFirstVisit(page, site.url) // never controlled
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull()
+  const controlled = await context.newPage()
+  await openControlled(controlled, site.url)
+
+  site.deploy(2)
+  await lookForUpdate(controlled) // installs, and waits: the second window is still on the old one
+  await lookForUpdate(page)
+  await expect(page.getByTestId("update-notice")).toBeVisible()
+
+  await tapReload(page)
+  await expect(page.locator("html")).toHaveAttribute("data-deploy", "2")
 })
 
 test("Reload switches only the window where it was tapped", async ({ page, context, site }) => {

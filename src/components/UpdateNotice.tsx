@@ -1,41 +1,49 @@
 import { Button } from "@/components/ui/button"
+import { isIosBrowserTab } from "@/lib/ios"
 import { useServiceWorker } from "@/lib/serviceWorker"
 
 /**
- * The two things the service worker has to tell the user: the app now works offline, and a new
- * version is ready. Reload throws away the Photo and taps in progress, so it is only offered
- * when no Photo is loaded; otherwise the notice asks the user to finish first.
+ * What the service worker has to tell the user: the app now works offline, and a new version is
+ * ready. It sits in the page flow under the title, not over the Photo, so it never covers a tap.
+ * Reload throws away the Photo and the taps made on it, so with a Photo loaded the button says
+ * so, and "Later" puts the notice away until the app next comes back to the front.
  */
 export function UpdateNotice({ hasPhoto }: { hasPhoto: boolean }) {
-  const { offlineReady, updateReady, dismissOfflineReady, reload } = useServiceWorker()
+  const { offlineReady, updateReady, dismissOfflineReady, dismissUpdate, reload } =
+    useServiceWorker()
   if (!updateReady && !offlineReady) return null
 
   return (
-    <div className="fixed inset-x-0 top-0 z-20 mx-auto max-w-xl px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+    <div className="px-4 pb-3">
       <div
         role="status"
         data-testid={updateReady ? "update-notice" : "offline-notice"}
-        className="flex items-center justify-between gap-3 rounded-md border-2 border-foreground bg-card p-3 text-sm font-medium"
+        className="grid gap-3 rounded-md border-2 border-foreground bg-card p-3 text-sm font-medium"
       >
         {updateReady ? (
           <>
-            <span>
-              {hasPhoto
-                ? "A new version is ready. Reload clears the current Photo, so finish this one first, then reopen the app."
-                : "A new version is ready."}
-            </span>
-            {!hasPhoto && (
-              <Button size="lg" onClick={reload}>
-                Reload
+            <p>A new version is ready.</p>
+            <div className="flex gap-2">
+              <Button size="lg" className="h-11" onClick={reload}>
+                {hasPhoto ? "Reload (clears this Photo)" : "Reload"}
               </Button>
-            )}
+              <Button size="lg" variant="outline" className="h-11" onClick={dismissUpdate}>
+                Later
+              </Button>
+            </div>
           </>
         ) : (
           <>
-            <span>Ready to work offline.</span>
-            <Button size="lg" onClick={dismissOfflineReady}>
-              OK
-            </Button>
+            <p>
+              {isIosBrowserTab()
+                ? "Ready to work offline in this browser. If you add it to the Home Screen, open the icon once with signal."
+                : "Ready to work offline."}
+            </p>
+            <div className="flex">
+              <Button size="lg" className="h-11" onClick={dismissOfflineReady}>
+                OK
+              </Button>
+            </div>
           </>
         )}
       </div>

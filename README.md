@@ -53,12 +53,14 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   styles, the bundled fonts, icons and any data files by type), so the app opens with no
   network after the first visit. The app registers the worker itself
   (`src/lib/serviceWorker.ts`) and says "Ready to work offline" once the first install is done.
-  A new deploy downloads in the background and a "new version is ready" notice follows; the app
-  also looks for one whenever it returns to the front. Reload is offered only when no Photo is
-  loaded, since it clears the Photo and the taps; otherwise the notice asks the user to finish
-  first, and the next open of the app has the new version anyway. Reload switches only the
-  window where it was tapped. The site is served at the root of soil.joncackler.com, so the base
-  is `/`. The icons in `public/` are drawn by `node scripts/make-icons.mjs` and committed.
+  A new deploy downloads in the background and a "new version is ready" notice follows, in the
+  page flow under the title so it never covers the Photo; the app looks for one whenever it
+  returns to the front or the network returns, and registers again if a first install failed.
+  Reload clears the Photo and the taps, so with a Photo loaded the button says "Reload (clears
+  this Photo)", and "Later" hides the notice until the app next returns to the front. Reload
+  switches only the window where it was tapped. The site is served at the root of
+  soil.joncackler.com, so the base is `/`. The icons in `public/` are drawn by
+  `node scripts/make-icons.mjs` and committed.
 
 The Card's patches are found from the four corner taps with a homography (a perspective
 transform, `src/engine/grid.ts`), so a Card photographed at an angle still lands on every patch,
@@ -103,10 +105,10 @@ the soil, is needed for a corrected Reading.
 
 Offline on iPhone and iPad: an app added to the Home Screen has its own storage, separate from
 Safari's, so it does not get the offline copy Safari already downloaded. After Add to Home
-Screen, open the icon once with signal; after that it works with no signal. Safari can also clear
-a site's stored data, the offline copy included, after 7 days without a visit; opening the app
-with signal brings it back. The app shows a hint about the first limit on iOS, outside the
-installed app.
+Screen, open the icon once with signal; after that it works with no signal. In a Safari tab (not
+the Home Screen app), Safari can delete the offline copy after seven days of Safari use without
+opening this site; opening it with signal brings it back. The Home Screen app is not affected.
+The app shows a hint about the first limit on iOS, outside the installed app.
 
 The first version of this page lives on the `prototype/logic` branch.
 

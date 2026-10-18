@@ -6,7 +6,9 @@ export type ServiceWorkerStatus = {
   /** A newer version of the app has downloaded and is waiting for a reload. */
   updateReady: boolean
   dismissOfflineReady: () => void
-  /** Switch to the newer version. Only the window where this is called reloads. */
+  /** Hide the update notice until the app next comes back to the front. */
+  dismissUpdate: () => void
+  /** Switch to the newer version in this window. */
   reload: () => void
 }
 
@@ -19,10 +21,8 @@ export type ServiceWorkerStatus = {
 export function useServiceWorker(): ServiceWorkerStatus {
   const [offlineReady, setOfflineReady] = React.useState(false)
   const [updateReady, setUpdateReady] = React.useState(false)
+  const [updateDismissed, setUpdateDismissed] = React.useState(false)
   const registration = React.useRef<ServiceWorkerRegistration | undefined>(undefined)
-  // Set when the user taps Reload in this window, so the other open windows are left alone when
-  // the new worker takes over.
-  const reloading = React.useRef(false)
 
   React.useEffect(() => {
     // The development server has no service worker file.
@@ -52,56 +52,81 @@ export function useServiceWorker(): ServiceWorkerStatus {
       check()
     }
 
-    const onControllerChange = () => {
-      if (reloading.current) location.reload()
+    // Registers, or finds the existing registration, and follows its installs.
+    const start = () => {
+      container
+        .register(`${import.meta.env.BASE_URL}sw.js`)
+        .then((reg) => {
+          if (stop) return
+          registration.current = reg
+          const onUpdateFound = () => {
+            if (reg.installing) track(reg.installing, !!reg.active)
+          }
+          // Every update is followed, so one that fails to install does not end the watching.
+          reg.addEventListener("updatefound", onUpdateFound)
+          onUpdateFound()
+          // An update that finished waiting while the app was closed.
+          if (reg.waiting) track(reg.waiting, true)
+        })
+        .catch(() => {
+          // Offline or refused; the next look tries again. The app works online without it.
+        })
     }
-    container.addEventListener("controllerchange", onControllerChange)
 
-    // A phone can keep the app open for days without a new page load, so look for a new
-    // version whenever it comes back to the front. Offline the check fails; the next one will do.
+    // A phone can keep the app open for days without a new page load, so look for a new version
+    // whenever it comes back to the front or the network returns. A first install that failed
+    // (weak signal) leaves no registration at all, so that case registers again.
+    const look = () => {
+      const reg = registration.current
+      if (!reg || (!reg.active && !reg.waiting && !reg.installing)) {
+        start()
+        return
+      }
+      reg.update().catch((error) => {
+        if (error?.name === "InvalidStateError") start()
+        // Anything else is the network being down; the next look will do.
+      })
+    }
     const onVisible = () => {
-      if (document.visibilityState === "visible") registration.current?.update().catch(() => {})
+      if (document.visibilityState !== "visible") return
+      setUpdateDismissed(false)
+      look()
     }
     document.addEventListener("visibilitychange", onVisible)
-
-    container
-      .register(`${import.meta.env.BASE_URL}sw.js`)
-      .then((reg) => {
-        if (stop) return
-        registration.current = reg
-        const onUpdateFound = () => {
-          if (reg.installing) track(reg.installing, !!reg.active)
-        }
-        // Every update is followed, so one that fails to install does not end the watching.
-        reg.addEventListener("updatefound", onUpdateFound)
-        onUpdateFound()
-        // An update that finished waiting while the app was closed.
-        if (reg.waiting) track(reg.waiting, true)
-      })
-      .catch(() => {
-        // The app still works online without a service worker.
-      })
+    window.addEventListener("online", look)
+    start()
 
     return () => {
       stop = true
-      container.removeEventListener("controllerchange", onControllerChange)
       document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("online", look)
     }
   }, [])
 
   const reload = React.useCallback(() => {
     const waiting = registration.current?.waiting
-    // With no controlling worker (a page open since before the first install) the new one is
-    // already active; with nothing waiting it is already running. A plain reload gets it.
-    if (!navigator.serviceWorker.controller || !waiting) {
+    // Nothing waiting: the new version is already the active one (a page no worker controlled),
+    // so a plain reload gets it.
+    if (!waiting) {
       location.reload()
       return
     }
-    reloading.current = true
+    // Reload once the waiting worker is active, in this window only. This holds whether or not
+    // this window is controlled: another window may be what kept the worker waiting.
+    waiting.addEventListener("statechange", () => {
+      if (waiting.state === "activated") location.reload()
+    })
     waiting.postMessage({ type: "SKIP_WAITING" })
   }, [])
 
   const dismissOfflineReady = React.useCallback(() => setOfflineReady(false), [])
+  const dismissUpdate = React.useCallback(() => setUpdateDismissed(true), [])
 
-  return { offlineReady, updateReady, dismissOfflineReady, reload }
+  return {
+    offlineReady,
+    updateReady: updateReady && !updateDismissed,
+    dismissOfflineReady,
+    dismissUpdate,
+    reload,
+  }
 }

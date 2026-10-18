@@ -1,20 +1,14 @@
-// iOS gives a home screen app its own storage, apart from Safari's, so the installed icon has
-// to be opened once with signal before it works offline. Nothing in the page can do that for
-// the user, so say it.
-const isIos = () =>
-  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) // iPadOS sends a Mac user agent
+import { isIosBrowserTab } from "@/lib/ios"
 
-const isInstalled = () =>
-  (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-  window.matchMedia("(display-mode: standalone)").matches
-
+// Nothing in the page can add itself to the Home Screen or open the new icon once with signal,
+// so say it. Safari is named because other iOS browsers, and the browsers inside other apps,
+// differ in how (or whether) they add a page to the Home Screen.
 export function InstallHint() {
-  if (!isIos() || isInstalled()) return null
+  if (!isIosBrowserTab()) return null
   return (
     <p className="px-2 text-sm text-muted-foreground" data-testid="install-hint">
-      On iPhone or iPad: tap Share, then Add to Home Screen, and open the icon once with signal to
-      use it offline.
+      On iPhone or iPad: open this page in Safari, tap Share, then Add to Home Screen, and open the
+      icon once with signal to use it offline.
     </p>
   )
 }

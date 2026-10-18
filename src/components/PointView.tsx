@@ -4,9 +4,12 @@ import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
 import { LayerForm } from "@/components/LayerForm"
 import { SoilPagePreview } from "@/components/SoilPagePreview"
+import { VegetationEntry } from "@/components/VegetationEntry"
+import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
-import { topToBottom, withPoint, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
+import { topToBottom, withPoint, withVegetation, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
+import type { Vegetation } from "@/delineation/vegetation/entry"
 
 interface Props {
   project: Project
@@ -66,6 +69,8 @@ export function PointView({ project, point, change, onBack }: Props) {
     setEditing(null)
   }
   const editedLayer = layers.find((l) => l.id === editing)
+  const changeVegetation = (fn: (vegetation: Vegetation) => Vegetation) =>
+    change(project.id, (p) => withPoint(p, point.id, (pt) => withVegetation(pt, fn)))
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -111,6 +116,9 @@ export function PointView({ project, point, change, onBack }: Props) {
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
       <SoilPagePreview project={project} point={point} form={form} />
+
+      <VegetationEntry key={point.id} project={project} point={point} onChange={changeVegetation} />
+      <VegetationPreview project={project} point={point} form={form} />
     </div>
   )
 }

@@ -94,6 +94,16 @@ export const CREDITS: Credit[] = [
     used: "The official Soil page (September 2024), unchanged, that a sampling point's profile is drawn onto for the PDF and the preview.",
     links: [{ label: "Regulatory Program", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/" }],
   },
+  {
+    name: "2022 National Wetland Plant List and USDA PLANTS checklist",
+    license: "US government data, public domain",
+    by: "U.S. Army Corps of Engineers (the list, version 3.6) and USDA NRCS (PLANTS)",
+    used: "The wetland indicator status of each plant, and the common names, USDA symbols and synonyms used to find a plant you type. Cut down to what the app needs and bundled, so the lookup works with no network.",
+    links: [
+      { label: "National Wetland Plant List", href: "https://wetland-plants.sec.usace.army.mil/" },
+      { label: "USDA PLANTS", href: "https://plants.usda.gov/" },
+    ],
+  },
 ]
 
 /** The sections of THIRD_PARTY_NOTICES.md, by heading. */

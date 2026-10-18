@@ -601,6 +601,14 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
+## Plant lists (US government data)
+
+`src/delineation/regions/ncne/plants.json` is made from the 2022 National Wetland Plant List, version
+3.6 (U.S. Army Corps of Engineers, 2023; Lichvar et al.), for the Northcentral and Northeast region and
+its neighbours, and from the USDA PLANTS Complete Checklist (USDA NRCS), for symbols, common names and
+synonyms. Both are works of the US government and in the public domain. The file is cut down to the
+species NCNE or a neighbour rates, and `scripts/make_plant_list.py` makes it from the official files.
+
 ## Everything else the app ships
 
 The other packages whose code or files are in the built app (React, the Radix UI and vaul

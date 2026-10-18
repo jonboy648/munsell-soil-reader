@@ -38,3 +38,34 @@ export const JF1_ROWS = [
   ["25-29", "10YR 4/2", "97", "7.5YR 4/6", "3"],
   ["29-34", "10YR 5/2", "75", "7.5YR 4/6", "25"],
 ] as const
+
+/**
+ * JF-1's herb stratum as typed on the paper form: the names as Jon wrote them (not scientific names), the
+ * absolute cover, and the plot size ("5"). Margin notes aside, the covers sum to 85. What each name should
+ * come to, by the 2022 NWPL for NCNE and the supplement's rules, is in `JF1_PLANTS_EXPECTED`.
+ */
+export const JF1_PLANTS_TYPED: readonly (readonly [name: string, cover: number])[] = [
+  ["Fall panicgrass", 50],
+  ["Yellow foxtail", 10],
+  ["RCG", 3],
+  ["Creeping thistle", 10],
+  ["Velvetleaf", 1],
+  ["Barnyard grass", 5],
+  ["Sow thistle", 2],
+  ["Lady's thumb", 3],
+  ["Stiff greenthread", 1],
+]
+export const JF1_REMARKS = "Bare ground - 10%"
+
+/** [what the form prints as the name, status, how far identified] for each of `JF1_PLANTS_TYPED`. */
+export const JF1_PLANTS_EXPECTED = [
+  ["Panicum dichotomiflorum", "FACW", "species"],
+  ["Setaria pumila", "FAC", "species"],
+  ["Phalaris arundinacea", "FACW", "species"],
+  ["Cirsium arvense", "FACU", "species"],
+  ["Abutilon theophrasti", "FACU", "species"],
+  ["Echinochloa crus-galli", "FAC", "species"],
+  ["Sonchus spp.", "FACU", "genus"],
+  ["Persicaria maculosa", "FAC", "species"],
+  ["Stiff greenthread", "UPL", "none"],
+] as const

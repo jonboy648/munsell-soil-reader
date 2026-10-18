@@ -8,6 +8,9 @@ import { soilPlacements } from "./soilPage"
 
 const COLUMNS = ["depth", "matrixColor", "matrixPercent", "redoxColor", "redoxPercent"] as const
 
+/** The fields of the Soil page's profile table. (The form also holds the Vegetation pages' fields.) */
+const soilFields = (form: ReturnType<typeof formFor>) => Object.entries(form.fields).filter(([id]) => id.startsWith("soil.profile."))
+
 const layer = (top: number, bottom: number, extra: Partial<Layer> = {}): Layer => ({
   id: `${top}-${bottom}`,
   top,
@@ -30,7 +33,7 @@ describe("JF-1 through the form engine", () => {
   test("every other field of the table is blank, and there is nothing to suggest, conclude or warn about", () => {
     const rows = regionOf("NCNE").soil.rowRules.length
     expect(rows).toBe(11)
-    const filled = Object.entries(form.fields).filter(([, text]) => text !== "")
+    const filled = soilFields(form).filter(([, text]) => text !== "")
     expect(filled).toHaveLength(16)
     for (let row = 0; row < rows; row++) {
       for (const column of PROFILE_COLUMNS) {
@@ -80,7 +83,7 @@ describe("layers in any order, with problems, still make a form", () => {
 
   test("a point with no layers is a blank table", () => {
     const form = formFor(project, newPoint("SP-1"))
-    expect(Object.values(form.fields).every((text) => text === "")).toBe(true)
+    expect(soilFields(form).every(([, text]) => text === "")).toBe(true)
     expect(form.warnings).toEqual([])
   })
 
@@ -112,7 +115,7 @@ describe("layers in any order, with problems, still make a form", () => {
     const layers = Array.from({ length: 13 }, (_, i) => layer(i * 2, i * 2 + 2))
     const form = formFor(project, { ...newPoint("SP-1"), layers })
     expect(form.warnings.map((w) => w.kind)).toEqual(["too-many-rows"])
-    expect(Object.keys(form.fields)).toHaveLength(11 * PROFILE_COLUMNS.length)
+    expect(soilFields(form)).toHaveLength(11 * PROFILE_COLUMNS.length)
   })
 })
 

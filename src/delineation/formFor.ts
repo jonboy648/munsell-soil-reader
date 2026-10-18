@@ -1,16 +1,19 @@
 // The form engine: the values of every printed field of a form, for one sampling point. Pure: no
 // UI, no files. The on-screen preview and the PDF both draw from what this returns.
 //
-// Only the Soil page's profile description table is filled so far. Its fields are named
-// `soil.profile.<row>.<column>`, rows from 0, and every one is in `fields`, blank when unknown.
+// The Soil page's profile description table is filled from the Layers. Its fields are named
+// `soil.profile.<row>.<column>`, rows from 0, and every one is in `fields`, blank when unknown. The
+// Vegetation pages are filled from the plants (vegetation/vegetationFields.ts): `veg.<stratum>.<row>.<column>`
+// and the stratum's `plotSize` and `total`, `veg.samplingPoint` and `veg.remarks`.
 import { regionOf } from "./regions"
 import { PROFILE_COLUMNS, type ProfileColumn } from "./regions/types"
 import { topToBottom, type LayerColor, type Project, type SamplingPoint } from "./model"
+import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
-export type FieldId = `soil.profile.${number}.${ProfileColumn}`
+export type FieldId = `soil.profile.${number}.${ProfileColumn}` | VegFieldId
 
 export interface FormWarning {
-  kind: "no-matrix" | "bad-depth" | "overlap" | "gap" | "too-many-rows"
+  kind: "no-matrix" | "bad-depth" | "overlap" | "gap" | "too-many-rows" | VegWarning["kind"]
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
   text: string
@@ -74,9 +77,10 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     })
   }
 
-  const fields = {} as Record<FieldId, string>
+  const vegetation = vegetationFields(project, point)
+  const fields = { ...vegetation.fields } as Record<FieldId, string>
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }
-  return { fields, suggestions: [], conclusions: [], warnings }
+  return { fields, suggestions: [], conclusions: [], warnings: [...warnings, ...vegetation.warnings] }
 }

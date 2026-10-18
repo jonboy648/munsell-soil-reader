@@ -2,6 +2,7 @@
 // Log on the device. Depths are inches everywhere.
 import type { SavedReading } from "@/lib/log"
 import type { RegionId } from "./regions"
+import { emptyVegetation, type Vegetation } from "./vegetation/entry"
 
 /** A color on a Layer: the Munsell notation, and how much of the Layer it covers. */
 export interface LayerColor {
@@ -28,6 +29,8 @@ export interface SamplingPoint {
   id: string
   name: string
   layers: Layer[]
+  /** The vegetation plot. Absent on a point saved before the Vegetation page existed: read it with `vegetationOf`. */
+  vegetation?: Vegetation
 }
 
 export interface Project {
@@ -53,6 +56,15 @@ export const newPoint = (name: string): SamplingPoint => ({ id: crypto.randomUUI
 export const withPoint = (project: Project, pointId: string, change: (point: SamplingPoint) => SamplingPoint): Project => ({
   ...project,
   points: project.points.map((point) => (point.id === pointId ? change(point) : point)),
+})
+
+/** The point's vegetation, empty when none is recorded. */
+export const vegetationOf = (point: SamplingPoint): Vegetation => point.vegetation ?? emptyVegetation
+
+/** The point with its vegetation changed. */
+export const withVegetation = (point: SamplingPoint, change: (vegetation: Vegetation) => Vegetation): SamplingPoint => ({
+  ...point,
+  vegetation: change(vegetationOf(point)),
 })
 
 /** The Layers from the surface down. */

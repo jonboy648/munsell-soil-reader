@@ -70,7 +70,11 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   table, suggestions, conclusions and warnings. The region package (`regions/ncne/`) is data: the
   official ENG Form 6116-8 page, as a PDF and an image, and where each field sits on it, measured
   from the PDF. The PDF is the official page with the values drawn on it (pdf-lib, on the device),
-  and the on-screen preview draws the same list of placed values.
+  and the on-screen preview draws the same list of placed values. The Vegetation pages (and the
+  Vegetation Continued page when a stratum overflows) are filled from the plants a point holds:
+  a plant is typed by common name, scientific name or abbreviation and resolved against the 2022
+  National Wetland Plant List for the region, a chunk that loads when the entry opens and works offline.
+  How, and the rules it follows: [docs/vegetation.md](docs/vegetation.md).
 - `e2e/`: the browser tests.
 - Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
   against a ColorChecker and exports the batch file the frame card reads. It is a separate

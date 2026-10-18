@@ -26,13 +26,13 @@ import type { Fit, Reference } from "./correction"
 /** Most references left out: a few dirty Chips, not a Page that is dirty all over. */
 export const MAX_LEFT_OUT = 4
 /** Most steps of the ladder left out. A ladder always keeps enough steps to draw its curves. */
-const MAX_LADDER_LEFT_OUT = 2
+export const MAX_LADDER_LEFT_OUT = 2
 const MIN_LADDER_STEPS = 5
 
 /** An off-ladder reference is dirty when its held-out error is above this CIEDE2000 ... */
-const DIRTY_FLOOR = 4
+export const DIRTY_FLOOR = 4
 /** ... and above this many times the median held-out error of the references off the ladder. */
-const DIRTY_FACTOR = 3
+export const DIRTY_FACTOR = 3
 
 /** Leaving ladder steps out must bring their row-mates' typical error down to under this share of what it was ... */
 const LADDER_GAIN = 0.5

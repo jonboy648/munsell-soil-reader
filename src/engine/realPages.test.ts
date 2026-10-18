@@ -4,15 +4,16 @@
 // in fixture pixels, placed by eye on the four Chips the app asks for.
 //
 // These tests record how the engine behaves on real Photos today, with bands wide enough for a
-// recompression and narrow enough to notice a change. Where the behaviour is a known limit (the 3x3
-// pulls other hues toward the Page's own), a test says so.
+// recompression and narrow enough to notice a change. The Page's correction is the ladder's curves
+// and a 3x3 held near diagonal (`fitPageCorrection`); with the full 3x3 after the curves, the same
+// wood came out 11.8 CIEDE2000 apart across four Pages (see the wood tests below).
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import jpeg from "jpeg-js"
 import { describe, expect, it } from "vitest"
 import { shownReading } from "@/lib/verdict"
 import { deltaE2000, linearToLab, luminance, rgb255ToLinear, type Vec3 } from "./color"
-import { linearizeThen, pchip, type Fit } from "./correction"
+import { fitCorrection, type Fit } from "./correction"
 import { PAGE_HUES, pageModel, pagePaperSites, pageSites, readPhoto } from "./index"
 import type { Corners, PageHue, Pixels, XY } from "./index"
 import { medianRgb255 } from "./sampling"
@@ -155,12 +156,12 @@ describe("the Page model against the real book", () => {
 })
 
 describe("the Card check on real Photos", () => {
-  it("is worse than the simulated camera's on every real Page, which never passes 0.8", () => {
+  it("is worse than the simulated camera's on every real Page, which never passes 1", () => {
     for (const [name, f] of Object.entries(FIXTURES)) {
       const sim = simulatePhoto({ camera: { light: LIGHTS.warm, toneCurve: PHONE_TONE_CURVE }, page: f.hue })
       const simulated = readPhoto({ pixels: sim.pixels, card: { kind: "page", hue: f.hue, taps: sim.corners }, spots: [] }).cardCheck!.meanDE
-      expect(simulated, name).toBeLessThan(0.8)
-      expect(read(f).cardCheck!.meanDE, name).toBeGreaterThan(2 * simulated)
+      expect(simulated, name).toBeLessThan(1)
+      expect(read(f).cardCheck!.meanDE, name).toBeGreaterThan(1.8 * simulated)
     }
   })
 
@@ -171,9 +172,9 @@ describe("the Card check on real Photos", () => {
       expect(result.cardCheck!.leftOut).toContain("10YR 7/1")
       expect(result.cardCheck!.suspectRow).toBeUndefined()
     })
-    it("has a Card check of about 2 (5.1 with nothing left out), too high to be good, and no row to blame", () => {
-      expect(result.cardCheck!.meanDE).toBeGreaterThan(1.8)
-      expect(result.cardCheck!.meanDE).toBeLessThan(2.5)
+    it("has a Card check of about 2.8 (5.2 with nothing left out), too high to be good, and no row to blame", () => {
+      expect(result.cardCheck!.meanDE).toBeGreaterThan(2.4)
+      expect(result.cardCheck!.meanDE).toBeLessThan(3.2)
     })
   })
 
@@ -209,7 +210,7 @@ describe("the Card check on real Photos", () => {
   })
 
   it.each([
-    ["2.5Y on wood", 1.9, 2.6, false],
+    ["2.5Y on wood", 2.4, 3.2, false],
     ["5Y on wood", 1.5, 2.1, true],
   ])("%s: a Card check of %f to %f, nothing left out, good only if it is under 2 (%s)", (name, low, high, good) => {
     const check = read(FIXTURES[name]).cardCheck!
@@ -219,13 +220,13 @@ describe("the Card check on real Photos", () => {
     expect(check.ok).toBe(good)
   })
 
-  it("10YR on fabric, in warm indoor light, fails by a wide margin and leaves nothing out", () => {
+  it("10YR on fabric, in warm indoor light, fails by a wide margin, though it finds the smudged pair", () => {
     // The grays measure far from their notation (8/1 is (180, 149, 119) for (207, 199, 188), 2/1 is
-    // (16, 14, 15) for (55, 48, 41)): the whole fit is poor, so no Chip stands out of it.
+    // (16, 14, 15) for (55, 48, 41)), so the check stays high; the smudges on 8/1 and 7/1 are plain.
     const check = read(FIXTURES["10YR on fabric"]).cardCheck!
     expect(check.ok).toBe(false)
-    expect(check.meanDE).toBeGreaterThan(4.5)
-    expect(check.leftOut).toEqual([])
+    expect(check.meanDE).toBeGreaterThan(3.5)
+    expect(check.leftOut).toEqual(["10YR 8/1", "10YR 7/1"])
   })
 })
 
@@ -248,7 +249,7 @@ describe("the paper on real Photos", () => {
 describe("the wood behind the holes, as a stand-in sample", () => {
   // The same wood, in the same light, with the same phone: all four Photos show the paper as the same
   // cool white, and the wood's raw color is within 2.4 CIEDE2000 from one Page to the next. A Reading
-  // of it corrected against each Page should agree about as well.
+  // of it corrected against each Page should agree about as well, whatever hue the Page is.
   const lab = (rgb: number[]): Vec3 => linearToLab(rgb255ToLinear(rgb as Vec3))
   const meanLab = (labs: Vec3[]): Vec3 => [0, 1, 2].map((k) => labs.reduce((s, v) => s + v[k], 0) / labs.length) as Vec3
 
@@ -265,7 +266,7 @@ describe("the wood behind the holes, as a stand-in sample", () => {
   }
   const spread = (colors: Vec3[]) => {
     const pairs = colors.flatMap((a, i) => colors.slice(i + 1).map((b, k) => ({ i, j: i + 1 + k, de: deltaE2000(a, b) })))
-    return { max: Math.max(...pairs.map((p) => p.de)), pairs }
+    return { max: Math.max(...pairs.map((p) => p.de)), mean: pairs.reduce((s, p) => s + p.de, 0) / pairs.length, pairs }
   }
 
   const current = woodThroughHoles()
@@ -274,21 +275,19 @@ describe("the wood behind the holes, as a stand-in sample", () => {
     expect(spread(current.map((w) => w.raw)).max).toBeLessThan(3)
   })
 
-  it("reads two Pages of nearby hue alike once corrected (10YR and 7.5YR, the closest to the wood), and the others a good deal less so", () => {
-    const { max, pairs } = spread(current.map((w) => w.corrected))
-    expect(pairs.find((p) => p.i === 0 && p.j === 1)!.de).toBeLessThan(4.5) // 10YR and 7.5YR: 3.4
-    // KNOWN LIMIT: against a single hue the 3x3 is fitted along one line of the color space, and it pulls
-    // everything else toward that hue. The wood, 8 to 9YR, comes out 11.8 apart across the four Pages (mean
-    // 8.3) where the raw colors are 2.4 apart (mean 1.9). Corrected, the 5Y and 2.5Y Pages put it 4 to 9 CIEDE2000 away.
-    expect(max).toBeGreaterThan(8)
-    expect(max).toBeLessThan(15)
+  it("reads the same corrected color on every Page, at the noise floor of the wood's grain", () => {
+    // 4.3 largest and 3.1 mean (the full 3x3 after the curves: 11.8 and 8.3). Within one Photo the
+    // holes differ from their own mean by a median of 2.6 to 6.9, so this is about as close as the
+    // four Photos can be.
+    const { max, mean } = spread(current.map((w) => w.corrected))
+    expect(max).toBeLessThan(4.5)
+    expect(mean).toBeLessThan(3.5)
   })
 
-  it("is read alike on every Page with the tone curves alone, with no 3x3", () => {
-    // The same Photos, corrected by the ladder's curves only: the four Pages agree to 4.2 (mean 3.2), within
-    // the spread of the wood's own grain. Their own Card checks get worse (about 1 higher), which is the cost.
-    const curvesOnly = woodThroughHoles(linearizeThen(pchip, () => (lin) => lin))
-    expect(spread(curvesOnly.map((w) => w.corrected)).max).toBeLessThan(5)
+  it("can fail: the full 3x3 after the curves, which the Page used to get, pulls the four Pages 8 to 15 apart", () => {
+    const { max } = spread(woodThroughHoles(fitCorrection).map((w) => w.corrected))
+    expect(max).toBeGreaterThan(8)
+    expect(max).toBeLessThan(15)
   })
 
   it("reads every Page's holes within a few CIEDE2000 of their own mean: the wood's grain", () => {
@@ -300,17 +299,20 @@ describe("the wood behind the holes, as a stand-in sample", () => {
     }
   })
 
-  it("reads as 10YR raw on every Page, and as the Page's own hue once corrected on the 2.5Y and 5Y Pages, so the hue suggestion stays quiet", () => {
-    // KNOWN LIMIT: the pull toward the Page's hue (above) moves the Reading's Chip onto the Page's own
-    // hue, which is the case `betterPage` is for, and is the reason it does not fire: 0 of 25 holes on each.
+  it("reads as 10YR on every Page, corrected as well as raw, and the hue suggestion says so on the others", () => {
+    // Before, the 2.5Y and 5Y Pages pulled the Reading onto their own hue (2.5Y 5/6 on 20 of 25 holes,
+    // 5Y on 16 of 25) and `betterPage` was set for none of them.
     const commonHue = (hues: string[]) =>
       Object.entries(hues.reduce<Record<string, number>>((n, h) => ({ ...n, [h]: (n[h] ?? 0) + 1 }), {})).sort((a, b) => b[1] - a[1])[0][0]
     for (const [name, f] of WOOD) {
       const readings = read(f, holes(f)).readings
       expect(commonHue(readings.map((r) => r.raw.chip.hue)), `${name} raw`).toBe("10YR")
-      if (f.hue === "2.5Y" || f.hue === "5Y") {
-        expect(commonHue(readings.map((r) => r.corrected!.chip.hue)), `${name} corrected`).toBe(f.hue)
-        expect(readings.filter((r) => r.betterPage), `${name} suggestions`).toHaveLength(0)
+      expect(commonHue(readings.map((r) => r.corrected!.chip.hue)), `${name} corrected`).toBe("10YR")
+      if (f.hue !== "10YR") {
+        // 10YR is the most common suggestion, and it is made for most of the holes.
+        const suggested = readings.flatMap((r) => (r.betterPage ? [r.betterPage] : []))
+        expect(commonHue(suggested), `${name} suggestion`).toBe("10YR")
+        expect(suggested.length, `${name} suggestions`).toBeGreaterThan(0.6 * readings.length)
       }
     }
   })

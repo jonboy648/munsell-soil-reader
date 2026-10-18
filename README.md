@@ -79,7 +79,11 @@ printed) is derived from the Chip list, so each Page has its own bottom row and 
 taps four Chips that exist on that Page (10YR: 8/1, 8/8, 5/8, 2/1; the grid's bottom right is
 usually empty) and the homography finds the rest. Each Chip is read in its solid middle, clear of
 the round holes, and corrected against the color computed from its notation, with the /1 column as
-the ladder. A Spot tapped inside a hole reads the soil behind the Page. The Gley, 10Y-5GY and WHITE
+the ladder. The correction is the ladder's curves and then a 3x3 pulled toward one gain per channel,
+not the ColorChecker's full 3x3: a Page's Chips have one hue, so they cannot say how the camera
+mixes the channels in the hue direction, and a free matrix there pulled every other color toward the
+Page's hue (the same wood behind the holes of four Pages came out 11.8 apart, against 2.4 raw; now
+4.3). The comparison is in [docs/correction-comparison.md](docs/correction-comparison.md). A Spot tapped inside a hole reads the soil behind the Page. The Gley, 10Y-5GY and WHITE
 Pages (which mix hues), and 10R (not checked against the book), are not Cards yet; their Chips are
 still matchable. If the soil's nearest Chip is on another Page, the Reading suggests retaking with
 the hue Page that holds it (a Gley 1 or 10Y-5GY Chip goes to 5Y, a 10R Chip to 2.5YR; nothing is

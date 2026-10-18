@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest"
 import { CARD_CHECK_GOOD, readPhoto } from "./index"
 import type { Corners, Pixels, XY } from "./index"
 import { findCard } from "./frame"
+import { MARKER_ORIGINS, MARKER_SIZE } from "./frameLayout"
 import {
   LIGHTS,
   PHONE_TONE_CURVE,
@@ -88,6 +89,25 @@ function turnClockwise({ width, height, data }: Pixels) {
   }
 }
 
+/**
+ * A flat framed Photo with a second copy of marker `id` pasted `dx` Photo pixels to its right,
+ * quiet zone and all: a second frame in the shot, or a spare marker.
+ */
+function withSpareMarker(sim: SimPhoto, id: number, dx: number): Pixels {
+  const { width, height, data } = sim.pixels
+  const step = (sim.corners[1].x - sim.corners[0].x) / 5 // one grid step, in Photo pixels
+  const size = MARKER_SIZE * step
+  const [x0, y0] = [sim.corners[0].x + MARKER_ORIGINS[id].col * step, sim.corners[0].y + MARKER_ORIGINS[id].row * step]
+  const margin = Math.round(size / 8)
+  const pasted = new Uint8ClampedArray(data)
+  for (let y = Math.round(y0) - margin; y < Math.round(y0 + size) + margin; y++) {
+    for (let x = Math.round(x0) - margin; x < Math.round(x0 + size) + margin; x++) {
+      for (let k = 0; k < 4; k++) pasted[(y * width + x + dx) * 4 + k] = data[(y * width + x) * 4 + k]
+    }
+  }
+  return { width, height, data: pasted }
+}
+
 describe("a flat framed Photo", () => {
   const sim = framed()
   const found = findCard(sim.pixels)
@@ -166,6 +186,12 @@ describe("a Photo without the whole frame", () => {
 
   it.each([[0], [1], [2], [3]])("gives nothing when only marker %i is there", (only) => {
     expect(findCard(framed(undefined, { frameMarkers: [only] }).pixels)).toBeNull()
+  })
+
+  it.each([[0], [1], [2], [3]])("gives nothing when marker %i is in the shot twice: which one is the frame's is a guess", (twice) => {
+    const sim = framed()
+    expect(findCard(sim.pixels)).not.toBeNull() // the frame alone is fine, so the copy is what spoils it
+    expect(findCard(withSpareMarker(sim, twice, 100))).toBeNull()
   })
 })
 

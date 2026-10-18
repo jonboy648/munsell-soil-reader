@@ -26,7 +26,8 @@ const turn = (a: XY, b: XY, c: XY) => (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * 
 /**
  * The Card's four corners, as the corner patches' centres top left, top right, bottom right,
  * bottom left (the corners `readPhoto` wants), or null when the frame is not all there: a
- * marker is missing, or the four found are not a frame (not in clockwise order, or a bend).
+ * marker is missing, one shows twice, or the four found are not a frame (not in clockwise order,
+ * or a bend).
  *
  * The markers are told apart by their ID, not their place in the Photo, so the corners come
  * back in the Card's own order however the phone was turned. Markers 0 to 3 are the frame's
@@ -42,11 +43,11 @@ export function findCard(pixels: Pixels): Corners | null {
   })
   // Marker n's corner n is the frame's own corner n (its outer top left for marker 0, and so on).
   const found: (XY | undefined)[] = [undefined, undefined, undefined, undefined]
-  const distance: number[] = [Infinity, Infinity, Infinity, Infinity]
   for (const marker of detector.detect(pixels)) {
-    if (marker.id < 0 || marker.id > 3 || marker.hammingDistance >= distance[marker.id]) continue
+    if (marker.id < 0 || marker.id > 3) continue
+    // The same ID twice (a second frame, a spare marker): which one is the frame's is a guess.
+    if (found[marker.id]) return null
     found[marker.id] = marker.corners[marker.id]
-    distance[marker.id] = marker.hammingDistance
   }
   if (found.some((corner) => corner === undefined)) return null
   const frame = found as [XY, XY, XY, XY]

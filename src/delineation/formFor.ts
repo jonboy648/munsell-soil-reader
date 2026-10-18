@@ -5,10 +5,12 @@
 // (`soil.profile.<row>.<column>`, rows from 0), a tick for each confirmed hydric soil indicator
 // (`soil.indicator.<id>`), and the answer to "Hydric Soil Present?" once the user has confirmed it
 // (`soil.hydric.yes` or `.no`). Page 1: the header (`page1.<line>`, and `page1.summaryRemarks` for the
-// note of a pair) and the Hydrology section (`page1.hydrology.*`). Every field is in `fields`, blank
-// when unknown, and every value is already text the PDF's font can print. Nothing is ticked that the
-// user has not confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left
-// unconfirmed go on the cover note.
+// note of a pair) and the Hydrology section (`page1.hydrology.*`). The Vegetation pages are filled from
+// the plants (vegetation/vegetationFields.ts): `veg.<stratum>.<row>.<column>`, the stratum's `plotSize`
+// and `total`, `veg.samplingPoint` and `veg.remarks`. Every field is in `fields`, blank when unknown,
+// and every value is already text the PDF's font can print. Nothing is ticked that the user has not
+// confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left unconfirmed go on the
+// cover note.
 import { PROJECT_FIELDS, POINT_FIELDS, subregionText, writtenDate } from "./headerFields"
 import { regionOf } from "./regions"
 import {
@@ -24,6 +26,7 @@ import { hydrologyFor } from "./hydrology"
 import { fit, printable, truncate, widthOf, wrap, written } from "./text"
 import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
 import { indicatorLabel, suggest, type Suggestions } from "./rules/suggest"
+import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
 type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
 export type FieldId =
@@ -35,6 +38,7 @@ export type FieldId =
   | `soil.hydric.${"yes" | "no"}`
   | Page1Id
   | `page1.hydrology.${string}`
+  | VegFieldId
 
 export interface FormWarning {
   kind:
@@ -48,6 +52,7 @@ export interface FormWarning {
     | "field-cut"
     | "hydrology-observation"
     | "hydrology-answer"
+    | VegWarning["kind"]
     | "color-not-a-chip"
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
@@ -268,12 +273,14 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     warnings.push({ kind: "too-many-rows", text: "A layer has more redox colors than the form has rows. The rest are left off the page." })
   }
 
+  const vegetation = vegetationFields(project, point, name.text)
   const restrictive = point.restrictive
   const restrictiveType = printable(restrictive?.type ?? "")
   if (restrictiveType.replaced) {
     warnings.push({ kind: "text-changed", text: "The restrictive layer type has characters the form cannot print; they were replaced." })
   }
   const fields = {
+    ...vegetation.fields,
     ...page1Fields(project, point, warnings),
     "soil.samplingPoint": name.text,
     "soil.restrictive.type": restrictiveType.text,
@@ -314,7 +321,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
 
   const hydrology = hydrologyFor(regionOf(project.region), point.hydrology)
   Object.assign(fields, hydrology.fields)
-  warnings.push(...hydrology.warnings)
+  warnings.push(...hydrology.warnings, ...vegetation.warnings)
   const present = point.hydrology?.present
   return {
     fields,

@@ -2,6 +2,7 @@
 // Log on the device. Depths are inches everywhere.
 import type { SavedReading } from "@/lib/log"
 import type { RegionId } from "./regions"
+import { emptyVegetation, type Vegetation } from "./vegetation/entry"
 
 /** The form's own codes for a redox feature: Concentration, Depletion, Reduced Matrix, Masked Sand grains. */
 export type RedoxType = "C" | "D" | "RM" | "MS"
@@ -102,6 +103,8 @@ export interface SamplingPoint {
   id: string
   name: string
   layers: Layer[]
+  /** The vegetation plot. Absent on a point saved before the Vegetation page existed: read it with `vegetationOf`. */
+  vegetation?: Vegetation
   /** Latitude and longitude as typed, and the datum they are in (WGS84 for a phone's GPS). */
   lat: string
   long: string
@@ -229,6 +232,15 @@ export function normalizeProject(project: Project): Project {
 export const withPoint = (project: Project, pointId: string, change: (point: SamplingPoint) => SamplingPoint): Project => ({
   ...project,
   points: project.points.map((point) => (point.id === pointId ? change(point) : point)),
+})
+
+/** The point's vegetation, empty when none is recorded. */
+export const vegetationOf = (point: SamplingPoint): Vegetation => point.vegetation ?? emptyVegetation
+
+/** The point with its vegetation changed. */
+export const withVegetation = (point: SamplingPoint, change: (vegetation: Vegetation) => Vegetation): SamplingPoint => ({
+  ...point,
+  vegetation: change(vegetationOf(point)),
 })
 
 /**

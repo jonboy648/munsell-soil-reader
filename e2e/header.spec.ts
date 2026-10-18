@@ -111,12 +111,12 @@ test("the header is filled once, two points are added, and the project's PDF rea
   await expect(page1Text(sheet).filter({ hasText: "Cedar Creek crossing" })).toHaveCount(1)
   await expect(page1Text(sheet).filter({ hasText: /^JF-2$/ })).toHaveCount(1)
 
-  // The project's PDF: for each point, page 1 and the Soil page, in the order listed, then the Privacy Act page once.
+  // The project's PDF: for each point, page 1, the Vegetation page and the Soil page, in the order listed, then the Privacy Act page once.
   await sheet.getByRole("button", { name: "Cedar Creek" }).click()
   const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download project PDF" }).click()])
   expect(download.suggestedFilename()).toBe("wetland-forms-Cedar-Creek.pdf")
   const first = await textOf(download, 1)
-  const second = await textOf(download, 3)
+  const second = await textOf(download, 4)
   expect(first).toContain("JF-1")
   expect(first).not.toContain("JF-2")
   expect(second).toContain("JF-2")
@@ -129,12 +129,14 @@ test("the header is filled once, two points are added, and the project's PDF rea
   expect(second).toContain("42.5012")
   expect(first).toContain("Wetland point, paired with the upland point JF-2.")
   expect(second).toContain("Upland point, paired with the wetland point JF-1.")
-  expect(await textOf(download, 2)).toContain("JF-1") // the Soil page names its point
-  expect(await textOf(download, 4)).toContain("JF-2")
-  const privacy = (await textOf(download, 5)).join(" ")
+  expect(await textOf(download, 2)).toContain("JF-1") // the Vegetation page names its point
+  expect(await textOf(download, 3)).toContain("JF-1") // so does the Soil page
+  expect(await textOf(download, 5)).toContain("JF-2")
+  expect(await textOf(download, 6)).toContain("JF-2")
+  const privacy = (await textOf(download, 7)).join(" ")
   expect(privacy).toContain("AGENCY DISCLOSURE NOTIFICATION")
   expect(privacy).toContain("PRIVACY ACT STATEMENT")
-  await expect(textOf(download, 6)).rejects.toThrow() // once, at the end: two points, five pages
+  await expect(textOf(download, 8)).rejects.toThrow() // once, at the end: two points, three pages each, and the Privacy Act page
 })
 
 test("the header and the pair are still there after a reload, and a point's own PDF holds only its pages", async ({ page }) => {
@@ -156,11 +158,11 @@ test("the header and the pair are still there after a reload, and a point's own 
 
   const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download form PDF" }).click()])
   expect(download.suggestedFilename()).toBe("wetland-form-Pond-SP-2.pdf")
-  const pages = await Promise.all([1, 2, 3].map((n) => textOf(download, n)))
+  const pages = await Promise.all([1, 2, 3, 4].map((n) => textOf(download, n)))
   expect(pages[0]).toContain("SP-2")
   expect(pages[0]).toContain("North pond")
   expect(pages.flat()).not.toContain("SP-1")
-  await expect(textOf(download, 4)).rejects.toThrow() // three pages, not four
+  await expect(textOf(download, 5)).rejects.toThrow() // four pages: page 1, Vegetation, Soil and Privacy Act
 })
 
 test("a line too long for its place on the form says so, and a character the form cannot print is replaced", async ({ page }) => {

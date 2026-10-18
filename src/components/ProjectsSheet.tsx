@@ -215,7 +215,7 @@ function ProjectView({ project, change, onOpen, onBack }: { project: Project; ch
       />
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Project PDF</h4>
       <p className="text-sm text-muted-foreground">
-        Every sampling point's form in one file, in the order above: page 1 and the Soil page of each, then the Privacy Act page once, at the end.
+        Every sampling point's form in one file, in the order above: page 1, the Vegetation page and the Soil page of each, then the Privacy Act page once, at the end.
       </p>
       <FormExport
         project={project}

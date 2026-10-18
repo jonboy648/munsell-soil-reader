@@ -104,7 +104,7 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
 test("lists every credit with its license", async ({ page }) => {
   await openMethodPage(page)
   const credits = page.getByTestId("credit")
-  await expect(credits).toHaveCount(10)
+  await expect(credits).toHaveCount(11)
   const expected: [string, string][] = [
     ["Munsell Soil Reader", "MIT"],
     ["munsell.js", "MPL-2.0"],
@@ -115,6 +115,7 @@ test("lists every credit with its license", async ({ page }) => {
     ["ReUI components, from 21st.dev", "MIT"],
     ["js-aruco2", "MIT"],
     ["ENG Form 6116-8", "public domain"],
+    ["2022 National Wetland Plant List", "public domain"],
     ["Regional Supplement", "public domain"],
   ]
   for (const [name, license] of expected) {
@@ -187,6 +188,15 @@ test("opens the full license text of each credit that has one", async ({ page })
   const chips = page.getByTestId("credit").filter({ hasText: "Soil-book Chip list" })
   await expect(chips.getByTestId("license-text")).toHaveCount(0)
   await expect(chips.getByRole("link", { name: "CC0 1.0 legal code" })).toBeVisible()
+})
+
+test("says how a plant's status is found, and that the order of the neighbouring regions is an assumption", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("2022 National Wetland Plant List")
+  await expect(notes).toContainText("The 2022 list has no NI or NO ratings.")
+  await expect(notes).toContainText("Midwest, then the Eastern Mountains and Piedmont, then the Atlantic and Gulf Coastal Plain, then the Great Plains")
+  await expect(notes).toContainText("the order is an assumption")
 })
 
 test("says the 20-soil test has not been run, and marks what is not in this version", async ({ page }) => {

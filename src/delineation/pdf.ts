@@ -8,6 +8,7 @@ import { regionOf } from "./regions"
 import { indicatorLabel } from "./rules/suggest"
 import { soilPlacements, type Placement } from "./soilPage"
 import { printable, wrap } from "./text"
+import { vegetationPlacements } from "./vegetation/vegetationPage"
 
 /** The cover note's page: letter size, with a margin. */
 const NOTE = { width: 612, height: 792, margin: 54, size: 10, line: 13 }
@@ -93,14 +94,18 @@ export const page1Pdf = (blank: ArrayBuffer | Uint8Array, project: Project, poin
 /** The official one-page PDFs of the pages a form is made of. */
 export interface Blanks {
   page1: ArrayBuffer | Uint8Array
+  vegetation: ArrayBuffer | Uint8Array
   soil: ArrayBuffer | Uint8Array
+  /** The Vegetation Continued page: used for a point only when a stratum has more plants than the Vegetation page holds. */
+  continued: ArrayBuffer | Uint8Array
   privacy: ArrayBuffer | Uint8Array
 }
 
 /**
- * The forms of these Sampling points as one PDF, in the order given: for each point, page 1 and the Soil
- * page (and the cover note after it, when something is not ticked there), then the Privacy Act page once,
- * at the end. Each official page is embedded once and shown for every point, so the file does not grow
+ * The forms of these Sampling points as one PDF, in the order given: for each point, page 1, the Vegetation
+ * page and the Soil page (and the cover note after it, when something is not ticked there), then the
+ * Vegetation Continued page when a stratum has more plants than the Vegetation page holds, then the Privacy
+ * Act page once, at the end. That is the official form's own order, with the cover note beside the Soil page. Each official page is embedded once and shown for every point, so the file does not grow
  * by a whole copy of the form for each.
  */
 export async function formsPdf(blanks: Blanks, project: Project, points: readonly SamplingPoint[]): Promise<Uint8Array> {
@@ -108,7 +113,9 @@ export async function formsPdf(blanks: Blanks, project: Project, points: readonl
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const [page1] = await doc.embedPdf(blanks.page1)
+  const [vegetation] = await doc.embedPdf(blanks.vegetation)
   const [soil] = await doc.embedPdf(blanks.soil)
+  const [continued] = await doc.embedPdf(blanks.continued)
   const [privacy] = await doc.embedPdf(blanks.privacy)
   const { size } = regionOf(project.region).page1
 
@@ -119,9 +126,12 @@ export async function formsPdf(blanks: Blanks, project: Project, points: readonl
   }
   for (const point of points) {
     const form = formFor(project, point)
+    const veg = vegetationPlacements(project, form)
     addPage(page1, page1Placements(project, form))
+    addPage(vegetation, veg.vegetation)
     addPage(soil, soilPlacements(project, form))
     if (form.hydric.cover.unconfirmed.length > 0 || form.hydric.cover.ticked.length > 0) await addCoverNote(doc, project, point, form)
+    if (veg.continued) addPage(continued, veg.continued)
   }
   addPage(privacy, [])
   doc.setTitle(`Wetland Determination Data Form: ${project.name}${points.length === 1 ? `, ${points[0].name}` : ""}`)

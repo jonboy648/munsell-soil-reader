@@ -626,6 +626,14 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## Plant lists (US government data)
+
+`src/delineation/regions/ncne/plants.json` is made from the 2022 National Wetland Plant List, version
+3.6 (U.S. Army Corps of Engineers, 2023; Lichvar et al.), for the Northcentral and Northeast region and
+its neighbours, and from the USDA PLANTS Complete Checklist (USDA NRCS), for symbols, common names and
+synonyms. Both are works of the US government and in the public domain. The file is cut down to the
+species NCNE or a neighbour rates, and `scripts/make_plant_list.py` makes it from the official files.
+
 ## Everything else the app ships
 
 The other packages whose code or files are in the built app (React, the Radix UI and vaul

@@ -71,13 +71,17 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   the pure form engine: every printed field of page 1's header and Hydrology section and the Soil page's
   profile table, suggestions, conclusions and warnings. The region package (`regions/ncne/`) is data:
   the official ENG Form 6116-8 pages, as PDFs and images, and where each field sits on them, measured
-  from the PDF. A point's PDF is its page 1, Soil page and Privacy Act page, each the official page
-  with the values drawn on it (pdf-lib, on the device); the project PDF is those for every point in
+  from the PDF. A point's PDF is its page 1, Vegetation page, Soil page (and the Vegetation Continued page when a
+  stratum overflows) and Privacy Act page, each the official page with the values drawn on it (pdf-lib, on the device); the project PDF is those for every point in
   order, with each official page embedded once. The on-screen previews draw the same lists of placed
   values. Text is made printable and fitted to its line in `text.ts`, with a warning when it is cut.
   Page 1's Hydrology section (the 29 indicators with the supplement's definitions and pages,
   `regions/ncne/hydrology-rules.md`, the one-primary-or-two-secondary rule, depths and notes) is drawn
   on the same page the same way.
+  The Vegetation pages are filled from the plants a point holds: a plant is typed by common name,
+  scientific name or abbreviation and resolved against the 2022 National Wetland Plant List for the region,
+  a chunk that loads when the entry opens and works offline. How, and the rules it follows:
+  [docs/vegetation.md](docs/vegetation.md).
   A layer also takes a texture from the NRCS Field Book's classes (`texture.ts`: the 21 classes, the
   mucky modifier, muck, mucky peat and peat), the form's redox type and location codes, and colors typed
   by hand, which are checked against the Chip list (`colorCheck.ts`).

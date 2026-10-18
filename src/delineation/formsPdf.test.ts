@@ -1,11 +1,12 @@
 // The forms as one PDF: every Sampling point's pages in order, drawn on the official pages, read back.
-// A point's form is page 1 and the Soil page (and the cover note after it, when something is not ticked
-// there); the Privacy Act page is printed once, at the end of the whole PDF.
+// A point's form is page 1, the Vegetation page and the Soil page (and the cover note after it, when
+// something is not ticked there, and the Vegetation Continued page when a stratum overflows); the Privacy
+// Act page is printed once, at the end of the whole PDF.
 import { readFileSync } from "node:fs"
 import { describe, expect, test } from "vitest"
 import { formFor } from "./formFor"
 import { JF1_POINT, JF1_PROJECT } from "./fixtures/jf1"
-import { newPoint, type Project, type SamplingPoint } from "./model"
+import { newPoint, withVegetation, type Project, type SamplingPoint } from "./model"
 import { page1Placements } from "./page1"
 import { formsPdf, type Blanks } from "./pdf"
 import { regionOf } from "./regions"
@@ -13,7 +14,13 @@ import { pdfRules } from "./testing/pdfRules"
 import { pdfText } from "./testing/pdfText"
 
 const read = (name: string) => readFileSync(new URL(`./regions/ncne/${name}`, import.meta.url))
-const blanks: Blanks = { page1: read("page1.pdf"), soil: read("soil-page.pdf"), privacy: read("privacy-page.pdf") }
+const blanks: Blanks = {
+  page1: read("page1.pdf"),
+  vegetation: read("vegetation-page.pdf"),
+  soil: read("soil-page.pdf"),
+  continued: read("vegetation-continued-page.pdf"),
+  privacy: read("privacy-page.pdf"),
+}
 
 const second: SamplingPoint = { ...newPoint("JF-2"), id: "jf-2" }
 const project: Project = {
@@ -49,35 +56,64 @@ describe("the official page 1 and the measured header", () => {
 })
 
 describe("a project's PDF", () => {
-  test("has every point's page 1 and Soil page in order, and the Privacy Act page once, at the end", async () => {
+  test("has every point's page 1, Vegetation page and Soil page in order, and the Privacy Act page once, at the end", async () => {
     const bytes = await formsPdf(blanks, project, project.points)
     const pages = await allPages(bytes)
-    // JF-1's page 1 and Soil page, JF-2's page 1 and Soil page, the cover notes there are, and the Privacy Act page.
-    expect(pages).toHaveLength(4 + covers(project, project.points) + 1)
+    // For JF-1 and JF-2: page 1, the Vegetation page and the Soil page; the cover notes there are; the Privacy Act page.
+    expect(pages).toHaveLength(6 + covers(project, project.points) + 1)
 
     expect(pages[0]).toContain("Cedar Creek crossing")
     expect(pages[0]).toContain("JF-1")
     expect(pages[0]).not.toContain("JF-2")
-    expect(pages[1]).toContain("0-20") // the Soil page, with JF-1's layers
-    expect(pages[2].join(" ")).toContain("Cover note: hydric soil indicators") // JF-1 has a suggestion not ticked
-    const secondPage1 = pages.findIndex((texts, i) => i > 1 && texts.includes("JF-2") && texts.includes("Cedar Creek crossing"))
-    expect(secondPage1).toBeGreaterThan(1) // the header is copied to every point
+    expect(pages[1].join(" ")).toContain("VEGETATION") // the Vegetation page, with the point's name
+    expect(pages[1]).toContain("JF-1")
+    expect(pages[2]).toContain("0-20") // the Soil page, with JF-1's layers
+    expect(pages[3].join(" ")).toContain("Cover note: hydric soil indicators") // JF-1 has a suggestion not ticked
+    const secondPage1 = pages.findIndex((texts, i) => i > 2 && texts.includes("JF-2") && texts.includes("Cedar Creek crossing"))
+    expect(secondPage1).toBeGreaterThan(2) // the header is copied to every point
     expect(pages[secondPage1]).not.toContain("JF-1")
-    expect(pages[secondPage1 + 1]).not.toContain("0-20") // JF-2 has no layers
+    expect(pages[secondPage1 + 1]).toContain("JF-2") // JF-2's Vegetation page
+    expect(pages[secondPage1 + 2]).not.toContain("0-20") // JF-2 has no layers
 
     const privacy = pages.flatMap((texts, i) => (texts.join(" ").includes("PRIVACY ACT STATEMENT") ? [i] : []))
     expect(privacy).toEqual([pages.length - 1])
     expect(pages.filter((texts) => texts.join(" ").includes("AGENCY DISCLOSURE NOTIFICATION"))).toHaveLength(1)
   })
 
-  test("one point's PDF is its page 1 and Soil page, then the Privacy Act page", async () => {
+  test("one point's PDF is its page 1, Vegetation page and Soil page, then the Privacy Act page", async () => {
     const bytes = await formsPdf(blanks, project, [project.points[1]])
     const pages = await allPages(bytes)
-    expect(pages).toHaveLength(2 + covers(project, [project.points[1]]) + 1)
+    expect(pages).toHaveLength(3 + covers(project, [project.points[1]]) + 1)
     expect(pages[0]).toContain("JF-2")
     expect(pages[0]).toContain("Cedar Creek crossing")
     expect(pages.at(-1)!.join(" ")).toContain("PRIVACY ACT STATEMENT")
     expect(pages.flat()).not.toContain("JF-1")
+  })
+
+  test("a point's plants are on its Vegetation page, and an overflowing stratum adds the Continued page after the Soil page", async () => {
+    const herbs = Array.from({ length: 14 }, (_, i) => ({
+      id: `h${i}`,
+      stratum: "herb" as const,
+      typed: `Carex ${i}`,
+      name: `Carex plant${i}`,
+      status: "FAC" as const,
+      listed: "FAC",
+      note: "",
+      identified: "species" as const,
+      symbol: "",
+      cover: i + 1,
+    }))
+    const planted: Project = { ...project, points: [withVegetation(project.points[1], (v) => ({ ...v, plants: herbs }))] }
+    const pages = await allPages(await formsPdf(blanks, planted, planted.points))
+    // Page 1, the Vegetation page, the Soil page, the Continued page, the Privacy Act page (JF-2 has no layers, so no cover note).
+    expect(pages).toHaveLength(5)
+    expect(pages[1]).toContain("Carex plant0")
+    expect(pages[1]).toContain("Carex plant11") // the 12th, the last row of the Vegetation page
+    expect(pages[1]).not.toContain("Carex plant12")
+    expect(pages[3]).toContain("Carex plant12") // the Continued page, its first rows
+    expect(pages[3]).toContain("Carex plant13")
+    expect(pages[3].join(" ")).toContain("Continued")
+    expect(pages[4].join(" ")).toContain("PRIVACY ACT STATEMENT")
   })
 
   test("draws each header value at the place it was given, on the official page", async () => {
@@ -107,7 +143,7 @@ describe("a project's PDF", () => {
     const ten = Array.from({ length: 10 }, (_, i) => ({ ...second, id: `p${i}`, name: `P-${i}` }))
     const one = await formsPdf(blanks, project, [project.points[0]])
     const many = await formsPdf(blanks, project, ten)
-    expect(await pageCount(many)).toBe(20 + covers(project, ten) + 1)
+    expect(await pageCount(many)).toBe(30 + covers(project, ten) + 1)
     expect(many.length).toBeLessThan(one.length * 2)
   })
 

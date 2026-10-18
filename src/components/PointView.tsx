@@ -10,9 +10,12 @@ import { LayerForm } from "@/components/LayerForm"
 import { PagePreview } from "@/components/PagePreview"
 import { PointDetails, type PointDetailsChange } from "@/components/PointDetails"
 import { RestrictiveForm } from "@/components/RestrictiveForm"
+import { VegetationEntry } from "@/components/VegetationEntry"
+import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
-import { pairOf, topToBottom, withPoint, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
+import { pairOf, topToBottom, withPoint, withVegetation, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
+import type { Vegetation } from "@/delineation/vegetation/entry"
 
 interface Props {
   project: Project
@@ -107,6 +110,8 @@ export function PointView({ project, point, change, onBack }: Props) {
     setEditing(null)
   }
   const editedLayer = layers.find((l) => l.id === editing)
+  const changeVegetation = (fn: (vegetation: Vegetation) => Vegetation) =>
+    change(project.id, (p) => withPoint(p, point.id, (pt) => withVegetation(pt, fn)))
 
   const onChoose = (id: string, choice: IndicatorChoice | null) =>
     change(project.id, (p) =>
@@ -183,8 +188,11 @@ export function PointView({ project, point, change, onBack }: Props) {
       <HydrologyForm key={`hydrology-${point.id}`} project={project} point={point} change={change} />
       <PagePreview page="page1" project={project} point={point} form={form} />
 
+      <VegetationEntry key={`vegetation-${point.id}`} project={project} point={point} onChange={changeVegetation} />
+      <VegetationPreview project={project} point={point} form={form} />
+
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">This sampling point's form</h4>
-      <p className="text-sm text-muted-foreground">Page 1, the Soil page and the Privacy Act page in one file.</p>
+      <p className="text-sm text-muted-foreground">Page 1, the Vegetation page, the Soil page and the Privacy Act page in one file.</p>
       <FormExport
         project={project}
         points={[point]}

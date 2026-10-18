@@ -134,8 +134,94 @@ export const linearizeThen =
     return (lin) => matrix(linearize(lin))
   }
 
-/** The fit the engine uses for the ColorChecker. */
-export const fitCorrection: Fit = linearizeThen(pchip)
+// ---- one tone curve for all three channels (the ColorChecker) ----
+// One curve for all three channels. A camera applies one tone curve to the image, and its
+// white balance only scales each channel before that, so in log space the three channels'
+// curves are one shape, one vertical shift apart. Fitting that shape to all the grays' three
+// channels at once is 3 times the data per parameter, which has two effects. A gray that is off
+// in a way no tone curve explains (a tint, a smudge, a hazy black) cannot bend the curve by
+// itself, so it stands out instead of being drawn through. And on a real sensor, whose channels
+// disagree a little, the shape averages the disagreement out.
+
+/** Degree of the polynomial that is the curve's shape (log of the true value against log of the measured). */
+const SHAPE_DEGREE = 3
+/** The fewest ladder steps a curve is drawn through: 12 numbers for the 6 it has. */
+const MIN_LADDER = 4
+/** The smallest value the log is taken of: a channel that reads black. */
+const FLOOR = 1e-4
+const ln = (v: number) => Math.log(Math.max(v, FLOOR))
+/** Robust-fit passes, and the Huber limit in units of the (scaled) median residual. */
+const PASSES = 8
+const HUBER = 1.345
+
+/**
+ * Fit the curve to the ladder: the three channels' offsets and the shape's coefficients, by
+ * least squares that gives less weight to a gray far from the curve (Huber), so one dirty gray
+ * pulls it less. Returns the identity if the ladder is too short to draw a curve.
+ */
+function fitToneCurve(references: Reference[]): Correction {
+  const ladder = references.filter((r) => r.ladder)
+  if (ladder.length < MIN_LADDER) return (lin) => lin
+  const rows: number[][] = []
+  const targets: Vec3[] = []
+  for (const r of ladder) {
+    for (let c = 0; c < 3; c++) {
+      const u = ln(r.measured[c])
+      rows.push([
+        c === 0 ? 1 : 0,
+        c === 1 ? 1 : 0,
+        c === 2 ? 1 : 0,
+        ...Array.from({ length: SHAPE_DEGREE }, (_, k) => u ** (k + 1)),
+      ])
+      targets.push([ln(r.truth[c]), 0, 0])
+    }
+  }
+  let weights = rows.map(() => 1)
+  let coef: number[] = []
+  for (let pass = 0; pass < PASSES; pass++) {
+    const root = weights.map(Math.sqrt)
+    coef = leastSquares(
+      rows.map((row, i) => row.map((v) => v * root[i])),
+      targets.map((t, i) => [t[0] * root[i], 0, 0] as Vec3),
+    ).map((row) => row[0])
+    const resid = rows.map((row, i) => Math.abs(targets[i][0] - row.reduce((s, v, k) => s + v * coef[k], 0)))
+    const scale = Math.max(1e-3, 1.4826 * [...resid].sort((a, b) => a - b)[Math.floor(resid.length / 2)])
+    weights = resid.map((r) => (r <= HUBER * scale ? 1 : (HUBER * scale) / r))
+  }
+  const shape = (u: number) => coef.slice(3).reduce((s, b, k) => s + b * u ** (k + 1), 0)
+  // Past the darkest and lightest gray the curve goes straight on, at the slope it ends with.
+  const us = ladder.flatMap((r) => [0, 1, 2].map((c) => ln(r.measured[c])))
+  const lo = Math.min(...us)
+  const hi = Math.max(...us)
+  const h = 1e-6
+  const bent = (u: number) => {
+    if (u < lo) return shape(lo) + ((shape(lo + h) - shape(lo)) / h) * (u - lo)
+    if (u > hi) return shape(hi) + ((shape(hi) - shape(hi - h)) / h) * (u - hi)
+    return shape(u)
+  }
+  return (lin) => [0, 1, 2].map((c) => Math.exp(coef[c] + bent(ln(lin[c])))) as Vec3
+}
+
+/**
+ * Undo the tone curve along the ladder, then fit `then` (a 3x3 matrix unless told otherwise) on
+ * the corrected references. The curve is fitted inside this fit, so the Card check refits it
+ * without the reference it holds out.
+ */
+export const linearizeShared =
+  (then: Fit = fitMatrix): Fit =>
+  (references) => {
+    const linearize = fitToneCurve(references)
+    const matrix = then(references.map((r) => ({ ...r, measured: linearize(r.measured) })))
+    return (lin) => matrix(linearize(lin))
+  }
+
+/**
+ * The fit the engine uses for the ColorChecker: one tone curve shared by the three channels, drawn
+ * through its six truly neutral grays, then a 3x3. Simulation favours it over a curve per channel
+ * (one dirty gray cannot bend it alone, and a real sensor's channels agree on it). No real
+ * ColorChecker Photo has been run yet (#15).
+ */
+export const fitCorrection: Fit = linearizeShared()
 
 /**
  * A 3x3 matrix fitted by least squares with a ridge on its off-diagonal terms, which pulls it
@@ -169,8 +255,18 @@ export const fitRidgeMatrix =
 export const PAGE_MATRIX_RIDGE = 1
 
 /**
- * The fit the engine uses for a Page: the ladder's curves, then a 3x3 pulled toward one gain per
- * channel. With the full 3x3 after the curves, a Page pulled every color it was not made of toward
+ * A PCHIP curve per channel through the ladder, exactly through every gray, then a plain 3x3. The
+ * Page builds on it. Measurement mode uses it as is: it reads swatches to a CIEDE2000 of about 1,
+ * and on a clean simulated camera the exact curve is up to 1 closer on the lightest and darkest
+ * swatches than the shared one.
+ */
+export const fitChannelCurves: Fit = linearizeThen(pchip)
+
+/**
+ * The fit the engine uses for a Page: a PCHIP curve per channel through the ladder, then a 3x3 pulled
+ * toward one gain per channel. A Page's ladder is the /1 column, slightly tinted, so its channels do
+ * not share one curve (on Jon's real Pages a shared curve fits the ladder worse and misses the
+ * smudged steps). With the full 3x3 after the curves, a Page pulled every color it was not made of toward
  * its own hue (the same wood behind the holes of four Pages came out 11.8 CIEDE2000 apart, 2.4 raw).
  * A Page's Chips cannot say how the camera mixes the channels, so the matrix is held near diagonal.
  */

@@ -13,7 +13,7 @@ import jpeg from "jpeg-js"
 import { describe, expect, it } from "vitest"
 import { shownReading } from "@/lib/verdict"
 import { deltaE2000, linearToLab, luminance, rgb255ToLinear, type Vec3 } from "./color"
-import { fitCorrection, type Fit } from "./correction"
+import { PAGE_MATRIX_RIDGE, fitRidgeMatrix, linearizeShared, linearizeThen, pchip, type Fit } from "./correction"
 import { CARD_CHECK_CAUTION, PAGE_HUES, pageModel, pagePaperSites, pageSites, readPhoto } from "./index"
 import type { Corners, PageHue, Pixels, XY } from "./index"
 import { medianRgb255 } from "./sampling"
@@ -241,6 +241,21 @@ describe("the Card check on real Photos", () => {
     }
   })
 
+  it("keeps a curve per channel for a Page: one curve shared by the channels cannot find the smudged steps", () => {
+    // The ColorChecker shares one tone curve between the channels, because its six grays are neutral. A
+    // Page's ladder, the /1 column, is slightly tinted, and on Jon's real Pages the channels do not share
+    // a curve. With the shared curve the 10YR Page keeps its smudged 8/1 and 7/1, and fails; with a curve
+    // per channel it finds them and gives caution (see docs/correction-comparison.md).
+    const f = FIXTURES["10YR on wood"]
+    const shared = read(f, [], linearizeShared(fitRidgeMatrix(PAGE_MATRIX_RIDGE))).cardCheck!
+    expect(shared.leftOut).toEqual([])
+    expect(shared.verdict).toBe("failed")
+    expect(shared.meanDE).toBeGreaterThan(4)
+    const shipped = read(f).cardCheck!
+    expect(shipped.leftOut).toContain("10YR 8/1")
+    expect(shipped.verdict).toBe("caution")
+  })
+
   it("10YR on fabric, in warm indoor light, fails by a wide margin, though it finds the smudged pair", () => {
     // The grays measure far from their notation (8/1 is (180, 149, 119) for (207, 199, 188), 2/1 is
     // (16, 14, 15) for (55, 48, 41)), so the check stays high; the smudges on 8/1 and 7/1 are plain.
@@ -307,7 +322,7 @@ describe("the wood behind the holes, as a stand-in sample", () => {
   })
 
   it("can fail: the full 3x3 after the curves, which the Page used to get, pulls the four Pages 8 to 15 apart", () => {
-    const { max } = spread(woodThroughHoles(fitCorrection).map((w) => w.corrected))
+    const { max } = spread(woodThroughHoles(linearizeThen(pchip)).map((w) => w.corrected))
     expect(max).toBeGreaterThan(8)
     expect(max).toBeLessThan(15)
   })

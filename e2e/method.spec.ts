@@ -40,9 +40,10 @@ test("explains the steps, the Card check line and each warning with its number",
   await expect(warnings).toContainText("more than 0.3 stops")
 
   const correction = page.locator("#correction")
-  await expect(correction).toContainText("Five corrections were compared")
-  await expect(correction.getByRole("row")).toHaveCount(6) // the header and five corrections
-  await expect(correction).toContainText("Straighten the tone curve with a smooth curve, then 3x3 (used)")
+  await expect(correction).toContainText("Six corrections were compared")
+  await expect(correction.getByRole("row")).toHaveCount(7) // the header and six corrections
+  await expect(correction).toContainText("a smooth curve per channel, then 3x3 (used for a Page)")
+  await expect(correction).toContainText("one curve shared by the channels, then 3x3 (used for a ColorChecker)")
   await expect(correction).toContainText("Root-polynomial")
 })
 

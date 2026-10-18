@@ -8,10 +8,10 @@ import type { CardCheck, CardVerdict } from "./types"
 /**
  * The mean held-out CIEDE2000 below which the Card check is good. Provisional.
  *
- * A clean Card from an ideal simulated camera scores 0.5 to 0.8 (2.1 under a 20% light
- * gradient); one from a real sensor's spectral response 2.0 to 3.1 (daylight 2.0 to 2.1,
- * fluorescent 2.4 to 2.7, tungsten 2.8 to 3.1). Below 2 no real-sensor Reading was more than a
- * Chip off. Jon's four real Pages score 1.6 to 2.3.
+ * A clean ColorChecker from an ideal simulated camera scores 0.4 to 1.8 (2.2 under a 20% light
+ * gradient); from a real sensor's spectral response 1.6 to 2.9 (daylight 1.6, fluorescent 2.1,
+ * tungsten 2.7 to 2.9). Below 2 no simulated real-sensor Reading was more than a Chip off. Jon's
+ * real Pages score 1.8 to 3.0 after leave-out.
  */
 export const CARD_CHECK_GOOD = 2
 
@@ -19,9 +19,11 @@ export const CARD_CHECK_GOOD = 2
  * The mean above which the Card check has failed. From GOOD up to this is caution: the corrected
  * Reading is still the answer, with the raw one beside it. Provisional.
  *
- * Clean Cards reach 3.48 (a real sensor under a 20% light gradient). A Card that spoils the
- * Reading by more than a Chip (a dirty patch, a shadow, glare, corners out of order) scores 3.56
- * or more. The gap is narrow, because the simulations are one camera; real Photos will say.
+ * Clean ColorCheckers reach 3.36 (a real sensor under a 20% light gradient). One that spoils the
+ * Reading by more than a Chip (a dirty patch, a shadow, glare, corners out of order) scores 3.32 at
+ * the lowest (a light shadow over a dark soil), then 3.66. The ranges touch: 3.5 keeps every clean
+ * Photo out of failed, and puts that one shadow in caution. Jon's real Pages score up to 3.0; the
+ * Photo of one on fabric in warm indoor light, with uneven light, scores 4.0 and fails.
  */
 export const CARD_CHECK_CAUTION = 3.5
 

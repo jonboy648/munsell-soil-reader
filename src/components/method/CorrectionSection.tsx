@@ -11,25 +11,34 @@ export function CorrectionSection() {
     <Section id="correction" title="Which correction, and why">
       <p>
         The app straightens the camera's tone curve along the Card's gray patches, then fits a 3x3
-        color matrix. (A Page of your book uses the same curves and a matrix held near one gain per
-        channel, for a reason given under the Card.) Five corrections were compared on 160 simulated Photos (8 soils, 5 lights, 4
-        strengths of phone tone curve), each scored on how close it brought the soil to its true
-        color. The soil is never part of the fit, so it is an honest test of the correction.
+        color matrix. A ColorChecker's six grays are neutral, so it draws one tone curve and shares it
+        between the three channels. A Page of your book has a ladder that is slightly tinted, and on
+        real Pages the channels do not share a curve, so a Page draws a curve for each channel and
+        uses a matrix held near one gain per channel (a reason given under the Card). Six corrections
+        were compared on 160 simulated Photos (8 soils, 5 lights, 4 strengths of phone tone curve),
+        each scored on how close it brought the soil to its true color. The soil is never part of the
+        fit, so it is an honest test of the correction.
       </p>
       <Table
         head={["Correction", "Soil off by (CIEDE2000, average)", "Within one Chip"]}
         rows={[
           ["3x3 matrix alone", "3.00", "125 of 160"],
           ["Root-polynomial", "3.26", "124 of 160"],
-          ["Straighten the tone curve with straight lines, then 3x3", "0.65", "159 of 160"],
-          ["Straighten the tone curve with a smooth curve, then 3x3 (used)", "0.55", "159 of 160"],
+          ["Straighten the tone curve with straight lines, one per channel, then 3x3", "0.65", "159 of 160"],
+          ["Straighten the tone curve with a smooth curve per channel, then 3x3 (used for a Page)", "0.55", "159 of 160"],
+          ["Straighten the tone curve with one curve shared by the channels, then 3x3 (used for a ColorChecker)", "0.63", "160 of 160"],
           ["Straighten the tone curve, then root-polynomial", "0.63", "158 of 160"],
         ]}
       />
       <p>
         Phones brighten shadows and squeeze highlights. A matrix alone cannot undo that, so its error
         grows with the strength of the curve. Straightening the curve first keeps the error near 0.6
-        however strong the curve is. Root-polynomial correction, a published method that adds
+        however strong the curve is. A shared curve gives up 0.08 against a curve per channel on a
+        simulated camera, and wins on a simulated real sensor, whose channels disagree a little (Readings
+        are off by 2.3 instead of 3.1 on average, and 7 of 132 are more than a Chip off instead of
+        25). On Jon's real Pages the order flips: the shared curve fits their gray
+        ladders worse and cannot find the smudged steps, so a Page keeps a curve per channel.
+        No real ColorChecker Photo has been tried yet. Root-polynomial correction, a published method that adds
         nonlinear terms to the matrix, was no better than the plain matrix, and no better after the
         curve was straightened, so the app does not use it.
       </p>
@@ -102,8 +111,8 @@ export function CorrectionSection() {
           film of soil on it, or a black patch gone gray, bends the curve of every channel while the
           average over 24 patches hardly moves. The app now judges the gray steps against the
           patches beside them and leaves a dirty one out, which it names. In 624 simulated Photos
-          with one dirty gray step it did so in 174, and 46 Readings were still more than a Chip off,
-          14 of them with the check good and 32 in caution.
+          of a ColorChecker with one dirty gray step it did so in 48, and 15 Readings were still
+          more than a Chip off, 2 of them with the check good and 13 in caution.
         </li>
         <li>
           <b>A failure is not proof the Reading is wrong.</b> A Card can fail and still give a good

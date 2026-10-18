@@ -44,6 +44,15 @@ export interface Restrictive {
   depth: number | null
 }
 
+/** What the user decided about one indicator of the form. */
+export interface IndicatorChoice {
+  state: "confirmed" | "rejected"
+  /** The user's own words. A tick the app did not suggest carries the reason. */
+  remark?: string
+  /** True when the user ticked an indicator the app did not suggest. */
+  manual?: boolean
+}
+
 /** One of the three Field Observations: whether it was seen, and how deep (inches) when it was. */
 export interface Observation {
   /** Yes, No, or null while it has not been answered. */
@@ -84,10 +93,20 @@ export interface SamplingPoint {
   id: string
   name: string
   layers: Layer[]
+  /** The user's decisions, by the indicator's id on the form. An indicator not in here is undecided. */
+  indicators?: Record<string, IndicatorChoice>
+  /** The user's answer to "Hydric Soil Present?". Unset until they confirm it. */
+  hydricSoilPresent?: "yes" | "no"
   /** Absent until something is recorded for the Hydrology section. */
   hydrology?: Hydrology
   /** The restrictive layer, if one was observed. */
   restrictive?: Restrictive
+}
+
+/** The Land Resource Region (and MLRA, when it matters) a project lies in. Decides which indicators apply. */
+export interface Subregion {
+  lrr: string
+  mlra?: string
 }
 
 export interface Project {
@@ -97,6 +116,8 @@ export interface Project {
   /** Milliseconds since 1970. */
   createdAt: number
   points: SamplingPoint[]
+  /** Picked once for the project. Until it is, an indicator that is limited to some subregions is not suggested. */
+  subregion?: Subregion
 }
 
 export const newProject = (name: string, region: RegionId): Project => ({

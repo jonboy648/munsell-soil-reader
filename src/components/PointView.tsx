@@ -3,12 +3,13 @@ import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
 import { HydrologyForm } from "@/components/HydrologyForm"
+import { IndicatorsPanel } from "@/components/IndicatorsPanel"
 import { LayerForm } from "@/components/LayerForm"
 import { PagePreview } from "@/components/PagePreview"
 import { RestrictiveForm } from "@/components/RestrictiveForm"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
-import { topToBottom, withPoint, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
+import { topToBottom, withPoint, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
 
 interface Props {
   project: Project
@@ -76,6 +77,18 @@ export function PointView({ project, point, change, onBack }: Props) {
   }
   const editedLayer = layers.find((l) => l.id === editing)
 
+  const onChoose = (id: string, choice: IndicatorChoice | null) =>
+    change(project.id, (p) =>
+      withPoint(p, point.id, (pt) => {
+        const { [id]: _gone, ...rest } = pt.indicators ?? {}
+        return { ...pt, indicators: choice ? { ...rest, [id]: choice } : rest }
+      }),
+    )
+  const onHydric = (answer: "yes" | "no" | null) =>
+    change(project.id, (p) =>
+      withPoint(p, point.id, ({ hydricSoilPresent: _gone, ...pt }) => (answer ? { ...pt, hydricSoilPresent: answer } : pt)),
+    )
+
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <Button variant="ghost" className="h-11 justify-start px-1 text-base" onClick={onBack}>
@@ -119,6 +132,8 @@ export function PointView({ project, point, change, onBack }: Props) {
       )}
 
       <RestrictiveForm key={`restrictive-${point.id}`} project={project} point={point} change={change} />
+
+      <IndicatorsPanel project={project} point={point} form={form} onChoose={onChoose} onHydric={onHydric} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
       <PagePreview page="soil" project={project} point={point} form={form} />

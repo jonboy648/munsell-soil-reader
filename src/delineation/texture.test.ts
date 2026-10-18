@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest"
 import { REDOX_LOCATIONS, REDOX_TYPES, RESTRICTION_KINDS } from "./codes"
 import { checkColor } from "./colorCheck"
 import { notationOf } from "./model"
+import { textureOf } from "./rules/texture"
 import { ORGANIC_TERMS, TEXTURE_CLASSES, isBaseTerm, parseTextureTerm, textureCode, textureTerm } from "./texture"
 import { pdfText } from "./testing/pdfText"
 
@@ -92,5 +93,38 @@ describe("a color typed in by hand", () => {
     expect(notationOf("10yr 4.0/2.0")).toBe("10YR 4/2")
     expect(notationOf("2.50Y 5/3")).toBe("2.5Y 5/3")
     expect(notationOf("n 2.50")).toBe("N 2.5/")
+  })
+})
+
+describe("the pick list and the indicator rules read the same terms", () => {
+  // Sandy is "loamy fine sand or coarser" (Field Indicators v9.3, p. 7): the first seven classes. The rest are loamy or clayey.
+  const SANDY = ["coarse sand", "sand", "fine sand", "very fine sand", "loamy coarse sand", "loamy sand", "loamy fine sand"]
+
+  test("every class the pick list offers is read by the rules, as sandy or as loamy, and not as unknown", () => {
+    for (const { term } of TEXTURE_CLASSES) {
+      expect(textureOf(term), term).toEqual({ group: SANDY.includes(term) ? "sandy" : "loamy" })
+    }
+  })
+
+  test("every class with the mucky modifier keeps its group and is mucky", () => {
+    for (const { term } of TEXTURE_CLASSES) {
+      expect(textureOf(textureTerm(term, true)), term).toEqual({ group: SANDY.includes(term) ? "sandy" : "loamy", mucky: true })
+    }
+  })
+
+  test("the organic terms are organic soil material, and muck is not mucky peat", () => {
+    expect(textureOf(textureTerm("muck", true))).toEqual({ group: "unknown", organic: "muck" })
+    expect(textureOf(textureTerm("mucky peat", true))).toEqual({ group: "unknown", organic: "mucky peat" })
+    expect(textureOf(textureTerm("peat", true))).toEqual({ group: "unknown", organic: "peat" })
+    expect(ORGANIC_TERMS.map((o) => textureOf(o.term).organic)).toEqual(["muck", "mucky peat", "peat"])
+  })
+
+  test("no term the pick list can make is read as unknown, except the organic ones, which have no mineral group", () => {
+    const terms = [...TEXTURE_CLASSES.flatMap((c) => [c.term, textureTerm(c.term, true)]), ...ORGANIC_TERMS.map((o) => o.term)]
+    expect(terms).toHaveLength(21 * 2 + 3)
+    for (const term of terms) {
+      const read = textureOf(term)
+      expect(read.group !== "unknown" || read.organic !== undefined, term).toBe(true)
+    }
   })
 })

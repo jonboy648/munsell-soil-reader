@@ -9,6 +9,7 @@ import { PagePreview } from "@/components/PagePreview"
 import { VegetationEntry } from "@/components/VegetationEntry"
 import { VegetationIndicators } from "@/components/VegetationIndicators"
 import { VegetationPreview } from "@/components/VegetationPreview"
+import { RestrictiveForm } from "@/components/RestrictiveForm"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
 import { topToBottom, withPoint, withVegetation, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
@@ -30,11 +31,18 @@ function LayerCard({ layer, onEdit, onDelete }: { layer: Layer; onEdit: () => vo
         {layer.top}-{layer.bottom} in
       </p>
       <p className="min-w-0 text-sm [overflow-wrap:anywhere]">
-        Matrix {layer.matrix ? `${layer.matrix.notation}, ${layer.matrix.percent}%` : "not set"}
+        Matrix {layer.matrix ? `${layer.matrix.notation}, ${layer.matrix.percent}%${layer.matrix.exact ? " (not a book Chip)" : ""}` : "not set"}
+        {layer.texture && (
+          <>
+            <br />
+            Texture {layer.texture}
+          </>
+        )}
         {layer.redox.map((c, i) => (
           <span key={i}>
             <br />
-            Redox {c.notation}, {c.percent}%
+            Redox {c.notation}, {c.percent}%{[c.type, c.location].filter(Boolean).map((code) => `, ${code}`).join("")}
+            {c.exact ? " (not a book Chip)" : ""}
           </span>
         ))}
         {layer.remarks && (
@@ -129,12 +137,14 @@ export function PointView({ project, point, change, onBack }: Props) {
         )
       )}
 
+      <RestrictiveForm key={`restrictive-${point.id}`} project={project} point={point} change={change} />
+
       <IndicatorsPanel project={project} point={point} form={form} onChoose={onChoose} onHydric={onHydric} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
       <PagePreview page="soil" project={project} point={point} form={form} />
 
-      <HydrologyForm key={point.id} project={project} point={point} change={change} />
+      <HydrologyForm key={`hydrology-${point.id}`} project={project} point={point} change={change} />
       <PagePreview page="page1" project={project} point={point} form={form} />
 
       <VegetationEntry key={`vegetation-${point.id}`} project={project} point={point} onChange={changeVegetation} />

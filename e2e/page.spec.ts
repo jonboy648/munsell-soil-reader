@@ -66,7 +66,8 @@ test("a worn Page reads a Spot in a hole to a corrected Reading, and names the C
   // A Spot inside a hole: the soil sits behind the Page.
   await tapPhoto(page, example.holes[10])
   await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
-  await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
+  // Two steps of the ladder are smudged and left out, so the Card check is caution, not good.
+  await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "caution")
 
   await page.getByRole("button", { name: "Open Readings" }).click()
   const sheet = page.getByRole("dialog")

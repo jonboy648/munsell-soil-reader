@@ -40,9 +40,10 @@ test("explains the steps, the Card check line and each warning with its number",
   await expect(warnings).toContainText("more than 0.3 stops")
 
   const correction = page.locator("#correction")
-  await expect(correction).toContainText("Five corrections were compared")
-  await expect(correction.getByRole("row")).toHaveCount(6) // the header and five corrections
-  await expect(correction).toContainText("Straighten the tone curve with a smooth curve, then 3x3 (used)")
+  await expect(correction).toContainText("Six corrections were compared")
+  await expect(correction.getByRole("row")).toHaveCount(7) // the header and six corrections
+  await expect(correction).toContainText("a smooth curve per channel, then 3x3 (used for a Page)")
+  await expect(correction).toContainText("one curve shared by the channels, then 3x3 (used for a ColorChecker)")
   await expect(correction).toContainText("Root-polynomial")
 })
 
@@ -79,11 +80,11 @@ test("explains how a Page is used, how dirty Chips are handled, and what has not
 test("says the Card check line is provisional and that a pass is not a promise", async ({ page }) => {
   await openMethodPage(page)
   const correction = page.locator("#correction")
-  await expect(correction).toContainText("The line is 2, and it is provisional.")
-  await expect(correction).toContainText("one or two dirty patches 0.9 to 16")
+  await expect(correction).toContainText("The lines are 2 and 3.5, and they are provisional.")
+  await expect(correction).toContainText("scored 3.56 or more")
   await expect(correction).toContainText("A pass is not a promise that the Reading is within one Chip.")
-  await expect(correction).toContainText("A dirty or tinted gray patch can pass.")
-  await expect(correction).toContainText("14 of 24")
+  await expect(correction).toContainText("A real camera's clean Card is mostly caution.")
+  await expect(correction).toContainText("Caution,")
   // Claims that were not true, and are gone.
   await expect(correction).not.toContainText("3.7 or more")
   await expect(correction).not.toContainText("half the lowest")

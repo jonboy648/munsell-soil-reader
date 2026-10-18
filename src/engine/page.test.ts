@@ -343,6 +343,7 @@ describe("a worn Page", () => {
       for (const tilt of [undefined, TILT]) {
         const { check, reading } = read({ page: "10YR", camera: phone(light), smudged, tilt })
         expect(check.leftOut).toEqual(["10YR 8/1", "10YR 7/1"])
+        expect(check.verdict).toBe("caution") // a ladder step was left out: the raw Reading is shown beside
         // With the light end of the ladder gone the light Chips are extrapolated, and the Page's matrix is
         // held near diagonal, so the check sits near the line (2.0 in warm light, 2.2 in shift light, 0.7
         // in dim) instead of under it: the 5.1 it would be with the dirt left in is what is being avoided.
@@ -423,7 +424,7 @@ describe("dirt on the dark end of the ladder", () => {
       const { check, reading } = dark({ hazed }, soil)
       expect(check.leftOut).toEqual(Object.keys(hazed))
       expect(check.suspectRow).toBeUndefined()
-      expect(check.ok).toBe(true)
+      expect(check.verdict).toBe("caution") // a ladder step was left out
       expect(withinOneChip(reading.corrected!.chip.notation, soil), soil).toBe(true)
     }
   })
@@ -437,13 +438,13 @@ describe("dirt on the dark end of the ladder", () => {
   it("leaves out a smudged light step and a hazed dark one together", () => {
     const { check, reading } = dark({ smudged: { "10YR 8/1": 0.3 }, hazed: { "10YR 3/1": 0.04 } }, "10YR 3/3")
     expect(check.leftOut).toEqual(["10YR 8/1", "10YR 3/1"])
-    expect(check.ok).toBe(true)
+    expect(check.verdict).toBe("caution")
     expect(withinOneChip(reading.corrected!.chip.notation, "10YR 3/3")).toBe(true)
   })
 
-  it("never passes the Card check while a dark soil reads more than one Chip off", () => {
-    // The bad case: the check passes, the Reading is wrong. Film on one or two steps of the dark
-    // end, three strengths, three lights, two dark soils.
+  it("never shows a corrected Reading while a dark soil reads more than one Chip off", () => {
+    // The bad case: the check does not fail, the Reading is wrong. Film on one or two steps of the
+    // dark end, three strengths, three lights, two dark soils.
     const films = [{ "10YR 3/1": 1 }, { "10YR 2/1": 1 }, { "10YR 3/1": 1, "10YR 2/1": 1 }, { "10YR 4/1": 1 }]
     let passed = 0
     for (const share of [0.03, 0.06, 0.1]) {
@@ -452,7 +453,7 @@ describe("dirt on the dark end of the ladder", () => {
         for (const light of [LIGHTS.warm, LIGHTS.dim, LIGHTS.shift]) {
           for (const soil of darkSoils) {
             const { check, reading } = read({ page: "10YR", soil, hazed, camera: phone(light) })
-            if (!check.ok) continue
+            if (check.verdict === "failed") continue
             passed++
             expect(withinOneChip(reading.corrected!.chip.notation, soil), `${JSON.stringify(hazed)} ${soil}`).toBe(true)
           }

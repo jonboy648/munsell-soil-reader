@@ -35,6 +35,10 @@ CI runs typecheck, `npm test` and `npm run test:e2e` on every pull request.
   `ReadingsPanel`), plus the step indicator, example picker, bottom bar and theme toggle.
   `src/components/ui/` is shadcn/ui.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
+- The Log: Samples and their Readings are saved on the device in IndexedDB (`src/lib/log.ts`,
+  `logStore.ts`) and exported as CSV (`logCsv.ts`); the screens are `LogPanel`, `SaveToLogSheet` and
+  `LogScreen`. Photos are never stored. Location is off unless the user switches it on in the Save
+  form.
 - `e2e/`: the browser tests.
 
 How a Reading is made: the median of the tapped pixels, a white balance and then a 3x3
@@ -51,8 +55,9 @@ Two seams, and nothing else:
 - **Engine** (`src/engine/engine.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
   a Card and soil of a known Chip under a chosen light, exposure, color shift and tone curve,
   then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
-- **Browser** (`e2e/reader.spec.ts`): the production build in Chromium at a phone viewport. It
-  picks an example, taps corners and Spots by coordinates and reads the text on screen.
+- **Browser** (`e2e/reader.spec.ts`, `e2e/log.spec.ts`): the production build in Chromium at a phone
+  viewport. It picks an example, taps corners and Spots by coordinates and reads the text on screen;
+  the Log tests save, reload, edit, delete and read the downloaded CSV.
 
 ## Limits
 

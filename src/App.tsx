@@ -4,6 +4,7 @@ import type { ExamplePhoto } from "@/engine/simulate"
 import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
+import { LogPanel } from "@/components/LogPanel"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
 import { SpotsPanel } from "@/components/SpotsPanel"
@@ -95,6 +96,7 @@ export function App() {
           ) : (
             <p className="text-base">Take or choose a Photo with the Card beside the soil.</p>
           )}
+          <LogPanel result={result} card={cardOf(session)} />
           <ExamplePicker activeId={session.photo?.exampleId} onPick={pickExample} />
         </div>
 

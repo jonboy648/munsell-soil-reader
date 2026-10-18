@@ -1,12 +1,13 @@
 // The Log as a CSV spreadsheet (RFC 4180): a header row, then one row per Reading with the
 // Sample's fields repeated on each row.
 import type { Sample, SavedReading } from "@/lib/log"
+import { downloadBlob } from "@/lib/download"
 import { shownReading } from "@/lib/verdict"
 
 export const CSV_HEADER = [
   "Sample",
-  "Depth top (cm)",
-  "Depth bottom (cm)",
+  "Depth top (in)",
+  "Depth bottom (in)",
   "Condition",
   "Notes",
   "Latitude",
@@ -115,10 +116,6 @@ const BYTE_ORDER_MARK = String.fromCharCode(0xfeff)
  * `logToCsv`: Excel needs it to read the file as UTF-8 (otherwise "Café" comes out as "CafÃ©").
  */
 export function downloadCsv(samples: Sample[], now = new Date()): void {
-  const url = URL.createObjectURL(new Blob([BYTE_ORDER_MARK, logToCsv(samples)], { type: "text/csv;charset=utf-8" }))
-  const link = document.createElement("a")
-  link.href = url
-  link.download = `soil-log-${localDate(now)}.csv`
-  link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000) // not at once: some browsers still need it
+  const blob = new Blob([BYTE_ORDER_MARK, logToCsv(samples)], { type: "text/csv;charset=utf-8" })
+  downloadBlob(blob, `soil-log-${localDate(now)}.csv`)
 }

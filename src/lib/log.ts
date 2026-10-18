@@ -5,6 +5,16 @@ import type { Card, CardCheck, QualityWarning, ReadPhotoResult, Reading } from "
 
 export type Condition = "moist" | "dry"
 
+/** The Log kept depths in centimeters until its second version. Inches, to a tenth. */
+export const inchesFromCm = (cm: number): number => Math.round((cm / 2.54) * 10) / 10
+
+/** A Sample from the first version of the Log, its depths turned from centimeters into inches. */
+export const cmSampleToInches = (sample: Sample): Sample => ({
+  ...sample,
+  depthTop: sample.depthTop === null ? null : inchesFromCm(sample.depthTop),
+  depthBottom: sample.depthBottom === null ? null : inchesFromCm(sample.depthBottom),
+})
+
 export interface Location {
   lat: number
   lon: number
@@ -27,7 +37,7 @@ export interface SavedReading {
 export interface Sample {
   id: string
   name: string
-  /** Centimeters; null when not recorded. */
+  /** Inches; null when not recorded. */
   depthTop: number | null
   depthBottom: number | null
   condition: Condition
@@ -67,18 +77,18 @@ export function problemWith(d: SampleDraft): string | null {
   const top = depthOf(d.depthTop)
   const bottom = depthOf(d.depthBottom)
   if ((top !== null && !(top >= 0)) || (bottom !== null && !(bottom >= 0))) {
-    return "Depths are in centimeters, zero or more."
+    return "Depths are in inches, zero or more."
   }
   if (top !== null && bottom !== null && bottom < top) return "The bottom depth must be below the top."
   return null
 }
 
-/** "0-15 cm", "from 20 cm", "to 40 cm", or "" when no depth was recorded. */
+/** "0-15 in", "from 20 in", "to 40 in", or "" when no depth was recorded. */
 export function depthText(s: Pick<Sample, "depthTop" | "depthBottom">): string {
   const { depthTop: top, depthBottom: bottom } = s
-  if (top !== null && bottom !== null) return `${top}-${bottom} cm`
-  if (top !== null) return `from ${top} cm`
-  if (bottom !== null) return `to ${bottom} cm`
+  if (top !== null && bottom !== null) return `${top}-${bottom} in`
+  if (top !== null) return `from ${top} in`
+  if (bottom !== null) return `to ${bottom} in`
   return ""
 }
 

@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest"
 import { CARD_CHECK_GOOD, readPhoto } from "./index"
 import type { Batch, Corners, XY } from "./index"
 import { BatchFormatError, UnmeasuredBatchError, batchProblem, parseBatch } from "./batch"
-import { FRAME_PATCHES } from "./frameLayout"
 import {
   FRAME_DISTANCE,
   LIGHTS,
@@ -42,6 +41,8 @@ const withinOneChip = (a: string, b: string) => stepsApart(a, b) <= 1
 // ---- helpers ----
 const phone = (light: SimCamera["light"], toneCurve = PHONE_TONE_CURVE): SimCamera => ({ light, toneCurve })
 const WARM: SimScene = { camera: phone(LIGHTS.warm), frame: {} }
+/** The first line of a batch file. */
+const HEADER = "patch,L,a,b,sd_L,sd_a,sd_b,n,method,date"
 
 /** Read a simulated frame Photo with the outline where the markers really are. */
 function read(sim: SimPhoto, extra: { spots?: XY[]; batch?: Batch; outline?: Corners } = {}) {
@@ -53,15 +54,15 @@ function read(sim: SimPhoto, extra: { spots?: XY[]; batch?: Batch; outline?: Cor
 }
 const corrected = (sim: SimPhoto, extra?: Parameters<typeof read>[1]) => read(sim, extra).readings[0].corrected!.chip.notation
 
-/** The batch as the CSV file the measurement mode exports, with the rows of `leave` blanked or left out. */
-function csvOf(batch: Batch, options: { leave?: string[]; blank?: boolean } = {}): string {
-  const rows = FRAME_PATCHES.filter((p) => p.kind !== "reserved").flatMap((p) => {
-    const measured = batch.patches.find((m) => m.id === p.id)!
-    if (options.leave?.includes(p.id)) return options.blank ? [`${p.id},,,,,,,`] : []
-    const [L, a, b] = measured.lab
-    return [`${p.id},${L},${a},${b},${measured.sd},${measured.n},"${measured.method}",${measured.date}`]
-  })
-  return ["patch,L,a,b,sd,n,method,date", ...rows].join("\n")
+/** The batch as the CSV file the measurement mode exports, with the rows of `leave` left out. */
+function csvOf(batch: Batch, options: { leave?: string[] } = {}): string {
+  const rows = batch.patches
+    .filter((p) => !options.leave?.includes(p.id))
+    .map((p) => {
+      const [L, a, b] = p.lab
+      return `${p.id},${L},${a},${b},${(p.sd ?? ["", "", ""]).join(",")},${p.n ?? ""},"${p.method}",${p.date}`
+    })
+  return [HEADER, ...rows].join("\n")
 }
 
 describe("readPhoto with the frame card", () => {
@@ -246,7 +247,8 @@ describe("a batch file", () => {
   })
 
   it("is the same batch whatever the line endings, the case of the header and a byte-order mark", () => {
-    const windows = "﻿" + csvOf(batch).replace(/^patch,L,a,b,sd,n,method,date/, "Patch,l,A,B,SD,N,Method,Date").replace(/\n/g, "\r\n") + "\r\n\r\n"
+    const header = "Patch,l,A,B,SD_L,sd_A,Sd_b,N,Method,Date"
+    const windows = "﻿" + csvOf(batch).replace(HEADER, header).replace(/\n/g, "\r\n") + "\r\n\r\n"
     expect(parseBatch("SIM-1", windows).patches).toEqual(batch.patches)
   })
 
@@ -255,33 +257,42 @@ describe("a batch file", () => {
     expect(corrected(sim, { batch: parseBatch("SIM-1", csvOf(batch)) })).toBe(corrected(sim))
   })
 
-  it("counts patches that are listed but blank as not measured yet", () => {
-    const parsed = parseBatch("SIM-1", csvOf(batch, { leave: ["G2", "S07"], blank: true }))
-    expect(parsed.patches.map((p) => p.id)).not.toContain("G2")
-    expect(batchProblem(parsed)).toContain("not yet: G2, S07")
+  it("counts a patch with no row as not measured yet", () => {
+    expect(batchProblem(parseBatch("SIM-1", csvOf(batch, { leave: ["G2", "S07"] })))).toContain("not yet: G2, S07")
     expect(batchProblem(parseBatch("SIM-1", csvOf(batch, { leave: ["G2"] })))).toContain("not yet: G2")
   })
 
   it("is refused as a Card until every patch is measured", () => {
-    const header = "patch,L,a,b,sd,n,method,date"
-    expect(batchProblem(parseBatch("NEW", header))).toContain("has not been measured yet")
-    expect(batchProblem(parseBatch("NEW", header + "\nG1,,,,,,,\nS01,,,,,,,"))).toContain("has not been measured yet")
+    expect(batchProblem(parseBatch("NEW", HEADER))).toContain("has not been measured yet")
+  })
+
+  it("takes an instrument's reading, which has no spread and no count", () => {
+    const parsed = parseBatch("SIM-1", HEADER + "\nG1,94.8,-0.4,1.9,,,,,X-Rite i1 Pro 3,2026-11-02")
+    expect(parsed.patches).toEqual([{ id: "G1", lab: [94.8, -0.4, 1.9], method: "X-Rite i1 Pro 3", date: "2026-11-02" }])
+  })
+
+  it("reads a method with a comma or a quote in it", () => {
+    const row = '\nG1,94.8,-0.4,1.9,0.2,0.1,0.1,3,"camera, ""ColorChecker""",2026-11-02'
+    expect(parseBatch("SIM-1", HEADER + row).patches[0].method).toBe('camera, "ColorChecker"')
   })
 
   it.each([
     ["is empty", "", "line 1: it is empty"],
-    ["has the wrong columns", "patch,L,a,b\nG1,50,0,0", "line 1: the first line must be patch,L,a,b,sd,n,method,date"],
-    ["names a patch the frame does not have", "patch,L,a,b,sd,n,method,date\nX9,50,0,0,0.2,3,m,2026-01-01", 'line 2: "X9" is not a patch on this frame'],
-    ["names a reserved patch", "patch,L,a,b,sd,n,method,date\nR1,50,0,0,0.2,3,m,2026-01-01", 'line 2: "R1" is not a patch on this frame'],
-    ["lists a patch twice", "patch,L,a,b,sd,n,method,date\nG1,50,0,0,0.2,3,m,2026-01-01\nG1,50,0,0,0.2,3,m,2026-01-01", "line 3: patch G1 is listed twice"],
-    ["has a row with too few columns", "patch,L,a,b,sd,n,method,date\nG1,50,0,0", "line 2: expected 8 columns, found 4"],
-    ["has a color that is not a number", "patch,L,a,b,sd,n,method,date\nG1,fifty,0,0,0.2,3,m,2026-01-01", "line 2: L, a and b of G1 must be numbers"],
-    ["has some of a color blank", "patch,L,a,b,sd,n,method,date\nG1,50,,0,0.2,3,m,2026-01-01", "line 2: L, a and b of G1 must be numbers, or all blank"],
-    ["has a lightness past 100", "patch,L,a,b,sd,n,method,date\nG1,101,0,0,0.2,3,m,2026-01-01", "line 2: the color of G1 is not a CIELAB color"],
-    ["has no spread", "patch,L,a,b,sd,n,method,date\nG1,50,0,0,,3,m,2026-01-01", "line 2: sd of G1 must be a number"],
-    ["has no shots", "patch,L,a,b,sd,n,method,date\nG1,50,0,0,0.2,0,m,2026-01-01", "line 2: n of G1 must be a whole number"],
-    ["has no method", "patch,L,a,b,sd,n,method,date\nG1,50,0,0,0.2,3,,2026-01-01", "line 2: say how G1 was measured"],
-    ["has a date that is not a date", "patch,L,a,b,sd,n,method,date\nG1,50,0,0,0.2,3,m,Jan 1", "line 2: the date of G1 must be YYYY-MM-DD"],
+    ["has the wrong columns", "patch,L,a,b\nG1,50,0,0", `line 1: the first line must be ${HEADER}`],
+    ["has the old single sd column", "patch,L,a,b,sd,n,method,date", "line 1: the first line must be"],
+    ["names a patch the frame does not have", HEADER + "\nX9,50,0,0,,,,3,m,2026-01-01", 'line 2: "X9" is not a patch on this frame'],
+    ["names a reserved patch", HEADER + "\nR1,50,0,0,,,,3,m,2026-01-01", 'line 2: "R1" is not a patch on this frame'],
+    ["lists a patch twice", HEADER + "\nG1,50,0,0,,,,3,m,2026-01-01\nG1,50,0,0,,,,3,m,2026-01-01", "line 3: patch G1 is listed twice"],
+    ["has a row with too few columns", HEADER + "\nG1,50,0,0", "line 2: expected 10 columns, found 4"],
+    ["has a color that is not a number", HEADER + "\nG1,fifty,0,0,,,,3,m,2026-01-01", "line 2: L, a and b of G1 must be numbers"],
+    ["has a color with a part missing", HEADER + "\nG1,50,,0,,,,3,m,2026-01-01", "line 2: L, a and b of G1 must be numbers"],
+    ["has a lightness past 100", HEADER + "\nG1,101,0,0,,,,3,m,2026-01-01", "line 2: the color of G1 is not a CIELAB color"],
+    ["has only some of the spread", HEADER + "\nG1,50,0,0,0.2,,0.1,3,m,2026-01-01", "line 2: sd_L, sd_a and sd_b of G1 must be numbers"],
+    ["has a negative spread", HEADER + "\nG1,50,0,0,0.2,-0.1,0.1,3,m,2026-01-01", "line 2: sd_L, sd_a and sd_b of G1 must be numbers"],
+    ["counts no shots", HEADER + "\nG1,50,0,0,0.2,0.1,0.1,0,m,2026-01-01", "line 2: n of G1 must be a whole number"],
+    ["counts a part of a shot", HEADER + "\nG1,50,0,0,0.2,0.1,0.1,2.5,m,2026-01-01", "line 2: n of G1 must be a whole number"],
+    ["has no method", HEADER + "\nG1,50,0,0,,,,3,,2026-01-01", "line 2: say how G1 was measured"],
+    ["has a date that is not a date", HEADER + "\nG1,50,0,0,,,,3,m,Jan 1", "line 2: the date of G1 must be YYYY-MM-DD"],
   ])("is refused, with the line and the reason, when it %s", (_name, csv, message) => {
     expect(() => parseBatch("SIM-1", csv)).toThrow(BatchFormatError)
     expect(() => parseBatch("SIM-1", csv)).toThrow(message)

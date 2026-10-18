@@ -207,7 +207,7 @@ export function simFrameBatch(error = 0): Batch {
     code: SIM_BATCH_CODE,
     patches: FRAME_PATCHES.filter((p) => p.kind !== "reserved").map((p, i) => {
       const lab = linearToLabD50(aimLinear(p.aim)).map((v, k) => v + ((i + k) % 2 === 0 ? error : -error))
-      return { id: p.id, lab: lab as Vec3, sd: 0.2, n: 3, method: "made up for the simulated camera", date: "2026-01-01" }
+      return { id: p.id, lab: lab as Vec3, sd: [0.2, 0.2, 0.2], n: 3, method: "made up for the simulated camera", date: "2026-01-01" }
     }),
   }
 }

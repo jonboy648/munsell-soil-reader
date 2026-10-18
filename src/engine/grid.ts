@@ -1,0 +1,134 @@
+// Where a Card's patches (or Chips) sit in the Photo. A Card is a flat grid. Seen at an
+// angle, the grid goes through a perspective transform (a homography), and four points fix
+// it. This is the one place that knows that, so every kind of Card shares it.
+import type { XY } from "./types"
+
+/**
+ * A position on the Card's grid in grid steps: the column counts to the right and the row
+ * downwards from the first patch. Positions between patches are allowed.
+ */
+export interface GridPoint {
+  col: number
+  row: number
+}
+
+export type Four<T> = [T, T, T, T]
+
+/** Where to read one patch: its centre in the Photo and the radius of the circle to read. */
+export interface Site {
+  center: XY
+  radius: number
+}
+
+export type GridMap = (position: GridPoint) => XY
+
+/** Share of the local patch pitch that the read circle takes as its radius. */
+const READ_FRACTION = 0.2
+/** Read radius floor, in Photo pixels. */
+const MIN_RADIUS = 2
+/** Below this the transform sends the point toward the horizon, so it is not a view of the Card. */
+const MIN_SCALE = 1e-3
+/** Largest ratio of the transform's scale between two tapped points, which is how much nearer one is. */
+const MAX_SCALE_RATIO = 10
+
+/** Solve A x = b by Gaussian elimination with partial pivoting; null when A is singular. */
+function solve(A: number[][], b: number[]): number[] | null {
+  const n = b.length
+  const M = A.map((row, i) => [...row, b[i]])
+  const scale = Math.max(...A.flat().map(Math.abs))
+  for (let k = 0; k < n; k++) {
+    let p = k
+    for (let r = k + 1; r < n; r++) if (Math.abs(M[r][k]) > Math.abs(M[p][k])) p = r
+    if (Math.abs(M[p][k]) < 1e-9 * scale) return null
+    ;[M[k], M[p]] = [M[p], M[k]]
+    for (let r = k + 1; r < n; r++) {
+      const f = M[r][k] / M[k][k]
+      for (let c = k; c <= n; c++) M[r][c] -= f * M[k][c]
+    }
+  }
+  const x = new Array<number>(n).fill(0)
+  for (let r = n - 1; r >= 0; r--) {
+    let s = M[r][n]
+    for (let c = r + 1; c < n; c++) s -= M[r][c] * x[c]
+    x[r] = s / M[r][r]
+  }
+  return x
+}
+
+/**
+ * The map from the Card's grid to the Photo, fixed by four grid positions and the four Photo
+ * points the user tapped on them. The positions need not be the grid's corners, or a
+ * rectangle, but no three of them may lie on a line.
+ *
+ * Taps that cannot be a view of a Card (repeated, in a line, crossed over, folded, or with the
+ * horizon between them) give a map that puts everything at the centre of the taps, so the
+ * Card check fails instead of the app.
+ */
+export function gridMap(known: Four<GridPoint>, tapped: Four<XY>): GridMap {
+  // x = (a X + b Y + c) / (g X + h Y + 1), y = (d X + e Y + f) / (g X + h Y + 1)
+  const A: number[][] = []
+  const b: number[] = []
+  known.forEach(({ col: X, row: Y }, i) => {
+    const { x, y } = tapped[i]
+    A.push([X, Y, 1, 0, 0, 0, -X * x, -Y * x], [0, 0, 0, X, Y, 1, -X * y, -Y * y])
+    b.push(x, y)
+  })
+  const centre: XY = {
+    x: tapped.reduce((s, p) => s + p.x, 0) / 4,
+    y: tapped.reduce((s, p) => s + p.y, 0) / 4,
+  }
+  const h = solve(A, b)
+  if (!h) return () => centre
+  const [a, b2, c, d, e, f, g, h2] = h
+  const scale = ({ col: X, row: Y }: GridPoint) => g * X + h2 * Y + 1
+  // The scale is linear in the grid position, so if it is sound at all four taps it is sound
+  // between them: no horizon in the Card, and no tap many times nearer than another.
+  const taps = known.map(scale)
+  if (Math.min(...taps) < MIN_SCALE || Math.max(...taps) > MAX_SCALE_RATIO * Math.min(...taps)) {
+    return () => centre
+  }
+  return (position) => {
+    const w = scale(position)
+    if (w < MIN_SCALE) return centre // outside the taps, past the horizon
+    const { col: X, row: Y } = position
+    return { x: (a * X + b2 * Y + c) / w, y: (d * X + e * Y + f) / w }
+  }
+}
+
+/** The longest distance between two of the four points. */
+const span = <T>(points: Four<T>, distance: (a: T, b: T) => number): number =>
+  Math.max(...points.flatMap((p, i) => points.slice(i + 1).map((q) => distance(p, q))))
+
+/**
+ * Read sites for the wanted grid positions. The radius follows the local patch size, so it
+ * shrinks on the far side of a tilted Card: it is a share of the pitch to the neighbouring
+ * patch toward the middle of the grid, in whichever direction the pitch is smaller. It never
+ * exceeds that share of the average pitch, which keeps a bad set of taps from reading a circle
+ * as wide as the Photo.
+ */
+export function gridSites(known: Four<GridPoint>, tapped: Four<XY>, wanted: GridPoint[]): Site[] {
+  const map = gridMap(known, tapped)
+  const middle = {
+    col: known.reduce((s, k) => s + k.col, 0) / 4,
+    row: known.reduce((s, k) => s + k.row, 0) / 4,
+  }
+  const toward = (at: number, to: number) => (at <= to ? 1 : -1)
+  const pitch = (from: GridPoint, to: GridPoint) => {
+    const [p, q] = [map(from), map(to)]
+    return Math.hypot(p.x - q.x, p.y - q.y)
+  }
+  const averagePitch =
+    span(tapped, (p, q) => Math.hypot(p.x - q.x, p.y - q.y)) /
+    span(known, (p, q) => Math.hypot(p.col - q.col, p.row - q.row))
+  return wanted.map((position) => {
+    const { col, row } = position
+    const local = Math.min(
+      pitch(position, { col: col + toward(col, middle.col), row }),
+      pitch(position, { col, row: row + toward(row, middle.row) }),
+    )
+    return {
+      center: map(position),
+      radius: Math.max(MIN_RADIUS, READ_FRACTION * Math.min(local, averagePitch)),
+    }
+  })
+}

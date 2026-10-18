@@ -5,7 +5,7 @@
 // Nothing here knows about the ColorChecker. The caller describes the Card with two lists:
 //  - references: where the Card's patches are, each with a read radius and the luminance it has
 //    in even light. They show glare, clipping and the Card's spacing. References marked
-//    `neutral` are the Card's tonal ladder: the brightest shows whether the exposure blows out
+//    `ladder` are the Card's tonal ladder: the brightest shows whether the exposure blows out
 //    the highlights, the darkest whether it crushes the shadows.
 //  - evenness: places on the Card that should come out equally bright in even light, with the
 //    limit that suits them. The ColorChecker passes its black frame; a Page of the soil book
@@ -49,7 +49,7 @@ export interface QualityReference {
   /** Relative luminance (white is 1) the reference has in even light. */
   y: number
   /** Part of the Card's tonal ladder. */
-  neutral?: boolean
+  ladder?: boolean
 }
 
 /** A place that should come out as bright as its siblings in even light, up to `y`. */
@@ -188,7 +188,7 @@ export function checkQuality({ pixels, spots, spotRadius, references, spacing, e
   // few readable grays to tell, the references are taken as placed.
   const seen = references.map((r) => scan(pixels, r.at, r.radius))
   const ladder = references
-    .flatMap((r, i) => (r.neutral ? [{ r, s: seen[i] }] : []))
+    .flatMap((r, i) => (r.ladder ? [{ r, s: seen[i] }] : []))
     .sort((a, b) => b.r.y - a.r.y)
   const readable = ladder
     .filter(({ s }) => s.blown < GLARE_SHARE && s.crushed < GLARE_SHARE)

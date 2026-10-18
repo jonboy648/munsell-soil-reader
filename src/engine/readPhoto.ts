@@ -2,10 +2,10 @@
 import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_ROWS, patchCenters } from "./colorchecker"
+import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
 import { fitCorrection, heldOutError, type Fit, type Reference } from "./correction"
 import { checkQuality, type Evenness, type QualityReference } from "./quality"
-import { medianLinear, patchRadius, spotRadius } from "./sampling"
+import { medianLinear, spotRadius } from "./sampling"
 import type {
   CardCheck,
   ChipReading,
@@ -14,7 +14,6 @@ import type {
   ReadPhotoInput,
   ReadPhotoResult,
   Reading,
-  XY,
 } from "./types"
 
 /** The Card check is good when the mean held-out CIEDE2000 of the Card is below this. */
@@ -59,9 +58,8 @@ function readColor(lin: Vec3): ChipReading {
 }
 
 function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
-  const radius = patchRadius(corners)
-  const references: Reference[] = patchCenters(corners).map((p, i) => ({
-    measured: medianLinear(pixels, p, radius),
+  const references: Reference[] = patchSites(corners).map(({ center, radius }, i) => ({
+    measured: medianLinear(pixels, center, radius),
     truth: PATCH_LINEAR[i],
     ladder: NEUTRAL_PATCHES.includes(i),
   }))
@@ -80,35 +78,23 @@ const FRAME_OFF_CARD_STOPS = 2
 
 /**
  * What the quality checks need from a ColorChecker: its patches as references (the grays are
- * the tonal ladder) and the black frame where four patches meet, read in a circle a quarter of
- * the way across the diagonal between the patches (the darkest pixels there are the frame, even
- * when a tap is a few pixels off).
+ * the tonal ladder), the black frame where four patches meet as the evenness samples, and the
+ * spacing of the patches in the Photo.
  */
 function cardQuality(corners: Corners): { references: QualityReference[]; spacing: number; evenness: Evenness } {
-  const centers = patchCenters(corners)
-  const radius = patchRadius(corners)
-  const references = centers.map((at, i) => ({
-    at,
+  const references = patchSites(corners).map(({ center, radius }, i) => ({
+    at: center,
     radius,
     y: luminance(PATCH_LINEAR[i]),
-    neutral: NEUTRAL_PATCHES.includes(i),
+    ladder: NEUTRAL_PATCHES.includes(i),
   }))
-  const samples = []
-  for (let row = 0; row < PATCH_ROWS - 1; row++) {
-    for (let col = 0; col < PATCH_COLUMNS - 1; col++) {
-      const a = centers[row * PATCH_COLUMNS + col]
-      const b = centers[(row + 1) * PATCH_COLUMNS + col + 1]
-      samples.push({ at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, radius: 0.25 * Math.hypot(a.x - b.x, a.y - b.y), y: 1 })
-    }
-  }
-  const [tl, tr, br, bl] = corners
-  const dist = (a: XY, b: XY) => Math.hypot(a.x - b.x, a.y - b.y)
-  const spacing = Math.min(
-    dist(tl, tr) / (PATCH_COLUMNS - 1),
-    dist(bl, br) / (PATCH_COLUMNS - 1),
-    dist(tl, bl) / (PATCH_ROWS - 1),
-    dist(tr, br) / (PATCH_ROWS - 1),
-  )
+  const samples = frameSites(corners).map(({ center, radius }) => ({ at: center, radius, y: 1 }))
+  // The patch spacing, from the Card's diagonals: the two longest distances between taps are
+  // the diagonals whatever order the corners were tapped in, and the shorter is the one a
+  // tilted Card shortens. (Edges over their patch counts would call a good Card small when the
+  // corners are in the wrong order.)
+  const taps = corners.flatMap((p, i) => corners.slice(i + 1).map((q) => Math.hypot(p.x - q.x, p.y - q.y)))
+  const spacing = taps.sort((a, b) => b - a)[1] / Math.hypot(PATCH_COLUMNS - 1, PATCH_ROWS - 1)
   return { references, spacing, evenness: { samples, limitStops: FRAME_UNEVEN_STOPS, offCardStops: FRAME_OFF_CARD_STOPS } }
 }
 

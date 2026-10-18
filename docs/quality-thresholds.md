@@ -33,7 +33,7 @@ The checks read the Card through two lists the caller supplies, so a Page of the
 can reuse them without ColorChecker code in the engine.
 
 - **`references`**: where the Card's patches are, each with a read radius and the luminance it has
-  in even light. They carry glare, clipping and the placement test. References marked `neutral`
+  in even light. They carry glare, clipping and the placement test. References marked `ladder`
   are the tonal ladder: the brightest is the white and the darkest the black.
 - **`evenness`**: places on the Card that should come out equally bright in even light, with the
   limit that suits them. The ColorChecker supplies its black frame, limit 0.2 stops. A Page will
@@ -110,11 +110,13 @@ brightest place, in stops.
 The limit of 0.2 sits above everything clean, with the harshest compression and noise at 0.15,
 and below a shadow of about a third of a stop in most layouts and half a stop in all. Corners
 tapped up to 12 px off (a pitch of 74) left every clean Photo clear and missed no shadow, in 30
-trials each. Above 2 stops the spread is not the light. Of the 23 wrong corner orders, 12 read 2.5 to 5.9 stops
-because the sampling places land on patches, so those are left alone and the failed Card check
-explains them. The other 11 (flips and half turns of the grid) put the places on the frame again
-and read near 0, so they raise nothing. A real shadow deeper than 2 stops is lost the same way as
-the first 12.
+trials each. Above 2 stops the spread is not the light: with all four taps half a patch off across and down,
+the places land on patches and read 3.9 stops (3.3 at one and a half patches off) while the Card
+check fails at 29.8, so uneven light is left out and the failed Card check explains it. A real
+shadow deeper than 2 stops is lost the same way. Taps up to 0.3 of a patch off leave the Card check
+good (0.7) and every warning quiet. The places and their radii follow the same homography as the
+patches, so a Card tilted 40 degrees (the `angled` example) reads clean, and a shadow or glare on
+it is still flagged (both tested).
 **Least certain:** the simulated frame is 16% of the patch pitch wide, and the real card's is
 narrower. The darkest-15% reading needs the frame to be a good share of the circle (about half at
 16%, a third at 10%), and a shadow only on the outer ring of patches (the white end alone) does not
@@ -131,9 +133,10 @@ blur, flat patches, tone curve 0.5) the Card check stayed good in 40 of 40 trial
 of up to 8 px at a pitch of 24.4 px, in 38 of 40 at 20.7 px, and in 23 of 40 at 17.8 px. With
 errors up to 6 px it held in 40 of 40 down to 17.8 px and fell to 36 of 40 at 14.8 px. So a pitch of about three times the tap
 error is safe, and 24 px allows 8 px of error (about 2 screen pixels on a phone, where a 1600 px
-Photo is shown 4 times smaller). The spacing comes from the tapped corners (the smallest of
-the four sides over its patch count), not from the patch positions they imply: with the corners in
-the wrong order those bunch together and would call a good Card small. **Least certain:** real
+Photo is shown 4 times smaller). The spacing comes from the tapped corners (the shorter diagonal over the
+patch grid's diagonal, which is the same whichever order the corners were tapped in), not from the
+patch positions they imply or from a side over its patch count: with the corners in the wrong order
+those bunch together and would call a good Card small. **Least certain:** real
 blur and JPEG blocks eat into this, so 24 px may need to rise.
 
 **Corners off the Card.** With the corners tapped in the wrong order the references are not on
@@ -141,33 +144,30 @@ the Card and nothing they show says much. The test: sort the readable grays (not
 white to black and count pairs measured in the wrong order. Light, shadows and tone curves squeeze
 the order but keep it. Over 51 right-order Photos (every light, tone curve, exposure, shadow
 direction and depth, and glare) it counted 0, except 1 to 3 for shadows of a stop or more that
-darken the white end or fall from right to left. The 23 wrong orders counted 4 or more, except
-three that count 0, 1 and 1 and so pass as the Card (one is the two top corners swapped, which
-leaves the gray row alone). Uneven light stays quiet for those three anyway (the frame spread is
-over 2 stops or near 0), Card too small does not depend on this test, and the Card check fails.
-Off the Card, uneven light and Card too small are skipped. With fewer than 3 readable grays the
-references are taken as placed. Glare and clipping
-are not: with no white to compare to, a reference that is partly blown is glare and one that
-is mostly blown is exposure. So a white blown by 30% extra light is still `clipped` in the three wrong orders
-tried. With the exposure much further off and the corners also wrong, glare may be reported in
-its place.
+darken the white end or fall from right to left. Of the 23 wrong orders, 7 are a real view of the
+Card turned or flipped, and all 7 count 3 or more (3, 4, 7, 8, 11, 12 and 15). The other 16 cross
+the taps over, so the Card's map puts every patch at the middle of the taps: the references read
+one pixel, the grays are all equal (0 inversions), the frame places are all one spot (spread 0)
+and nothing is flagged, and the Card check fails. Off the Card, uneven light and Card too small
+are skipped. With fewer than 3 readable grays the references are taken as placed. Glare and
+clipping are not skipped: with no white to compare to, a reference that is partly blown is glare
+and one that is mostly blown is exposure, and mostly blown wins.
 
 ## Known limits
 
 Every one of these still leaves a signal: with the corners in any of the 23 wrong orders the Card
-check fails (24.8 or worse, against a limit of 2), so the Reading is shown uncorrected.
+check fails (24.8 or worse, against a limit of 2), so the Reading is shown uncorrected, and none of
+the 23 raises a warning on a clean Photo.
 
-- Three of the 23 wrong orders (`1023`, `3021` and `0321`, with 0, 1 and 1 inverted pairs) are not
-  told apart from the Card by the gray ladder, so the white and black it supplies are the wrong
-  patches. Their Card check reads 27.6, 34.0 and 31.2, and uneven light stays quiet for them (the
-  frame spread is 0.0, 5.9 and 5.8 stops).
+- With the taps crossed over (16 of the 23 wrong orders) the references see one pixel, so no
+  Card warning of any kind can come out of them, glare and clipping included. The Spot warnings
+  still work.
 - With the corners in the wrong order and the exposure also far off, glare can be reported where
-  clipped is true. For a warm light at 1.3 times, all 23 orders report clipped; at 2 times, 19 do
-  and 4 report glare; at 4 times, 17 do and 6 report glare.
+  clipped is true. For a warm light at 1.3 times, the 7 turned or flipped orders all report
+  clipped; at 2 times, 6 do and 1 reports glare; at 4 times, 5 do and 2 report glare.
 - A shadow of about 2.3 stops that darkens the white end, or falls from right to left, inverts up
   to 3 pairs of grays, so the ladder takes the Card for off the Card: uneven light and Card too
   small are then skipped, and the Card check, which fails at that depth, is the signal.
-
 - Glare that covers the whole white patch is reported as clipped: a reflection on the white is the
   same to the engine as a white that is too bright.
 - A single clipped channel (a red-heavy light blowing only red) is not flagged.

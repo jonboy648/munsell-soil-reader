@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 import { readPhoto } from "./index"
 import type { Card, Corners, XY } from "./index"
 import {
+  ANGLED_TILT,
   LIGHTS,
   PHONE_TONE_CURVE,
   SIM_CORNERS,
@@ -210,9 +211,32 @@ describe("corners tapped in the wrong order", () => {
 
   it("still flag a clipped white, which does not depend on where the corners are", () => {
     const [tl, tr, br, bl] = SIM_CORNERS
-    for (const corners of [[bl, tl, tr, br], [tr, tl, br, bl], [tl, bl, br, tr]] as Corners[]) {
+    // Turned a quarter, and tapped the other way around. (With the taps crossed over, the map
+    // puts every patch at one point, and the references see nothing.)
+    for (const corners of [[bl, tl, tr, br], [tl, bl, br, tr]] as Corners[]) {
       const quality = problems({ camera: camera(exposed(1.3)) }, { card: { kind: "colorchecker", corners } })
       expect(flagged(quality)).toEqual([["clipped", "card"]])
     }
+  })
+})
+
+describe("a Card seen at an angle", () => {
+  const tilted = (extra: Partial<SimScene> = {}) => {
+    const sim = simulatePhoto({ ...WARM, tilt: ANGLED_TILT, ...extra })
+    return readPhoto({ pixels: sim.pixels, card: { kind: "colorchecker", corners: sim.corners }, spots: [sim.spot] }).quality
+  }
+
+  it("raises no warning when the light is even", () => {
+    expect(tilted()).toEqual([])
+  })
+
+  it("still shows a shadow across the Card", () => {
+    expect(flagged(tilted({ shadow: { from: 60, to: 700, gain: 0.5 } }))).toEqual([["uneven-light", "card"]])
+  })
+
+  it("still shows glare on the Card", () => {
+    const sim = simulatePhoto({ ...WARM, tilt: ANGLED_TILT })
+    const glare = shine(sim.patches[10], 40)
+    expect(flagged(tilted({ glare: [glare] }))).toEqual([["glare", "card"]])
   })
 })

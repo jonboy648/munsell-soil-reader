@@ -7,13 +7,18 @@ import { EXAMPLES, SIM_HEIGHT, SIM_WIDTH, simulatePhoto } from "../src/engine/si
 // Where the Card's patches and the soil really are in the angled example.
 const angled = simulatePhoto(EXAMPLES.find((e) => e.id === "angled")!.scene)
 
-/** Tap a place on the Photo, given in Photo pixels (the example Photo is SIM_WIDTH x SIM_HEIGHT). */
+/**
+ * Tap a place on the Photo, given in Photo pixels (the example Photo is SIM_WIDTH x SIM_HEIGHT).
+ * A click lands on a whole CSS pixel, and engines differ on how they get there (Chromium rounds,
+ * WebKit and Firefox cut off the fraction), so the tap is rounded here and every engine taps the
+ * same place, at most half a CSS pixel from the one asked for.
+ */
 async function tapPhoto(page: Page, point: XY) {
   const box = await page.getByTestId("photo").boundingBox()
   if (!box) throw new Error("The Photo is not on screen")
   await page.touchscreen.tap(
-    box.x + (point.x * box.width) / SIM_WIDTH,
-    box.y + (point.y * box.height) / SIM_HEIGHT,
+    Math.round(box.x + (point.x * box.width) / SIM_WIDTH),
+    Math.round(box.y + (point.y * box.height) / SIM_HEIGHT),
   )
 }
 
@@ -52,14 +57,20 @@ test("after the fourth corner the overlay rings every patch in place, smaller on
     return centers.map((c) => ({ left: reach(c, -1, 0), right: reach(c, 1, 0), up: reach(c, 0, -1), down: reach(c, 0, 1) }))
   }, angled.patches)
 
+  // Taps land on whole CSS pixels, so a ring can sit up to half of one off its patch, which
+  // makes the two sides differ by up to one (here cssPx Photo pixels). Two more cover the
+  // white pixel being found a pixel early or late.
+  const cssPx = SIM_WIDTH / (await page.getByTestId("photo").boundingBox())!.width
+  const offCenter = cssPx + 2
+
   // The four corner patches carry the user's own tap marks too, so look at the other twenty.
   const corners = [0, 5, 18, 23]
   rings.forEach((ring, i) => {
     if (corners.includes(i)) return
     const { left, right, up, down } = ring
     expect(left, `patch ${i + 1} ring found`).not.toBeNull()
-    expect(Math.abs(left! - right!), `patch ${i + 1} is centered left to right`).toBeLessThanOrEqual(3)
-    expect(Math.abs(up! - down!), `patch ${i + 1} is centered top to bottom`).toBeLessThanOrEqual(3)
+    expect(Math.abs(left! - right!), `patch ${i + 1} is centered left to right`).toBeLessThanOrEqual(offCenter)
+    expect(Math.abs(up! - down!), `patch ${i + 1} is centered top to bottom`).toBeLessThanOrEqual(offCenter)
   })
   // The Card turns away to the right, so the rightmost patches are farther and their rings smaller.
   expect(rings[11].left!).toBeLessThan(0.7 * rings[6].left!)

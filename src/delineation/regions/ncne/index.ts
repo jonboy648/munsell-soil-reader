@@ -11,7 +11,10 @@ import { MIDDLE_COLUMN } from "./indicatorsMiddle"
 import { RIGHT_COLUMN } from "./indicatorsRight"
 import { NCNE_HYDROLOGY_INDICATORS } from "./hydrologyIndicators"
 
-// Page 1's Hydrology section is measured the same way: each tick is a 15 point rule (38.3 to 53.4,
+// Page 1's header is measured the same way: each line to write on is a filled rectangle about a point
+// thick, and each value sits just above its rule. The Y or N and tick blanks are the 22-point rules.
+// `page1.pdf` is the page cut from the official PDF as `soil-page.pdf` is; `privacy-page.pdf` is page 5,
+// the Privacy Act page, which has nothing to fill. The Hydrology section is measured the same way: each tick is a 15 point rule (38.3 to 53.4,
 // 201.7 to 216.8 and 382.7 to 397.8 across, 12.36 points apart down); the Field Observations,
 // "Wetland Hydrology Present?" and the two boxes of free text are rules and the boxes' borders.
 const TICK_LEFT = [38.3, 53.4] as const
@@ -34,6 +37,35 @@ export const NCNE: Region = {
     inset: 2,
     aboveRule: 2.5,
     tickSize: 10,
+    fields: {
+      site: { left: 86.5, right: 305.3, rule: 98.4 },
+      county: { left: 352.7, right: 465.7, rule: 98.4 },
+      date: { left: 533.5, right: 575.5, rule: 98.4 },
+      applicant: { left: 115.7, right: 405.7, rule: 113.6 },
+      state: { left: 435.6, right: 473.6, rule: 113.6 },
+      samplingPoint: { left: 541.4, right: 575.5, rule: 113.6 },
+      investigators: { left: 93.6, right: 337.0, rule: 128.9 },
+      sectionTownshipRange: { left: 435.6, right: 575.5, rule: 128.9 },
+      landform: { left: 161.5, right: 280.0, rule: 144.1 },
+      localRelief: { left: 413.5, right: 511.6, rule: 144.1 },
+      slope: { left: 549.4, right: 575.5, rule: 144.1 },
+      subregion: { left: 139.4, right: 216.8, rule: 159.4 },
+      lat: { left: 238.8, right: 352.8, rule: 159.4 },
+      long: { left: 382.7, right: 489.5, rule: 159.4 },
+      datum: { left: 533.5, right: 575.5, rule: 159.4 },
+      soilMapUnit: { left: 115.7, right: 397.8, rule: 174.6 },
+      nwi: { left: 473.5, right: 575.5, rule: 174.6 },
+      normalYes: { left: 511.4, right: 533.6, rule: 205.1 },
+      normalNo: { left: 549.4, right: 571.6, rule: 205.1 },
+      disturbedVegetation: { left: 93.6, right: 115.8, rule: 205.1 },
+      disturbedSoil: { left: 139.4, right: 161.6, rule: 205.1 },
+      disturbedHydrology: { left: 216.7, right: 238.9, rule: 205.1 },
+      problematicVegetation: { left: 93.6, right: 115.8, rule: 220.3 },
+      problematicSoil: { left: 139.4, right: 161.6, rule: 220.3 },
+      problematicHydrology: { left: 216.7, right: 238.9, rule: 220.3 },
+    },
+    // The Summary of Findings' Remarks box: where its first line of writing starts, under its label.
+    summaryRemarks: { left: 40, right: 571.4, baseline: 311 },
     hydrology: {
       ticks: {
         ...column(["A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B7", "B8"], TICK_LEFT, 431.76),

@@ -53,6 +53,15 @@ export interface IndicatorChoice {
   manual?: boolean
 }
 
+/** The two halves of a pair of Sampling points: the one in the wetland and the one in the upland. */
+export type PairRole = "wetland" | "upland"
+
+/** A Sampling point's pair, kept on one of the two: this point's own role, and the other's id. */
+export interface Pair {
+  with: string
+  role: PairRole
+}
+
 /** One of the three Field Observations: whether it was seen, and how deep (inches) when it was. */
 export interface Observation {
   /** Yes, No, or null while it has not been answered. */
@@ -93,6 +102,12 @@ export interface SamplingPoint {
   id: string
   name: string
   layers: Layer[]
+  /** Latitude and longitude as typed, and the datum they are in (WGS84 for a phone's GPS). */
+  lat: string
+  long: string
+  datum: string
+  /** Set on one point of a pair; the other one's form shows it too. */
+  pair?: Pair
   /** The user's decisions, by the indicator's id on the form. An indicator not in here is undecided. */
   indicators?: Record<string, IndicatorChoice>
   /** The user's answer to "Hydric Soil Present?". Unset until they confirm it. */
@@ -101,6 +116,41 @@ export interface SamplingPoint {
   hydrology?: Hydrology
   /** The restrictive layer, if one was observed. */
   restrictive?: Restrictive
+}
+
+export type YesNo = "" | "yes" | "no"
+
+/** The answer for each of vegetation, soil and hydrology. */
+export interface Conditions {
+  vegetation: YesNo
+  soil: YesNo
+  hydrology: YesNo
+}
+
+/** The fields at the top of page 1 that are the same for every Sampling point of a Project. */
+export interface ProjectHeader {
+  /** Project/Site. */
+  site: string
+  applicant: string
+  county: string
+  state: string
+  investigators: string
+  /** The sampling date, `yyyy-mm-dd` as a date field gives it, or blank. */
+  date: string
+  /** Section, Township, Range, typed as the user writes it. */
+  sectionTownshipRange: string
+  landform: string
+  localRelief: string
+  slope: string
+  soilMapUnit: string
+  /** The NWI classification. */
+  nwi: string
+  /** Are "Normal Circumstances" present? */
+  normalCircumstances: YesNo
+  /** Are vegetation, soil or hydrology significantly disturbed? */
+  disturbed: Conditions
+  /** Are vegetation, soil or hydrology naturally problematic? */
+  problematic: Conditions
 }
 
 /** The Land Resource Region (and MLRA, when it matters) a project lies in. Decides which indicators apply. */
@@ -115,26 +165,86 @@ export interface Project {
   region: RegionId
   /** Milliseconds since 1970. */
   createdAt: number
+  header: ProjectHeader
   points: SamplingPoint[]
   /** Picked once for the project. Until it is, an indicator that is limited to some subregions is not suggested. */
   subregion?: Subregion
 }
+
+const NO_CONDITIONS: Conditions = { vegetation: "", soil: "", hydrology: "" }
+
+export const emptyHeader = (site = ""): ProjectHeader => ({
+  site,
+  applicant: "",
+  county: "",
+  state: "",
+  investigators: "",
+  date: "",
+  sectionTownshipRange: "",
+  landform: "",
+  localRelief: "",
+  slope: "",
+  soilMapUnit: "",
+  nwi: "",
+  normalCircumstances: "",
+  disturbed: NO_CONDITIONS,
+  problematic: NO_CONDITIONS,
+})
 
 export const newProject = (name: string, region: RegionId): Project => ({
   id: crypto.randomUUID(),
   name: name.trim(),
   region,
   createdAt: Date.now(),
+  // The site starts as the project's name, and can be changed.
+  header: emptyHeader(name.trim()),
   points: [],
 })
 
-export const newPoint = (name: string): SamplingPoint => ({ id: crypto.randomUUID(), name: name.trim(), layers: [] })
+export const newPoint = (name: string): SamplingPoint => ({
+  id: crypto.randomUUID(),
+  name: name.trim(),
+  layers: [],
+  lat: "",
+  long: "",
+  datum: "",
+})
+
+/** A Project as stored by an earlier version, with the fields added since filled in blank. */
+export function normalizeProject(project: Project): Project {
+  const stored: Partial<ProjectHeader> = project.header ?? {}
+  return {
+    ...project,
+    header: {
+      ...emptyHeader(),
+      ...stored,
+      disturbed: { ...NO_CONDITIONS, ...stored.disturbed },
+      problematic: { ...NO_CONDITIONS, ...stored.problematic },
+    },
+    points: project.points.map((point) => ({ ...point, lat: point.lat ?? "", long: point.long ?? "", datum: point.datum ?? "" })),
+  }
+}
 
 /** The Project with one Sampling point changed. */
 export const withPoint = (project: Project, pointId: string, change: (point: SamplingPoint) => SamplingPoint): Project => ({
   ...project,
   points: project.points.map((point) => (point.id === pointId ? change(point) : point)),
 })
+
+/**
+ * What a Sampling point is in its pair, and who the other half is: the role on its own record, or
+ * the opposite of the role on the record of a point that names it. Null when it is not in a pair, or
+ * when the other half has been deleted.
+ */
+export function pairOf(project: Project, point: SamplingPoint): { role: PairRole; other: SamplingPoint } | null {
+  const opposite = (role: PairRole): PairRole => (role === "wetland" ? "upland" : "wetland")
+  if (point.pair) {
+    const other = project.points.find((p) => p.id === point.pair?.with)
+    return other ? { role: point.pair.role, other } : null
+  }
+  const owner = project.points.find((p) => p.pair?.with === point.id)
+  return owner?.pair ? { role: opposite(owner.pair.role), other: owner } : null
+}
 
 /** The Layers from the surface down. */
 export const topToBottom = (layers: readonly Layer[]): Layer[] => [...layers].sort((a, b) => a.top - b.top)

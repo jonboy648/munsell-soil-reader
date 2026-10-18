@@ -1,10 +1,11 @@
 // Placing a point on the Photo with a finger, a pen or a mouse.
 //
 // A mouse press shows the magnifier at once: dragging adjusts the point, releasing places it.
-// A finger or pen is also how the user scrolls and pinch-zooms, so it has to be told apart:
+// A finger or pen is also how the user scrolls, pans a pinch-zoomed page and pinch-zooms, and the
+// browser does all of that itself, so the Photo only has to tell them apart from placing:
 //   tap    lifted before HOLD_MS, still within SLOP: places the point where it came down
 //   hold   stays within SLOP for HOLD_MS: the magnifier shows, dragging adjusts, lifting places
-//   swipe  leaves SLOP first: nothing is placed and the page scrolls with the finger
+//   swipe  leaves SLOP first: nothing is placed, and the browser scrolls or pans the page
 //   pinch  a second finger, or the browser taking the gesture over: nothing is placed
 import * as React from "react"
 import type { XY } from "@/engine"
@@ -25,7 +26,6 @@ interface Gesture {
   canvas: HTMLCanvasElement
   from: XY // on screen, where the pointer came down
   at: XY // on screen, where it is now
-  scrolled: XY // on screen, how far a swipe has scrolled the page so far
   mode: "pending" | "placing" | "swiping"
   timer: number
 }
@@ -50,7 +50,7 @@ function placingOf(g: Gesture): Placing | null {
 
 const clientOf = (e: React.PointerEvent | PointerEvent): XY => ({ x: e.clientX, y: e.clientY })
 
-export function usePlacement(onPlace: (point: XY) => void) {
+export function usePlacement(canvas: HTMLCanvasElement | null, onPlace: (point: XY) => void) {
   const [placing, setPlacing] = React.useState<Placing | null>(null)
   const gesture = React.useRef<Gesture | null>(null)
 
@@ -72,6 +72,19 @@ export function usePlacement(onPlace: (point: XY) => void) {
     }
   }, [])
 
+  // Once the hold has fired, dragging the finger adjusts the point and must not also scroll or
+  // pan the page. The browser decides that at the first touchmove, and only a listener that is
+  // not passive can cancel it (React's own touch handlers are passive). It is on the Photo alone,
+  // so scrolling anywhere else stays on the browser's fast path.
+  React.useEffect(() => {
+    if (!canvas) return
+    const keepPut = (e: TouchEvent) => {
+      if (gesture.current?.mode === "placing" && e.cancelable) e.preventDefault()
+    }
+    canvas.addEventListener("touchmove", keepPut, { passive: false })
+    return () => canvas.removeEventListener("touchmove", keepPut)
+  }, [canvas])
+
   const handlers = {
     onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
       // One pointer at a time, and for a mouse only the main button.
@@ -84,7 +97,6 @@ export function usePlacement(onPlace: (point: XY) => void) {
         canvas: e.currentTarget,
         from: at,
         at,
-        scrolled: at,
         mode: e.pointerType === "mouse" ? "placing" : "pending",
         timer: 0,
       }
@@ -106,10 +118,6 @@ export function usePlacement(onPlace: (point: XY) => void) {
       if (g.mode === "pending" && Math.hypot(g.at.x - g.from.x, g.at.y - g.from.y) > SLOP) {
         window.clearTimeout(g.timer)
         g.mode = "swiping"
-      }
-      if (g.mode === "swiping") {
-        window.scrollBy(g.scrolled.x - g.at.x, g.scrolled.y - g.at.y)
-        g.scrolled = g.at
       } else if (g.mode === "placing") {
         setPlacing(placingOf(g))
       }

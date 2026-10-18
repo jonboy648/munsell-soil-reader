@@ -68,6 +68,18 @@ export const CREDITS: Credit[] = [
     notice: "Root-polynomial correction (BSD-3-Clause)",
   },
   {
+    name: "Archivo, Public Sans and IBM Plex Mono",
+    license: "SIL OFL 1.1",
+    by: "The Archivo Project Authors, the Public Sans Project Authors and IBM Corp.",
+    used: "The typefaces of the interface: headings, text and numbers. Bundled with the app, unmodified, so it looks the same with no network.",
+    links: [
+      { label: "Archivo", href: "https://github.com/Omnibus-Type/Archivo" },
+      { label: "Public Sans", href: "https://github.com/uswds/public-sans" },
+      { label: "IBM Plex", href: "https://github.com/IBM/plex" },
+    ],
+    notice: "Fonts (SIL Open Font License 1.1)",
+  },
+  {
     name: "js-aruco2",
     license: "MIT",
     by: "Damiano Falcioni, from js-aruco by Juan Mellado",

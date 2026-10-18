@@ -58,13 +58,14 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
 test("lists every credit with its license", async ({ page }) => {
   await openMethodPage(page)
   const credits = page.getByTestId("credit")
-  await expect(credits).toHaveCount(6)
+  await expect(credits).toHaveCount(7)
   const expected: [string, string][] = [
     ["Munsell Soil Reader", "MIT"],
     ["munsell.js", "MPL-2.0"],
     ["Soil-book Chip list", "CC0 1.0"],
     ["X-Rite ColorChecker Classic reference values", "BSD-3-Clause"],
     ["colour-science root-polynomial correction", "BSD-3-Clause"],
+    ["Archivo, Public Sans and IBM Plex Mono", "SIL OFL 1.1"],
     ["js-aruco2", "MIT"],
   ]
   for (const [name, license] of expected) {
@@ -89,6 +90,15 @@ test("opens the full license text of each credit that has one", async ({ page })
     await credit.getByText("Read the full license text").click()
     await expect(credit.getByTestId("license-text")).toContainText(snippet)
   }
+  // The fonts ship with the app, so the OFL text travels with them, with each font's copyright line.
+  const fonts = page.getByTestId("credit").filter({ hasText: "Archivo, Public Sans and IBM Plex Mono" })
+  await fonts.getByText("Read the full license text").click()
+  const ofl = fonts.getByTestId("license-text")
+  await expect(ofl).toContainText("Copyright 2020 The Archivo Project Authors")
+  await expect(ofl).toContainText("Copyright 2015 The Public Sans Project Authors")
+  await expect(ofl).toContainText("Copyright 2017 IBM Corp. All rights reserved.")
+  await expect(ofl).toContainText("SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007")
+  await expect(ofl).toContainText("PERMISSION & CONDITIONS")
   // The Chip list is CC0: a link, not a text to read.
   const chips = page.getByTestId("credit").filter({ hasText: "Soil-book Chip list" })
   await expect(chips.getByTestId("license-text")).toHaveCount(0)

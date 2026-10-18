@@ -50,6 +50,13 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
   `ReadingsPanel`), plus the step indicator, example picker, bottom bar and theme toggle.
   `src/components/ui/` is shadcn/ui.
+- `src/components/method/`: the accuracy and method page (how a Reading is made, the warnings and
+  their numbers, the correction, limits, what leaves the phone, credits and license texts). It
+  reads its numbers from the engine's constants and its license texts from `LICENSE` and
+  `THIRD_PARTY_NOTICES.md`, so it cannot drift from them. The licenses of everything else the
+  app ships are written at build time by `vite-plugins/bundledLicenses.ts` (every package in the
+  build, with its own license text) to `licenses.json`, which the service worker caches too. It is a page of the same single HTML
+  file (`#method`), so it works offline with the rest.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
 - `e2e/`: the browser tests.
 - Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)

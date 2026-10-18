@@ -1,0 +1,46 @@
+// The Cards the app can read against, and the trade between them (ADR 0001, ADR 0003). How a Page
+// is used is in PageCard.tsx; the printed frame is a marked stub until it ships.
+import { NotYet, Section, Sub } from "./parts"
+import { PageCard } from "./PageCard"
+
+export function CardsSection() {
+  return (
+    <Section id="cards" title="The Card: ColorChecker or a Page of your book">
+      <p>
+        The correction needs a Card in the same Photo and the same light as the soil, so it has
+        colors it knows to work from. The app reads against two Cards, a ColorChecker or a Page of your
+        soil book, and they trade against each other.
+      </p>
+      <Sub>X-Rite ColorChecker Classic</Sub>
+      <p>
+        A card of 24 patches. It is an independent reference:
+        its colors do not come from the soil book, and they do not fade the way a book does. It
+        costs money, and apart from its gray row and two skin tones, its patches are saturated colors, far from the
+        browns of soil, so the correction is not tuned to soil colors.
+      </p>
+      <Sub>A Page of your soil book</Sub>
+      <p>
+        Most people who read soil with the Munsell book do not own a ColorChecker, so a Page of the
+        book itself can be the Card. The app knows every Chip's notation, so the Page's Chips are
+        its reference colors. The Chips are exactly the colors soil has, and nothing extra has to be
+        bought. The correction is strongest near the colors on the Page, so lay down the Page
+        closest to your soil, as you would reading by eye.
+      </p>
+      <p>
+        <b>The catch: a Page corrects against the same book the answer is read from.</b> Books fade
+        and get dirty. A Chip that is worn on its own is left out of the correction and named. A
+        Page that has faded evenly shifts every Reading, and the Card check cannot see it, because
+        every Chip on it has moved together. The Page is for convenience. If a Reading matters,
+        cross-check it with a ColorChecker.
+      </p>
+      <PageCard />
+      <Sub>The printed frame</Sub>
+      <NotYet testId="frame-stub">
+        <p>
+          A printed frame with measured color patches and a marker in each corner is planned, so the
+          app can find the Card without taps and no book is needed. It is not in this version.
+        </p>
+      </NotYet>
+    </Section>
+  )
+}

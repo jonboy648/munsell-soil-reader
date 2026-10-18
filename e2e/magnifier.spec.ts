@@ -46,6 +46,12 @@ type TouchType = "touchStart" | "touchMove" | "touchEnd" | "touchCancel"
  * first as finger 0 and so on; a finger that stays down while another lifts names its `id`.
  */
 async function fingers(page: Page) {
+  // Raw touch events are sent over the Chrome DevTools Protocol, which only Chromium has. On the
+  // other engines these tests are skipped, and show up as skipped with this reason.
+  test.skip(
+    page.context().browser()?.browserType().name() !== "chromium",
+    "raw touch events need the Chrome DevTools Protocol, which only Chromium has",
+  )
   const cdp = await page.context().newCDPSession(page)
   const send = (type: TouchType, ...down: (XY & { id?: number })[]) =>
     cdp.send("Input.dispatchTouchEvent", { type, touchPoints: down.map((p, i) => ({ id: i, ...p })) })

@@ -111,6 +111,8 @@ test("...", async ({ browserName }) => {
 })
 ```
 
+`fingers()` in `e2e/magnifier.spec.ts` does this for every test that sends raw touch events.
+
 Taps: a click lands on a whole CSS pixel, and engines get there differently (Chromium rounds,
 WebKit and Firefox cut off the fraction). A test that measures where a tap landed must round the
 tap itself (see `tapPhoto` in `e2e/angled.spec.ts`) and allow for half a CSS pixel.

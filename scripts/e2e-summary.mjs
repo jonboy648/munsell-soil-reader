@@ -26,9 +26,11 @@ const lines = [
   `${count("expected")} passed, ${skipped.length} skipped, ${count("flaky")} flaky, ${count("unexpected")} failed ` +
     `in ${(report.stats.duration / 1000).toFixed(0)} s`,
 ]
-for (const t of skipped) {
-  const reason = t.annotations.find((a) => a.type === "skip")?.description || "no reason given"
-  lines.push(`- skipped: ${t.file} - ${t.title} (${reason})`)
+const byReason = Map.groupBy(skipped, (t) => t.annotations.find((a) => a.type === "skip")?.description || "no reason given")
+for (const [reason, group] of byReason) {
+  lines.push("", `<details><summary>${group.length} skipped: ${reason}</summary>`, "")
+  for (const t of group) lines.push(`- ${t.file}: ${t.title}`)
+  lines.push("", "</details>")
 }
 for (const t of tests.filter((t) => t.status === "flaky")) lines.push(`- flaky: ${t.file} - ${t.title}`)
 console.log(lines.join("\n"))

@@ -38,6 +38,8 @@ async function confirmedFrame(page: Page, name = "Frame as the Card") {
   await foundFrame(page, name)
   await page.getByTestId("confirm-outline").click()
   await expect(frameStatus(page)).toHaveAttribute("data-state", "confirmed")
+  // The button is below the Photo, and the next step is a tap on the Photo: it has to be back in view.
+  await expect(page.getByTestId("photo")).toBeInViewport({ ratio: 1 })
 }
 
 test("finds the frame with no taps, and a Spot in the window reads the corrected Chip", async ({ page }) => {

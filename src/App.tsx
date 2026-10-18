@@ -74,6 +74,12 @@ export function App() {
     () => (cardKind === "frame" ? { outline: frame.outline, confirmed: frame.confirmed } : undefined),
     [cardKind, frame.outline, frame.confirmed],
   )
+  // The button that confirms the outline is below the Photo, so the page may have scrolled to it
+  // (on a phone it nearly always has); the next thing to do is tap the soil in the Photo.
+  const confirmOutline = () => {
+    dispatch({ type: "frameConfirm" })
+    window.scrollTo({ top: 0 })
+  }
   const onBatchCode = (code: string) => {
     dispatch({ type: "batchCode", code })
     if (code.trim() !== "") void lookupBatch(code).then((answer) => dispatch({ type: "batchResult", code, result: answer }))
@@ -162,7 +168,7 @@ export function App() {
                 onHue={(h) => dispatch({ type: "hue", hue: h })}
                 frame={frame}
                 onBatchCode={onBatchCode}
-                onConfirmOutline={() => dispatch({ type: "frameConfirm" })}
+                onConfirmOutline={confirmOutline}
               />
               {step === "spots" && <SpotsPanel spotCount={session.spots.length} inWindow={cardKind === "frame" && !noCard} />}
             </>

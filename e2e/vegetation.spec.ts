@@ -152,14 +152,16 @@ test.describe("offline", () => {
   test.use({ serviceWorkers: "allow" })
 
   test("the plant list resolves a name and the PDF is made with the network off", async ({ page, context }) => {
-    const failed: string[] = []
-    page.on("requestfailed", (request) => failed.push(request.url()))
     await page.goto("/")
     await page.evaluate(() => navigator.serviceWorker.ready)
     await page.reload()
     await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true)
+    await page.waitForLoadState("networkidle")
 
+    // Only requests that fail with the network off count: a request cut off by the reload above is not one.
+    const failed: string[] = []
     await context.setOffline(true)
+    page.on("requestfailed", (request) => failed.push(request.url()))
     await page.reload()
     const sheet = await createPoint(page, "Field", "OFF-1")
     await sheet.getByLabel("Plant name").fill("RCG")

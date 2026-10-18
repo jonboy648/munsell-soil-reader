@@ -38,7 +38,7 @@ async function addLayer(sheet: Locator, layer: LayerFields) {
     await sheet.getByLabel(`Redox color ${i + 1}`).fill(color)
     await sheet.getByLabel(`Redox % ${i + 1}`).fill(percent)
   }
-  if (layer.remarks) await sheet.getByLabel("Remarks").fill(layer.remarks)
+  if (layer.remarks) await sheet.getByLabel("Remarks", { exact: true }).fill(layer.remarks)
   await sheet.getByRole("button", { name: "Save layer" }).click()
 }
 

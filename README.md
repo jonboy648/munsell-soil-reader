@@ -49,6 +49,11 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
 - `e2e/`: the browser tests.
 
+The Card's patches are found from the four corner taps with a homography (a perspective
+transform, `src/engine/grid.ts`), so a Card photographed at an angle still lands on every patch,
+and the read circle shrinks on the far side. Any four known grid positions fix it, so other
+Card kinds can reuse it.
+
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
 patches (ColorChecker "after November 2014" reference values): each channel is linearized along
 the six gray patches, undoing the camera's tone curve, and a 3x3 matrix is fitted to all 24. Then
@@ -70,10 +75,10 @@ on-screen swatch is clamped to sRGB.
 
 Two seams, and nothing else:
 
-- **Engine** (`src/engine/engine.test.ts`, `src/engine/correction.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
-  a Card and soil of a known Chip under a chosen light, exposure, color shift and tone curve,
-  then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
-- **Browser** (`e2e/reader.spec.ts`): the production build in Chromium at a phone viewport. It
+- **Engine** (`src/engine/*.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
+  a Card and soil of a known Chip under a chosen light, exposure, color shift, tone curve and
+  tilt, then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
+- **Browser** (`e2e/*.spec.ts`): the production build in Chromium at a phone viewport. It
   picks an example, taps corners and Spots by coordinates and reads the text on screen.
 
 ## Limits

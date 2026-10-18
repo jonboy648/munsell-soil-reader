@@ -94,6 +94,27 @@ async function expectNothingPlaced(page: Page, lens: Locator) {
 
 type Fingers = Awaited<ReturnType<typeof fingers>>
 
+/**
+ * Waits until the page has stopped moving. A pinch ends with the browser animating the zoom and
+ * the pan into place, which takes longer on a slow machine, and a position measured before it
+ * finishes is where the Photo was, not where it is.
+ */
+const settled = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const view = () => `${visualViewport!.scale} ${visualViewport!.offsetLeft} ${visualViewport!.offsetTop}`
+        let last = view()
+        let since = performance.now()
+        const check = () => {
+          if (view() !== last) [last, since] = [view(), performance.now()]
+          if (performance.now() - since > 300) done()
+          else requestAnimationFrame(check)
+        }
+        check()
+      }),
+  )
+
 /** Two fingers on the middle of the Photo, `from` then `to` CSS pixels either side of the middle. */
 async function pinch(page: Page, touch: Fingers, from: number, to: number) {
   const x = page.viewportSize()!.width / 2
@@ -104,6 +125,7 @@ async function pinch(page: Page, touch: Fingers, from: number, to: number) {
   for (let i = 1; i <= 12; i++) await touch.send("touchMove", ...apart(from + ((to - from) * i) / 12))
   await touch.send("touchEnd", { ...apart(to)[1], id: 1 })
   await touch.send("touchEnd")
+  await settled(page)
 }
 
 const LENS = 136 // the magnifier's size on screen, in pixels, when there is room

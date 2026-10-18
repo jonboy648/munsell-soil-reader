@@ -3,14 +3,24 @@
 import type { SavedReading } from "@/lib/log"
 import type { RegionId } from "./regions"
 
+/** The form's own codes for a redox feature: Concentration, Depletion, Reduced Matrix, Masked Sand grains. */
+export type RedoxType = "C" | "D" | "RM" | "MS"
+/** Where it is: Pore Lining or Matrix. */
+export type RedoxLocation = "PL" | "M"
+
 /** A color on a Layer: the Munsell notation, and how much of the Layer it covers. */
 export interface LayerColor {
   /** `10YR 4/2`, as it prints on the form. */
   notation: string
   /** Percent of the Layer, 0 to 100. */
   percent: number
+  /** True for a color typed in that is a Munsell notation but not a Chip of the soil book. It prints as typed. */
+  exact?: true
   /** The saved Reading it came from. Absent when the color was typed in. */
   reading?: SavedReading
+  /** A redox feature's type and location, when recorded. The indicator rules infer the type when it is not. */
+  type?: RedoxType
+  location?: RedoxLocation
 }
 
 export interface Layer {
@@ -22,6 +32,16 @@ export interface Layer {
   matrix: LayerColor | null
   redox: LayerColor[]
   remarks: string
+  /** The texture term from the Field Book's classes ("silt loam", "mucky sand", "muck"), when recorded. */
+  texture?: string
+}
+
+/** The Soil page's Restrictive Layer box. */
+export interface Restrictive {
+  /** A kind from the Field Book's list ("fragipan", "lithic bedrock"). */
+  type: string
+  /** Inches from the surface, or null while it is not known. */
+  depth: number | null
 }
 
 /** One of the three Field Observations: whether it was seen, and how deep (inches) when it was. */
@@ -66,6 +86,8 @@ export interface SamplingPoint {
   layers: Layer[]
   /** Absent until something is recorded for the Hydrology section. */
   hydrology?: Hydrology
+  /** The restrictive layer, if one was observed. */
+  restrictive?: Restrictive
 }
 
 export interface Project {
@@ -96,17 +118,26 @@ export const withPoint = (project: Project, pointId: string, change: (point: Sam
 /** The Layers from the surface down. */
 export const topToBottom = (layers: readonly Layer[]): Layer[] => [...layers].sort((a, b) => a.top - b.top)
 
-const STANDARD = /^(\d+(?:\.\d+)?(?:R|YR|Y|GY|G|BG|B|PB|P|RP))\s*(\d+(?:\.\d+)?\/\d+)$/
+const STANDARD = /^(\d+(?:\.\d+)?(?:R|YR|Y|GY|G|BG|B|PB|P|RP))\s*(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/
 const NEUTRAL = /^N\s*(\d+(?:\.\d+)?)\/?$/
 const GLEY = /^(GLEY[12])\s*(\d+(?:\.\d+)?\/(?:\d+[A-Z]+|N))$/
+
+/** 4.0 is written 4, as the soil book writes it. */
+const plain = (n: string) => String(Number(n))
 
 /** `10yr 4/2` as the notation prints (`10YR 4/2`), or null when it is not a soil-book notation. */
 export function notationOf(text: string): string | null {
   const t = text.trim().toUpperCase()
-  const standard = STANDARD.exec(t) ?? GLEY.exec(t)
-  if (standard) return `${standard[1]} ${standard[2]}`
+  const standard = STANDARD.exec(t)
+  if (standard) {
+    const [, hue, value, chroma] = standard
+    const letters = /[A-Z]+$/.exec(hue)![0]
+    return `${plain(hue.slice(0, -letters.length))}${letters} ${plain(value)}/${plain(chroma)}`
+  }
+  const gley = GLEY.exec(t)
+  if (gley) return `${gley[1]} ${gley[2]}`
   const neutral = NEUTRAL.exec(t)
-  return neutral ? `N ${neutral[1]}/` : null
+  return neutral ? `N ${plain(neutral[1])}/` : null
 }
 
 /** What is wrong with a Layer's depths, in plain words, or null when they are fine. */

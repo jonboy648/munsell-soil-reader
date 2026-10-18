@@ -67,8 +67,8 @@ export interface CardCheck {
   /** Good: below CARD_CHECK_GOOD, no dirty gray step. Caution: below CARD_CHECK_CAUTION, or a gray step was left out. Failed: above, or more than one gray step looked dirty. */
   verdict: CardVerdict
   ok: boolean // verdict is good
-  /** Gray steps that looked dirty or tinted, worst first. The first was left out of the correction; with a second the check failed. */
-  dirtyGrays?: string[]
+  /** The references that looked dirty and were left out of the correction, by name. */
+  leftOut?: string[]
 }
 
 export interface ReadPhotoInput {

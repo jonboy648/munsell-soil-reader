@@ -33,8 +33,8 @@
 // HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
 // TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import type { Vec3 } from "./color"
-import type { CurveFit, Fit } from "./correction"
+import { decode, encode, type Vec3 } from "./color"
+import { fitMatrix, type Fit, type Reference } from "./correction"
 import { leastSquares } from "./leastSquares"
 
 /** Root-polynomial degrees colour-science defines. Degree 1 is the plain RGB (3x3) set. */
@@ -152,3 +152,96 @@ export const gammaCurve: CurveFit = (points) => {
   const xs = points.map((p) => p.x)
   return straightOn((x) => best.a * Math.max(x, 0) ** best.g + best.b, Math.min(...xs), Math.max(...xs))
 }
+
+// ---- a curve per channel, through the ladder ----
+// The correction the engine shipped before the shared curve: each channel's curve drawn on its
+// own, in sRGB-encoded values, and inverted before the 3x3. PCHIP passes exactly through every
+// gray; the polynomial and gamma fits above smooth instead.
+export interface Point {
+  x: number
+  y: number
+}
+export type Curve = (x: number) => number
+/** Draws a curve through points. Past the first and last point the curve carries on straight. */
+export type CurveFit = (points: Point[]) => Curve
+
+/** Sorted by x, with points of the same x merged (their y averaged). */
+function distinct(points: Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a.x - b.x)
+  const merged: Point[] = []
+  let run: Point[] = []
+  const flush = () => {
+    if (run.length) merged.push({ x: run[0].x, y: run.reduce((s, p) => s + p.y, 0) / run.length })
+    run = []
+  }
+  for (const p of sorted) {
+    if (run.length && p.x - run[0].x > 1e-9) flush()
+    run.push(p)
+  }
+  flush()
+  return merged
+}
+
+/** Slope at an end of the curve (Fritsch-Carlson as in SciPy's PchipInterpolator). */
+function endSlope(h0: number, h1: number, d0: number, d1: number): number {
+  const d = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
+  if (Math.sign(d) !== Math.sign(d0)) return 0
+  if (Math.sign(d0) !== Math.sign(d1) && Math.abs(d) > 3 * Math.abs(d0)) return 3 * d0
+  return d
+}
+
+/**
+ * Monotone cubic through the points (Fritsch and Carlson 1980): smooth, and it never
+ * overshoots between two ladder steps the way an ordinary cubic can.
+ */
+export const pchip: CurveFit = (points) => {
+  const p = distinct(points)
+  const n = p.length
+  if (n < 2) return (x) => x
+  const h = p.slice(1).map((q, k) => q.x - p[k].x)
+  const delta = p.slice(1).map((q, k) => (q.y - p[k].y) / h[k])
+  const d: number[] = Array.from({ length: n }, () => 0)
+  if (n === 2) {
+    d[0] = d[1] = delta[0]
+  } else {
+    for (let k = 1; k < n - 1; k++) {
+      if (delta[k - 1] * delta[k] <= 0) continue
+      const w1 = 2 * h[k] + h[k - 1]
+      const w2 = h[k] + 2 * h[k - 1]
+      d[k] = (w1 + w2) / (w1 / delta[k - 1] + w2 / delta[k])
+    }
+    d[0] = endSlope(h[0], h[1], delta[0], delta[1])
+    d[n - 1] = endSlope(h[n - 2], h[n - 3], delta[n - 2], delta[n - 3])
+  }
+  return (x) => {
+    if (x <= p[0].x) return p[0].y + d[0] * (x - p[0].x)
+    if (x >= p[n - 1].x) return p[n - 1].y + d[n - 1] * (x - p[n - 1].x)
+    let k = 0
+    while (x >= p[k + 1].x) k++
+    const t = (x - p[k].x) / h[k]
+    return (
+      (2 * t ** 3 - 3 * t ** 2 + 1) * p[k].y +
+      (t ** 3 - 2 * t ** 2 + t) * h[k] * d[k] +
+      (-2 * t ** 3 + 3 * t ** 2) * p[k + 1].y +
+      (t ** 3 - t ** 2) * h[k] * d[k + 1]
+    )
+  }
+}
+
+// The curve is drawn in sRGB-encoded values, where a phone's tone curve is smooth and the
+// ladder steps are spread evenly. Encoding is extended to negative values as an odd function.
+const enc = (v: number): number => (v < 0 ? -encode(-v) : encode(v))
+const dec = (v: number): number => (v < 0 ? -decode(-v) : decode(v))
+
+/** Linearize each channel with its own curve through the ladder, then fit `then` (a 3x3 matrix by default). */
+export const linearizePerChannel =
+  (curveFit: CurveFit, then: Fit = fitMatrix): Fit =>
+  (references: Reference[]) => {
+    const ladder = references.filter((r) => r.ladder)
+    const curves = [0, 1, 2].map((c) =>
+      curveFit(ladder.map((r) => ({ x: enc(r.measured[c]), y: enc(r.truth[c]) }))),
+    )
+    const linearize = (lin: Vec3): Vec3 => [0, 1, 2].map((c) => dec(curves[c](enc(lin[c])))) as Vec3
+    const matrix = then(references.map((r) => ({ ...r, measured: linearize(r.measured) })))
+    return (lin) => matrix(linearize(lin))
+  }

@@ -288,7 +288,7 @@ export function simulatePhoto({
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare"
+export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "smudge"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -301,6 +301,12 @@ const phone = (light: SimCamera["light"]): SimCamera => ({ light, toneCurve: PHO
 
 /** A strong tilt: the right side of the scene turned 40 degrees away. */
 export const ANGLED_TILT: SimTilt = { yaw: 40, pitch: 0 }
+
+/** A black patch gone gray with handling: the scene color lifted toward a dull gray before the camera sees it. */
+const hazyBlack =
+  (light: SimCamera["light"]): SimCamera["light"] =>
+  (lin) =>
+    light(lin === PATCH_LINEAR[23] ? [lin[0] * 0.8 + 0.04, lin[1] * 0.8 + 0.04, lin[2] * 0.8 + 0.04] : lin)
 
 export const EXAMPLES: ExamplePhoto[] = [
   {
@@ -350,5 +356,11 @@ export const EXAMPLES: ExamplePhoto[] = [
         { at: { x: SIM_SPOT.x + 25, y: SIM_SPOT.y }, radius: 50, strength: 1.5 },
       ],
     },
+  },
+  {
+    id: "smudge",
+    name: "Smudged black patch",
+    note: "The Card's black patch has gone gray with handling, and the soil is dark. The Card check names the patch, leaves it out and still reads the soil.",
+    scene: { camera: phone(hazyBlack(LIGHTS.warm)), soil: "10YR 2.5/2" },
   },
 ]

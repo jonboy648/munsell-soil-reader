@@ -78,13 +78,16 @@ that its code is not in the app bundle. No frame exists yet; switching it on lat
 it in (a dynamic import, so js-aruco2 stays out of the main chunk).
 
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
-patches (ColorChecker "after November 2014" reference values): each channel is linearized along
-the six gray patches, undoing the camera's tone curve, and a 3x3 matrix is fitted to all 24. Then
+patches (ColorChecker "after November 2014" reference values): one tone curve, shared by the three
+channels, is drawn through the six gray patches and undone, and a 3x3 matrix is fitted to all 24. A
+gray that looks dirty is named and left out. Then
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
 then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 over the Card's
-patches, each corrected by a fit made without it (leave one out); below 2 is good. Why this
-correction and this threshold, and how it compares with a plain 3x3 and root-polynomial
-correction: [docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
+patches, each corrected by a fit made without it (leave one out): below 2 is good, up to 3.5 is
+caution (the corrected Reading is still the answer, with the raw one beside it) and above that it
+has failed. Both limits are provisional until a real Photo has been run. Why this correction and
+these limits, and how it compares with a plain 3x3 and root-polynomial correction:
+[docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
 the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
 what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
 list is only as complete as the checking, which is against one copy (Soil-Color Charts, 2009

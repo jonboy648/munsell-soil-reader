@@ -37,9 +37,9 @@ export function shownReading(
     }
   }
   if (reading.corrected && cardCheck?.verdict === "caution") {
-    const dirty = cardCheck.dirtyGrays?.[0]
+    const dirty = cardCheck.leftOut
     const cause = dirty
-      ? `The ${dirty} gray step looks dirty or tinted, so it was left out of the correction.`
+      ? `${dirty.join(" and ")} looked dirty or tinted, so ${dirty.length > 1 ? "they were" : "it was"} left out of the correction.`
       : flagged
         ? `Each Card patch, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, more than usual. The problem flagged below is the likely cause.`
         : `Each Card patch, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, more than usual. Uneven light across the Card or a dirty gray step can do that.`
@@ -58,15 +58,10 @@ export function shownReading(
     }
   }
   if (reading.corrected && cardCheck) {
-    const grays = cardCheck.dirtyGrays
-    const cause =
-      grays && grays.length > 1
-        ? `More than one gray step looks dirty or tinted (${grays.join(", ")}). Wipe the Card or try another.`
-        : "The corners were probably tapped out of order, or there is glare or shade on the Card. Tap Start over and begin at the brown patch."
     return {
       verdict: "failed",
       main: reading.raw,
-      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. ${cause} Showing the uncorrected Reading.`,
+      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
     }
   }
   return {

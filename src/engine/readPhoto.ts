@@ -2,7 +2,7 @@
 import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { checkCard } from "./cardCheck"
+import { checkCard, dirtyGrays } from "./cardCheck"
 import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_NAMES, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
 import { fitCorrection, type Fit, type Reference } from "./correction"
 import { checkQuality, type Evenness, type QualityReference } from "./quality"
@@ -61,7 +61,7 @@ function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
     ladder: NEUTRAL_PATCHES.includes(i),
     name: PATCH_NAMES[i],
   }))
-  return checkCard(references, fit)
+  return checkCard(references, fit, dirtyGrays(references, fit))
 }
 
 /**

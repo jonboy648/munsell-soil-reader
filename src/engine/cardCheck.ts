@@ -1,55 +1,47 @@
 // The Card check: whether the correction fitted on the Card can be trusted.
 //
-// Three numbers decide it, all of them provisional until a real Photo has been run through
-// (issue #15): they come from simulated Photos only. See docs/correction-comparison.md for
-// the sweeps behind them.
+// Two numbers decide it, both provisional until a real Photo has been run through (issue #15):
+// they come from simulated Photos only. docs/correction-comparison.md has the sweeps behind them.
 import { heldOutErrors, type Correction, type Fit, type Reference } from "./correction"
+import { dirtyLadderSteps } from "./leftOut"
 import type { CardCheck, CardVerdict } from "./types"
 
-/** The mean held-out CIEDE2000 below which the Card check is good. Provisional. */
+/**
+ * The mean held-out CIEDE2000 below which the Card check is good. Provisional.
+ *
+ * A Photo of a clean Card from an ideal camera scores 1.6 or less, and one from a real sensor's
+ * spectral response 1.6 to 2.9 (daylight about 2, tungsten about 3). Below 2 no real-sensor
+ * Reading was more than a Chip off.
+ */
 export const CARD_CHECK_GOOD = 2
 
-/** The mean above which it has failed. Between GOOD and this is caution. Provisional. */
-export const CARD_CHECK_CAUTION = 3.5
-
 /**
- * A gray step whose own held-out error is above this looks dirty or tinted. The mean hides it
- * (a gray is one of 24 references) but it bends the curve of every channel. Provisional.
+ * The mean above which the Card check has failed. From GOOD up to this is caution: the corrected
+ * Reading is still the answer, with the raw one beside it. Provisional.
+ *
+ * Honest Photos reach 3.4 (a real sensor under a 20% light gradient). A Card that spoils the
+ * Reading by more than a Chip (a dirty patch, a shadow, glare, corners out of order) scores
+ * 3.3 or more, and nearly always well over.
  */
-export const LADDER_LIMIT = 6
+export const CARD_CHECK_CAUTION = 3.5
 
 const mean = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length
 
-/** The ladder reference with the highest held-out error, and that error. */
-function worstGray(references: Reference[], errors: number[]) {
-  let worst: { index: number; error: number } | null = null
-  references.forEach((r, i) => {
-    if (r.ladder && (worst === null || errors[i] > worst.error)) worst = { index: i, error: errors[i] }
-  })
-  return worst as { index: number; error: number } | null
-}
+/** The ladder steps of a Card that look dirty, as indices into `references`. */
+export const dirtyGrays = (references: Reference[], fit: Fit): number[] => dirtyLadderSteps(references, fit)
 
 /**
- * Fit the correction on a Card's references and check it. A gray step that looks dirty is
- * named, left out, and the correction refitted without it; the check is then scored on the
- * references that remain, and can be no better than caution. A second dirty gray fails it.
+ * Fit the correction on a Card's references, leaving out the ones at `out` (dirty or smudged
+ * ones; see leftOut.ts), and check it. The check is the mean held-out error of the references
+ * that remain. Leaving anything out caps it at caution: the Card is not clean, and the user
+ * should look at the raw Reading beside the corrected one.
  */
-export function checkCard(references: Reference[], fit: Fit): { correct: Correction; check: CardCheck } {
-  let used = references
-  let errors = heldOutErrors(used, fit)
-  const dirty: string[] = []
-  const first = worstGray(used, errors)
-  if (first && first.error > LADDER_LIMIT) {
-    dirty.push(used[first.index].name ?? "a gray step")
-    used = used.filter((_, i) => i !== first.index)
-    errors = heldOutErrors(used, fit)
-    const second = worstGray(used, errors)
-    if (second && second.error > LADDER_LIMIT) dirty.push(used[second.index].name ?? "a gray step")
-  }
-  const meanDE = mean(errors)
+export function checkCard(references: Reference[], fit: Fit, out: number[]): { correct: Correction; check: CardCheck } {
+  const kept = references.filter((_, i) => !out.includes(i))
+  const meanDE = mean(heldOutErrors(kept, fit))
   let verdict: CardVerdict = meanDE < CARD_CHECK_GOOD ? "good" : meanDE < CARD_CHECK_CAUTION ? "caution" : "failed"
-  if (dirty.length === 1 && verdict === "good") verdict = "caution"
-  if (dirty.length > 1) verdict = "failed"
-  const check: CardCheck = { meanDE, verdict, ok: verdict === "good", ...(dirty.length ? { dirtyGrays: dirty } : {}) }
-  return { correct: fit(used), check }
+  if (out.length > 0 && verdict === "good") verdict = "caution"
+  const names = out.map((i) => references[i].name ?? "a reference")
+  const check: CardCheck = { meanDE, verdict, ok: verdict === "good", ...(out.length ? { leftOut: names } : {}) }
+  return { correct: fit(kept), check }
 }

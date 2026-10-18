@@ -81,7 +81,7 @@ async function exportCsv(page: Page) {
     logScreen(page).getByRole("button", { name: "Export CSV" }).click(),
   ])
   const bytes = readFileSync(await download.path())
-  return { filename: download.suggestedFilename(), bytes, text: bytes.toString("utf8").replace(/^﻿/, "") }
+  return { filename: download.suggestedFilename(), bytes, text: bytes.toString("utf8").replace(String.fromCharCode(0xfeff), "") }
 }
 
 /** A small RFC 4180 reader: quoted fields may hold commas, doubled quotes and line breaks. */

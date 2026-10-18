@@ -91,12 +91,14 @@ export function logToCsv(samples: Sample[]): string {
   return [CSV_HEADER.map(field).join(","), ...rows].map((line) => `${line}\r\n`).join("")
 }
 
+const BYTE_ORDER_MARK = String.fromCharCode(0xfeff)
+
 /**
  * Hands the CSV to the browser as a file download. The byte-order mark goes on here and not in
  * `logToCsv`: Excel needs it to read the file as UTF-8 (otherwise "Café" comes out as "CafÃ©").
  */
 export function downloadCsv(samples: Sample[], now = new Date()): void {
-  const url = URL.createObjectURL(new Blob(["﻿", logToCsv(samples)], { type: "text/csv;charset=utf-8" }))
+  const url = URL.createObjectURL(new Blob([BYTE_ORDER_MARK, logToCsv(samples)], { type: "text/csv;charset=utf-8" }))
   const link = document.createElement("a")
   link.href = url
   link.download = `soil-log-${localDate(now)}.csv`

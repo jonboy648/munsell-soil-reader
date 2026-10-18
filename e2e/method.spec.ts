@@ -40,8 +40,23 @@ test("explains the steps, the Card check line and each warning with its number",
   await expect(warnings).toContainText("more than 0.3 stops")
 
   const correction = page.locator("#correction")
-  await expect(correction).toContainText("Straighten the tone curve, then 3x3 (used)")
+  await expect(correction).toContainText("Five corrections were compared")
+  await expect(correction.getByRole("row")).toHaveCount(6) // the header and five corrections
+  await expect(correction).toContainText("Straighten the tone curve with a smooth curve, then 3x3 (used)")
   await expect(correction).toContainText("Root-polynomial")
+})
+
+test("says the Card check line is provisional and that a pass is not a promise", async ({ page }) => {
+  await openMethodPage(page)
+  const correction = page.locator("#correction")
+  await expect(correction).toContainText("The line is 2, and it is provisional.")
+  await expect(correction).toContainText("one or two dirty patches 0.9 to 16")
+  await expect(correction).toContainText("A pass is not a promise that the Reading is within one Chip.")
+  await expect(correction).toContainText("A dirty or tinted gray patch can pass.")
+  await expect(correction).toContainText("14 of 24")
+  // Claims that were not true, and are gone.
+  await expect(correction).not.toContainText("3.7 or more")
+  await expect(correction).not.toContainText("half the lowest")
 })
 
 test("explains the Page against ColorChecker trade and the faded-book limit", async ({ page }) => {
@@ -73,7 +88,41 @@ test("lists every credit with its license", async ({ page }) => {
     await expect(credit).toHaveCount(1)
     await expect(credit.getByTestId("credit-license")).toContainText(license)
   }
-  await expect(page.getByTestId("other-dependencies")).toContainText("React, React DOM")
+})
+
+test("lists every package the app ships, with its license text, generated from the build", async ({ page }) => {
+  await openMethodPage(page)
+  const packages = page.getByTestId("bundled-package")
+  await expect(packages.first()).toBeVisible()
+  expect(await packages.count()).toBeGreaterThan(30)
+
+  // The ones that need a notice, by license: Apache-2.0, MIT, ISC, and the stylesheet and service worker's.
+  const expected: [string, string, string][] = [
+    ["class-variance-authority", "Apache-2.0", "Apache License"],
+    ["clsx", "MIT", "Permission is hereby granted"],
+    ["@radix-ui/react-dialog", "MIT", "Permission is hereby granted"],
+    ["vaul", "MIT", "Permission is hereby granted"],
+    ["react", "MIT", "Permission is hereby granted"],
+    ["lucide-react", "ISC", "Permission to use, copy, modify"],
+    ["tailwindcss", "MIT", "Permission is hereby granted"],
+    ["workbox-core", "MIT", "Permission is hereby granted"],
+  ]
+  for (const [name, license, snippet] of expected) {
+    const pkg = page.locator(`[data-package="${name}"]`)
+    await expect(pkg, name).toHaveCount(1)
+    await expect(pkg.locator("summary")).toContainText(license)
+    await pkg.locator("summary").click()
+    await expect(pkg.getByTestId("package-license-text")).toContainText(snippet)
+  }
+  // Packages that have a credit of their own are not repeated, and nothing sends the reader to node_modules.
+  await expect(page.locator('[data-package="munsell"]')).toHaveCount(0)
+  await expect(page.getByTestId("method-page")).not.toContainText("node_modules")
+
+  // Every package has a text.
+  const empty = await page.getByTestId("package-license-text").evaluateAll((els) =>
+    els.filter((el) => !(el.textContent ?? "").trim()).length,
+  )
+  expect(empty).toBe(0)
 })
 
 test("opens the full license text of each credit that has one", async ({ page }) => {
@@ -115,7 +164,9 @@ test("says the 20-soil test has not been run, and marks what is not in this vers
   await expect(page.getByTestId("leaves-stub")).toContainText("Plant photo identification")
   await expect(page.getByTestId("leaves-stub")).toContainText("Your location")
   await expect(page.getByTestId("leaves-stub")).toContainText("Look-ups by location")
-  await expect(page.locator("#privacy")).toContainText("Nothing does.")
+  await expect(page.locator("#privacy")).toContainText("Your Photos and Readings never leave it.")
+  await expect(page.locator("#privacy")).toContainText("soil.joncackler.com")
+  await expect(page.locator("#privacy")).toContainText("carries no Photo and no Reading")
 })
 
 test("uses only gray: no text, border or background on the page has any color", async ({ page }) => {
@@ -159,8 +210,72 @@ test.describe("with no network", () => {
     await munsell.getByText("Read the full license text").click()
     await expect(munsell.getByTestId("license-text")).toContainText("Mozilla Public License Version 2.0")
 
+    // The list of everything else the app ships is cached too.
+    const cva = page.locator('[data-package="class-variance-authority"]')
+    await cva.locator("summary").click()
+    await expect(cva.getByTestId("package-license-text")).toContainText("Apache License")
+
     await page.reload()
     await expect(page.getByRole("heading", { level: 1, name: "Accuracy and method" })).toBeVisible()
     await expect(page.getByTestId("soil-test-results")).toBeVisible()
   })
+
+  test("a first visit straight to the method page still installs, and works offline", async ({ page, context }) => {
+    await page.goto("/#method")
+    await expect(page.getByTestId("method-page")).toBeVisible()
+    await page.evaluate(() => navigator.serviceWorker.ready)
+    await page.reload()
+    await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true)
+
+    await context.setOffline(true)
+    await page.reload()
+    await expect(page.getByRole("heading", { level: 1, name: "Accuracy and method" })).toBeVisible()
+    await page.getByTestId("back-to-reader").first().click()
+    await expect(page.getByTestId("method-link")).toBeVisible()
+  })
+
+  test("the ready-offline notice is still there after a visit to the method page", async ({ page }) => {
+    await page.goto("/#method")
+    await expect(page.getByTestId("method-page")).toBeVisible()
+    await page.evaluate(() => navigator.serviceWorker.ready)
+    await page.getByTestId("back-to-reader").first().click()
+    await expect(page.getByTestId("offline-notice")).toContainText("Ready to work offline")
+  })
+})
+
+test("Back to the Photo takes one step back, so the system Back does not reopen the page", async ({ page }) => {
+  await page.goto("/")
+  await page.getByTestId("method-link").click()
+  await expect(page).toHaveURL(/#method$/)
+  await page.getByTestId("back-to-reader").first().click()
+  await expect(page.getByTestId("method-link")).toBeVisible()
+  await expect(page).not.toHaveURL(/#method/)
+  await page.goBack()
+  await expect(page.getByTestId("method-page")).toHaveCount(0)
+})
+
+test("opened straight on the method page, Back to the Photo replaces it", async ({ page }) => {
+  await page.goto("/#method")
+  await expect(page.getByTestId("method-page")).toBeVisible()
+  await page.getByTestId("back-to-reader").first().click()
+  await expect(page.getByTestId("method-link")).toBeVisible()
+  await page.goBack()
+  // There was nothing in the app to go back to, so the system Back leaves it instead of reopening the page.
+  await expect(page.getByTestId("method-page")).toHaveCount(0)
+})
+
+test("opening each license text never makes the page wider than a 360 px phone", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await openMethodPage(page)
+  const wide = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  expect(await wide()).toBeLessThanOrEqual(0)
+
+  const credits = page.getByTestId("credit")
+  for (let i = 0; i < (await credits.count()); i++) {
+    const open = credits.nth(i).getByText("Read the full license text")
+    if (await open.count()) await open.click()
+  }
+  const packages = page.getByTestId("bundled-package")
+  for (let i = 0; i < (await packages.count()); i++) await packages.nth(i).locator("summary").click()
+  expect(await wide()).toBeLessThanOrEqual(0)
 })

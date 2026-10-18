@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { isIosBrowserTab } from "@/lib/ios"
-import { useServiceWorker } from "@/lib/serviceWorker"
+import type { ServiceWorkerStatus } from "@/lib/serviceWorker"
 
 /**
  * What the service worker has to tell the user: the app now works offline, and a new version is
@@ -9,10 +9,12 @@ import { useServiceWorker } from "@/lib/serviceWorker"
  * covered, and a tap never lands somewhere other than where the user aimed. Reload throws away
  * the Photo and the taps made on it, so with a Photo loaded the notice says so, and "Later" puts
  * it away until the app next comes back to the front. Render it inside a `relative` header.
+ *
+ * The status comes from the app, which follows the service worker for every page, so a first
+ * visit that opens on another page still installs it, and the notice survives a trip to one.
  */
-export function UpdateNotice({ hasPhoto }: { hasPhoto: boolean }) {
-  const { offlineReady, updateReady, dismissOfflineReady, dismissUpdate, reload } =
-    useServiceWorker()
+export function UpdateNotice({ hasPhoto, status }: { hasPhoto: boolean; status: ServiceWorkerStatus }) {
+  const { offlineReady, updateReady, dismissOfflineReady, dismissUpdate, reload } = status
   if (!updateReady && !offlineReady) return null
 
   return (

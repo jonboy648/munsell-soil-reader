@@ -7,7 +7,7 @@ import { Section } from "./parts"
 const STEPS: { name: string; body: string }[] = [
   {
     name: "Sampling",
-    body: `The app reads colors from the Photo, scaled down so its longest side is at most ${MAX_SIDE} pixels. Where you tap a Spot, it takes the median color inside a small circle, whose radius is a fortieth of the Photo's longer side (at least 6 pixels). On the Card it does the same inside a circle one fifth of a patch wide, centered on every patch. A median is used, not an average, so a few bright specks or a stray hair do not move the color.`,
+    body: `The app reads colors from the Photo, scaled down so its longest side is at most ${MAX_SIDE} pixels. Where you tap a Spot, it takes the median color inside a small circle, whose radius is a fortieth of the Photo's longer side (at least 6 pixels). On the Card it does the same inside a circle about half as wide as a patch, centered on every patch. A median is used, not an average, so a few bright specks or a stray hair do not move the color.`,
   },
   {
     name: "Correction",

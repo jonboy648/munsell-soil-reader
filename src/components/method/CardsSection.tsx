@@ -14,8 +14,8 @@ export function CardsSection() {
       <p>
         A card of 24 patches. This is the Card the app reads today. It is an independent reference:
         its colors do not come from the soil book, and they do not fade the way a book does. It
-        costs money, and its colors are bright and varied, not the browns and grays of soil, so the
-        correction is not tuned to soil colors.
+        costs money, and apart from its gray row and two skin tones, its patches are saturated colors, far from the
+        browns of soil, so the correction is not tuned to soil colors.
       </p>
       <Sub>A Page of your soil book</Sub>
       <p>

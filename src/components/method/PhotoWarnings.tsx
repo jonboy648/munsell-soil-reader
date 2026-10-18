@@ -28,7 +28,7 @@ const WARNINGS: { name: string; means: string; line: string }[] = [
     name: "Clipped",
     means:
       "Part of the Photo is washed out to pure white or lost in pure black, so the camera recorded nothing there that a correction could recover. Use less light or lower the exposure, or add light.",
-    line: `The Card's white has ${BLOWN_CHANNELS} channels at ${WHITE_CLIPPED_LEVEL} or more in its median color. Or the Card's black patch is ${percent(CLIP_SHARE)} crushed. Or fewer than ${MIN_LIT_SAMPLES} of the 15 places on the Card's black frame rise above black, so the light cannot be checked. On a Spot: blown pixels while the soil itself sits at ${NEAR_CLIP_LEVEL} or more, or ${percent(CLIP_SHARE)} of it crushed.`,
+    line: `The Card's white has ${BLOWN_CHANNELS} channels at ${WHITE_CLIPPED_LEVEL} or more in its median color. Or the Card's black patch is ${percent(CLIP_SHARE)} crushed. Or fewer than ${MIN_LIT_SAMPLES} of the 15 places on the Card's black frame rise above black, so the light cannot be checked. On a Spot: at least ${percent(GLARE_SHARE)} of its pixels blown while the soil itself sits at ${NEAR_CLIP_LEVEL} or more, or ${percent(CLIP_SHARE)} of it crushed.`,
   },
   {
     name: "Uneven light",
@@ -73,8 +73,9 @@ export function PhotoWarnings() {
         ))}
       </ul>
       <p>
-        These are first values, chosen from simulated Photos. Real phone Photos have blur and
-        compression the simulation lacks, so the lines will move as real Photos come in. A Photo can
+        These are first values, chosen from simulated Photos. The simulation includes noise and JPEG
+        compression, but not the blur, HDR and sharpening of real phone Photos, so the lines will
+        move as real Photos come in. A Photo can
         pass every check and still read wrong, and one that fails can still read well: the checks
         are warnings, not verdicts.
       </p>

@@ -14,7 +14,8 @@ import { ThemeToggle } from "@/components/ThemeToggle"
 import { buttonVariants } from "@/components/ui/button"
 import { UpdateNotice } from "@/components/UpdateNotice"
 import { examplePhoto, filePhoto } from "@/lib/photo"
-import { hrefOf, usePage } from "@/lib/route"
+import { hrefOf, markOpenedHere, usePage } from "@/lib/route"
+import { useServiceWorker } from "@/lib/serviceWorker"
 import {
   CORNER_COUNT,
   canUndo,
@@ -26,6 +27,9 @@ import {
 
 export function App() {
   const page = usePage()
+  // Followed here, above the page switch: a first visit that opens on the method page still
+  // installs the service worker, and its notices are not lost on the way between pages.
+  const serviceWorker = useServiceWorker()
   const [session, dispatch] = React.useReducer(sessionReducer, initialSession)
   const [problem, setProblem] = React.useState<string | null>(null)
   const step = stepOf(session)
@@ -66,7 +70,7 @@ export function App() {
         <h1 className="py-3 font-heading text-xl font-extrabold tracking-tight [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
-        <UpdateNotice hasPhoto={session.photo !== null} />
+        <UpdateNotice hasPhoto={session.photo !== null} status={serviceWorker} />
       </header>
 
       <main className="flex flex-1 flex-col gap-4 pb-44">
@@ -112,6 +116,7 @@ export function App() {
           <InstallHint />
           <a
             href={hrefOf("method")}
+            onClick={markOpenedHere}
             data-testid="method-link"
             className={buttonVariants({ variant: "ghost", size: "lg", className: "h-11" })}
           >

@@ -26,3 +26,24 @@ export function usePage(): Page {
 
 /** The link target for a page; the reader is the address with no #. */
 export const hrefOf = (page: Page): string => (page === "reader" ? "#" : `#${page}`)
+
+// Leaving a page. A page opened by a tap on a link in the app is one step on the browser's history,
+// so closing it takes that step back, and the system Back button does not bring it up again. A page
+// that was the first thing opened (a bookmark, a reload) has nothing to go back to inside the
+// app, so it is replaced by the reader instead.
+let openedHere = false
+
+/** Call when a link in the app opens a page. */
+export const markOpenedHere = (): void => {
+  openedHere = true
+}
+
+/** Close the page being shown and show the reader. */
+export function closePage(): void {
+  if (openedHere && window.history.length > 1) {
+    openedHere = false
+    window.history.back()
+  } else {
+    window.location.replace(hrefOf("reader"))
+  }
+}

@@ -113,12 +113,32 @@ export function licenseTextOf(credit: Credit): string | null {
   return body ? fencedText(body) : null
 }
 
-/** Rows of the table of other dependencies in THIRD_PARTY_NOTICES.md: package, license. */
-export function otherDependencies(): { name: string; license: string }[] {
-  const body = sections().get("Other dependencies") ?? ""
-  return body
-    .split("\n")
-    .filter((line) => line.startsWith("|") && !line.startsWith("| Package") && !line.startsWith("| ---"))
-    .map((line) => line.split("|").map((cell) => cell.trim()))
-    .map((cells) => ({ name: cells[1].replaceAll("`", ""), license: cells[2] }))
+/** One package whose code or files are in the built app (see vite-plugins/bundledLicenses.ts). */
+export interface BundledPackage {
+  name: string
+  version: string
+  license: string
+  homepage: string | null
+  /** The package's own license and notice text. */
+  text: string
+}
+
+/** Packages that have a credit of their own above, so the generated list leaves them out. */
+export const CREDITED_ABOVE = new Set([
+  "munsell",
+  "@fontsource-variable/archivo",
+  "@fontsource-variable/public-sans",
+  "@fontsource/ibm-plex-mono",
+])
+
+/**
+ * Every package the built app ships, with its license text. The list is written when the app is
+ * built, from what the build contains, and cached by the service worker with the rest of the
+ * app, so it reads the same with no network.
+ */
+export async function loadBundledPackages(): Promise<BundledPackage[]> {
+  const response = await fetch(`${import.meta.env.BASE_URL}licenses.json`)
+  if (!response.ok) throw new Error(`licenses.json answered ${response.status}`)
+  const body: { packages: BundledPackage[] } = await response.json()
+  return body.packages
 }

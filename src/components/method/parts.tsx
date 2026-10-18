@@ -16,7 +16,7 @@ export function Section({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="grid scroll-mt-4 gap-3 border-t border-border px-4 py-6"
+      className="grid min-w-0 scroll-mt-4 grid-cols-[minmax(0,1fr)] gap-3 border-t border-border px-4 py-6"
     >
       <h2 id={`${id}-title`} className="font-heading text-xl font-extrabold tracking-tight">
         {title}

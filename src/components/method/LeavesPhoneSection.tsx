@@ -1,14 +1,20 @@
-// What leaves the phone. Today: nothing. Later: three things, each only on purpose.
+// What leaves the phone. Today: nothing of yours, and one check for a new version of the app.
+// Later: three things, each only on purpose.
 import { NotYet, Section } from "./parts"
 
 export function LeavesPhoneSection() {
   return (
     <Section id="privacy" title="What leaves your phone">
       <p>
-        <b>Nothing does.</b> Your Photos are read in the app on your phone and are never uploaded.
-        There are no accounts and no cloud copy. The app downloads its own files from
-        soil.joncackler.com on your first visit and whenever a new version is out, and then works
-        with no signal.
+        <b>Your Photos and Readings never leave it.</b> They are read in the app on your phone and
+        are never uploaded. There are no accounts and no cloud copy.
+      </p>
+      <p>
+        The app does one thing with the network. It asks soil.joncackler.com, which is hosted on
+        GitHub Pages, for its own files: on your first visit, and then each time you open it, bring
+        it back to the front or get signal again, to see whether a new version is out. That request
+        carries no Photo and no Reading, only what any web request carries: your network address and
+        your browser's name. Between those, the app works with no signal.
       </p>
       <NotYet testId="leaves-stub">
         <p>

@@ -1,6 +1,14 @@
 // Credits and licenses. Each credit names its license and opens the full text, which is bundled
 // into the app (see src/lib/credits.ts), so it reads the same with no network.
-import { CREDITS, licenseTextOf, otherDependencies, type Credit } from "@/lib/credits"
+import * as React from "react"
+import {
+  CREDITED_ABOVE,
+  CREDITS,
+  licenseTextOf,
+  loadBundledPackages,
+  type BundledPackage,
+  type Credit,
+} from "@/lib/credits"
 import { Section, Sub } from "./parts"
 
 function CreditCard({ credit }: { credit: Credit }) {
@@ -8,7 +16,7 @@ function CreditCard({ credit }: { credit: Credit }) {
   return (
     <li
       data-testid="credit"
-      className="grid gap-1 rounded-md border border-border bg-card p-3 text-sm"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 rounded-md border border-border bg-card p-3 text-sm"
     >
       <p className="flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="font-heading text-base font-bold">{credit.name}</span>
@@ -32,13 +40,13 @@ function CreditCard({ credit }: { credit: Credit }) {
         ))}
       </p>
       {text && (
-        <details className="group mt-1">
+        <details className="group mt-1 min-w-0">
           <summary className="min-h-11 cursor-pointer py-2.5 font-semibold underline underline-offset-4">
             Read the full license text
           </summary>
           <pre
             data-testid="license-text"
-            className="mt-1 max-h-96 overflow-auto rounded-sm border border-border bg-background p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+            className="mt-1 max-h-96 max-w-full overflow-auto rounded-sm border border-border bg-background p-3 font-mono text-xs leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap"
           >
             {text}
           </pre>
@@ -48,16 +56,62 @@ function CreditCard({ credit }: { credit: Credit }) {
   )
 }
 
+/** The packages whose code or files are in the built app, each with the license it ships. */
+function BundledPackages() {
+  const [packages, setPackages] = React.useState<BundledPackage[] | "failed" | null>(null)
+  React.useEffect(() => {
+    let stop = false
+    loadBundledPackages().then(
+      (list) => !stop && setPackages(list.filter((pkg) => !CREDITED_ABOVE.has(pkg.name))),
+      () => !stop && setPackages("failed"),
+    )
+    return () => {
+      stop = true
+    }
+  }, [])
+
+  if (packages === null) return <p className="text-sm text-muted-foreground">Loading the list...</p>
+  if (packages === "failed") {
+    return (
+      <p role="alert" className="text-sm" data-testid="bundled-failed">
+        The list could not be loaded. It is made when the app is built, so the development server
+        does not have it.
+      </p>
+    )
+  }
+  return (
+    <ul className="grid grid-cols-[minmax(0,1fr)] text-sm" data-testid="bundled-packages">
+      {packages.map((pkg) => (
+        <li key={`${pkg.name}@${pkg.version}`} data-testid="bundled-package" data-package={pkg.name} className="min-w-0 border-b border-border">
+          <details className="min-w-0">
+            <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 py-1.5">
+              <span className="min-w-0 [overflow-wrap:anywhere]">
+                {pkg.name} <span className="text-muted-foreground">{pkg.version}</span>
+              </span>
+              <span className="shrink-0 font-mono text-xs font-semibold">{pkg.license}</span>
+            </summary>
+            <pre
+              data-testid="package-license-text"
+              className="mb-2 max-h-96 max-w-full overflow-auto rounded-sm border border-border bg-background p-3 font-mono text-xs leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap"
+            >
+              {pkg.text}
+            </pre>
+          </details>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function Credits() {
-  const others = otherDependencies()
   return (
     <Section id="credits" title="Credits and licenses">
       <p>
         The app is free and MIT licensed. It stands on the work below, each part under its own
-        license. The full license texts are in this page, and in THIRD_PARTY_NOTICES.md and LICENSE
-        in the source.
+        license, and the full texts open in this page, so they are here with no network too. They
+        are also in THIRD_PARTY_NOTICES.md and LICENSE in the source.
       </p>
-      <ul className="grid gap-3">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
         {CREDITS.map((credit) => (
           <CreditCard key={credit.name} credit={credit} />
         ))}
@@ -71,16 +125,13 @@ export function Credits() {
         that moves the ColorChecker's published colors to the screen's white.
       </p>
 
-      <Sub>Everything else the app is built with</Sub>
-      <p>These ship in the app, or build it. Each is used unmodified under its own license.</p>
-      <ul className="grid gap-1 text-sm" data-testid="other-dependencies">
-        {others.map((dep) => (
-          <li key={dep.name} className="flex justify-between gap-4 border-b border-border py-1">
-            <span>{dep.name}</span>
-            <span className="font-mono text-xs font-semibold">{dep.license}</span>
-          </li>
-        ))}
-      </ul>
+      <Sub>Everything else the app ships</Sub>
+      <p>
+        These packages are in the app you are using, used unmodified, each under the license it
+        comes with, whose text is below. The list is written when the app is built, from what the
+        build contains, so it cannot fall behind.
+      </p>
+      <BundledPackages />
     </Section>
   )
 }

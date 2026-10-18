@@ -18,9 +18,11 @@ export function ResultsSection() {
         recorded here.
       </p>
       <p>
-        Until then, the only measurements are from a simulated camera: on 160 simulated Photos the
-        correction reads within one Chip in 159. That says the method is sound in the best case. It
-        does not say how a real phone will do.
+        Until then, the only measurements are from a simulated camera: on 160 simulated Photos of a
+        simulated ColorChecker the correction reads within one Chip in 159. That says the method is
+        sound in the best case. It does not say how a real phone will do, and the Page Card, which
+        the 20-soil test uses, has no accuracy figure yet: the first real check of it is a Photo of
+        a real Page.
       </p>
     </Section>
   )

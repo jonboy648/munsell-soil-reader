@@ -4,7 +4,7 @@
 import * as React from "react"
 import { ArrowLeft } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
-import { hrefOf } from "@/lib/route"
+import { closePage, hrefOf } from "@/lib/route"
 import { CardsSection } from "./CardsSection"
 import { CorrectionSection } from "./CorrectionSection"
 import { Credits } from "./Credits"
@@ -32,6 +32,10 @@ function BackLink({ className }: { className?: string }) {
   return (
     <a
       href={hrefOf("reader")}
+      onClick={(event) => {
+        event.preventDefault()
+        closePage()
+      }}
       data-testid="back-to-reader"
       className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11", className)}
     >

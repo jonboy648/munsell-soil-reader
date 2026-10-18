@@ -601,16 +601,11 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
-## Other dependencies
+## Everything else the app ships
 
-These ship in the built app or build it. Each is used unmodified under its own license; the
-license text travels with the package in `node_modules`.
-
-| Package | License |
-| --- | --- |
-| React, React DOM | MIT |
-| Radix UI (`radix-ui`), vaul | MIT |
-| shadcn/ui components (copied into `src/components/ui`), `cn` | MIT |
-| Tailwind CSS, `tw-animate-css` | MIT |
-| lucide-react | ISC |
-| vite-plugin-pwa, Workbox (the service worker) | MIT |
+The other packages whose code or files are in the built app (React, the Radix UI and vaul
+dialogs, class-variance-authority, clsx, lucide-react, Tailwind CSS and the Workbox service
+worker, among others) are used unmodified under their own licenses. Their names, versions and
+full license texts are not kept by hand: the build writes them to `licenses.json`, from the
+packages the build contains, and the method page shows them, with no network too, because the
+service worker caches that file with the rest of the app.

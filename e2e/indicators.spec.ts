@@ -104,7 +104,7 @@ test("JF-1 suggests A12 with its rule and layers; confirmed, it and Yes are Xs o
 
 test("a rejected suggestion leaves no tick and no cover note; one the user ticks needs a remark and goes on the cover note", async ({ page }) => {
   await page.goto("/")
-  const sheet = await createPoint(page, "Pond", "SP-1")
+  const sheet = await createPoint(page, "Pond", "JF-1")
   await recordJf1(sheet)
   const panel = sheet.getByTestId("indicators")
   const suggestion = panel.getByTestId("suggestion")

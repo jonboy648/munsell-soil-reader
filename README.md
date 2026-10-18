@@ -36,6 +36,13 @@ CI runs typecheck, `npm test` and `npm run test:e2e` on every pull request.
   `src/components/ui/` is shadcn/ui.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
 - `e2e/`: the browser tests.
+- Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
+  writes the web app manifest and a service worker that precaches every built file (code,
+  styles, the bundled fonts, icons and any data files by type), so the app opens with no
+  network after the first visit. A new deploy downloads in the background and a "new version
+  is ready" notice offers Reload; the app also looks for one whenever it returns to the front.
+  The site is served at the root of soil.joncackler.com, so the base is `/`. The icons in
+  `public/` are drawn by `node scripts/make-icons.mjs` and committed.
 
 How a Reading is made: the median of the tapped pixels, a white balance and then a 3x3
 correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
@@ -53,6 +60,8 @@ Two seams, and nothing else:
   then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
 - **Browser** (`e2e/reader.spec.ts`): the production build in Chromium at a phone viewport. It
   picks an example, taps corners and Spots by coordinates and reads the text on screen.
+  `e2e/offline.spec.ts` covers install and offline: the manifest, the service worker, a Reading
+  with the network off, and the update notice for a new deploy.
 
 ## Limits
 

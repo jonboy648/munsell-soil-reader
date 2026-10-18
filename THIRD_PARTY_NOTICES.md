@@ -406,3 +406,4 @@ license text travels with the package in `node_modules`.
 | Tailwind CSS, `tw-animate-css` | MIT |
 | lucide-react | ISC |
 | Archivo, Public Sans, IBM Plex Mono (via `@fontsource`) | SIL Open Font License 1.1 |
+| vite-plugin-pwa, Workbox (the service worker) | MIT |

@@ -49,11 +49,14 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
 - `e2e/`: the browser tests.
 
-How a Reading is made: the median of the tapped pixels, a white balance and then a 3x3
-correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
+How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
+patches (ColorChecker "after November 2014" reference values): each channel is linearized along
+the six gray patches, undoing the camera's tone curve, and a 3x3 matrix is fitted to all 24. Then
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
-then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 of the corrected
-patches; below 3 is good. The engine knows 359 Chips with their color names, gley, neutral and
+then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 over the Card's
+patches, each corrected by a fit made without it (leave one out); below 2 is good. Why this
+correction and this threshold, and how it compares with a plain 3x3 and root-polynomial
+correction: [docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
 the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
 what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
 list is only as complete as the checking, which is against one copy (Soil-Color Charts, 2009
@@ -67,7 +70,7 @@ on-screen swatch is clamped to sRGB.
 
 Two seams, and nothing else:
 
-- **Engine** (`src/engine/engine.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
+- **Engine** (`src/engine/engine.test.ts`, `src/engine/correction.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
   a Card and soil of a known Chip under a chosen light, exposure, color shift and tone curve,
   then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
 - **Browser** (`e2e/reader.spec.ts`): the production build in Chromium at a phone viewport. It
@@ -76,7 +79,7 @@ Two seams, and nothing else:
 ## Limits
 
 The examples use a simulated camera, so real Photos will do worse: phones add tone curves, HDR
-and local processing that no 3x3 correction can undo. A Card in the shot, in the same light as
+and local processing that no per-channel curve and 3x3 correction can undo. A Card in the shot, in the same light as
 the soil, is needed for a corrected Reading.
 
 The first version of this page lives on the `prototype/logic` branch.

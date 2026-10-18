@@ -2,8 +2,8 @@
 import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { patchCenters } from "./colorchecker"
-import { cardFitError, fitCardCorrection } from "./correction"
+import { NEUTRAL_PATCHES, PATCH_LINEAR, patchCenters } from "./colorchecker"
+import { fitCorrection, heldOutError, type Fit, type Reference } from "./correction"
 import { medianLinear, patchRadius, spotRadius } from "./sampling"
 import type {
   CardCheck,
@@ -15,8 +15,8 @@ import type {
   Reading,
 } from "./types"
 
-/** The Card check is good when the mean CIEDE2000 of the corrected patches is below this. */
-export const CARD_CHECK_GOOD = 3
+/** The Card check is good when the mean held-out CIEDE2000 of the Card is below this. */
+export const CARD_CHECK_GOOD = 2
 
 export class UnsupportedCardError extends Error {
   constructor(kind: string) {
@@ -56,18 +56,26 @@ function readColor(lin: Vec3): ChipReading {
   }
 }
 
-function fitCard(pixels: Pixels, corners: Corners) {
+function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
   const radius = patchRadius(corners)
-  const measured = patchCenters(corners).map((p) => medianLinear(pixels, p, radius))
-  const correct = fitCardCorrection(measured)
-  const meanDE = cardFitError(measured, correct)
+  const references: Reference[] = patchCenters(corners).map((p, i) => ({
+    measured: medianLinear(pixels, p, radius),
+    truth: PATCH_LINEAR[i],
+    ladder: NEUTRAL_PATCHES.includes(i),
+  }))
+  const meanDE = heldOutError(references, fit)
   const check: CardCheck = { meanDE, ok: meanDE < CARD_CHECK_GOOD }
-  return { correct, check }
+  return { correct: fit(references), check }
 }
 
-export function readPhoto({ pixels, card, spots }: ReadPhotoInput): ReadPhotoResult {
+export function readPhoto({
+  pixels,
+  card,
+  spots,
+  correction = fitCorrection,
+}: ReadPhotoInput): ReadPhotoResult {
   if (card.kind === "page") throw new UnsupportedCardError("Page")
-  const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners) : null
+  const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners, correction) : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {
     const lin = medianLinear(pixels, spot, radius)

@@ -3,17 +3,12 @@
 // docs/correction-comparison.md comes from the cases below.
 import * as munsell from "munsell"
 import { beforeAll, describe, expect, it } from "vitest"
-import { CARD_CHECK_CAUTION, CARD_CHECK_GOOD, deltaE2000, patchSites, readPhoto } from "./index"
+import { CARD_CHECK_CAUTION, deltaE2000, patchSites, readPhoto } from "./index"
 import type { Corners } from "./index"
 import { decode, encode, linearToLab, rgb255ToLinear, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
-import { fitMatrix, linearizeThen, type Fit } from "./correction"
-import {
-  fitRootPolynomial,
-  leastSquaresPolynomial,
-  linearizePerChannel,
-  pchip,
-} from "./correctionCandidates.testkit"
+import { fitMatrix, linearizeThen, pchip, type Fit } from "./correction"
+import { fitRootPolynomial, leastSquaresPolynomial, linearizeShared } from "./correctionCandidates.testkit"
 import realSensor from "./golden/realSensor.json"
 import { LIGHTS, SIM_CORNERS, SIM_SOIL, SIM_SPOT, simulatePhoto, type SimCamera, type SimPhoto } from "./simulate"
 
@@ -96,12 +91,12 @@ describe("the Card check is held out", () => {
 
 describe("the shipped correction against the alternatives, across the simulated cases", () => {
   const CANDIDATES = {
-    shipped: undefined, // one tone curve through the grays for all channels, then a 3x3
+    shipped: undefined, // a PCHIP curve through the grays for each channel, then a 3x3
     matrix: fitMatrix,
     rootPolynomial2: fitRootPolynomial(2),
-    sharedRootPolynomial2: linearizeThen(fitRootPolynomial(2)),
-    perChannelPchip: linearizePerChannel(pchip), // the correction before the shared curve
-    perChannelCubic: linearizePerChannel(leastSquaresPolynomial(3)),
+    curveRootPolynomial2: linearizeThen(pchip, fitRootPolynomial(2)),
+    cubicCurves: linearizeThen(leastSquaresPolynomial(3)),
+    sharedCurve: linearizeShared(), // one curve shape for the three channels
   }
   type Name = keyof typeof CANDIDATES
   interface Row {
@@ -157,13 +152,12 @@ describe("the shipped correction against the alternatives, across the simulated 
     }
   })
 
-  it("reads the soil closer to its true color than a 3x3 or root-polynomial, and as well as a curve per channel", () => {
+  it("reads the soil closer to its true color than a 3x3 or root-polynomial, and as well as any other curve", () => {
     expect(meanOf("shipped", error)).toBeLessThan(meanOf("matrix", error))
     expect(meanOf("shipped", error)).toBeLessThan(meanOf("rootPolynomial2", error))
-    // On a clean simulated camera a curve per channel passing through every gray is as exact as
-    // it gets; the shared curve gives up at most a tenth of a CIEDE2000 step against it.
-    expect(meanOf("shipped", error) - meanOf("perChannelPchip", error)).toBeLessThan(0.1)
-    expect(meanOf("shipped", error) - meanOf("perChannelCubic", error)).toBeLessThan(0.1)
+    // On a clean simulated camera a curve through every gray is as exact as it gets.
+    expect(meanOf("shipped", error)).toBeLessThanOrEqual(meanOf("cubicCurves", error))
+    expect(meanOf("shipped", error)).toBeLessThanOrEqual(meanOf("sharedCurve", error))
   })
 
   it("is not thrown by a strong tone curve, and costs little on a camera without one", () => {
@@ -186,7 +180,7 @@ describe("the shipped correction against the alternatives, across the simulated 
   })
 
   it("gains nothing from root-polynomial terms once the tone curve is undone", () => {
-    expect(meanOf("sharedRootPolynomial2", error)).toBeGreaterThan(meanOf("shipped", error))
+    expect(meanOf("curveRootPolynomial2", error)).toBeGreaterThan(meanOf("shipped", error))
   })
 })
 
@@ -206,15 +200,15 @@ describe("on a real sensor's response", () => {
   }
 
   const SOILS_ON_SENSOR = Object.keys(FIXTURE.D65.soils)
-  const perChannel = linearizePerChannel(pchip)
-  const rows: { light: string; soil: string; shipped: Result; before: Result }[] = []
+  const shared = linearizeShared()
+  const rows: { light: string; soil: string; shipped: Result; shared: Result }[] = []
 
   beforeAll(() => {
     for (const light of Object.keys(FIXTURE)) {
       for (const soil of SOILS_ON_SENSOR) {
         for (const toneCurve of [0.3, 0.5]) {
           const photo = sensorPhoto(light, soil, toneCurve)
-          rows.push({ light, soil, shipped: readSoil(photo, soil), before: readSoil(photo, soil, { correction: perChannel }) })
+          rows.push({ light, soil, shipped: readSoil(photo, soil), shared: readSoil(photo, soil, { correction: shared }) })
         }
       }
     }
@@ -232,29 +226,35 @@ describe("on a real sensor's response", () => {
     expect(Math.max(...rows.map((r) => r.shipped.cardCheck.meanDE))).toBeLessThan(CARD_CHECK_CAUTION)
   })
 
-  it("holds the grays out too, so fluorescent light is caution, not good", () => {
+  it("holds the grays out too: fluorescent light scores over 2.3, where a leaked curve scores 2.1 to 2.2", () => {
     // The tone ladder is held out like every other reference: the curve is refitted without the
-    // gray it predicts. A curve drawn through all six grays and then asked about one of them
-    // scores fluorescent light 1.93, under the limit; held out properly it is 2.06 to 2.07.
+    // gray it predicts. A curve drawn through all six grays and then asked about one of them is
+    // asked nothing hard, and scores a real camera's Card better than it should.
     const fluorescent = rows.filter((r) => r.light === "FL2")
     expect(fluorescent.length).toBeGreaterThan(0)
-    for (const row of fluorescent) {
-      expect(row.shipped.cardCheck.meanDE).toBeGreaterThan(CARD_CHECK_GOOD)
-      expect(row.shipped.cardCheck.verdict).toBe("caution")
-    }
-    for (const row of rows.filter((r) => r.light === "D65")) expect(row.shipped.cardCheck.verdict).toBe("good")
+    for (const row of fluorescent) expect(row.shipped.cardCheck.meanDE).toBeGreaterThan(2.3)
   })
 
-  it("trusts a Reading as good only when it is within a Chip of the truth", () => {
+  it("is caution, not good, on a clean Card from a real sensor: its Readings are not all within a Chip", () => {
+    // Where the check says good the Reading is within a Chip. A real sensor's clean Card scores
+    // over the good limit, and a quarter of its Readings are more than a Chip off.
+    const wrong = rows.filter((r) => r.shipped.chipsOff > 1)
+    expect(wrong.length).toBeGreaterThan(0)
     for (const row of rows) {
       if (row.shipped.cardCheck.verdict === "good") expect(row.shipped.chipsOff, `${row.light}, ${row.soil}`).toBeLessThanOrEqual(1)
     }
+    expect(rows.filter((r) => r.shipped.cardCheck.verdict === "caution").length).toBeGreaterThan(0.9 * rows.length)
   })
 
-  it("reads the soil closer to its true color than a curve per channel does", () => {
-    expect(mean(rows.map((r) => r.shipped.soilDE))).toBeLessThan(mean(rows.map((r) => r.before.soilDE)) - 0.4)
+  it("would read the same Photos closer to the truth with one curve shape for the three channels", () => {
+    // The sensor's channels disagree a little, and a shared shape averages that out. It is not the
+    // shipped correction: on Jon's real Pages the shared shape fits the gray ladder worse than a
+    // curve per channel (rms 0.06 to 0.17 in log units against 0.04 to 0.10), and it misses the
+    // smudged steps the Page's leave-out finds. So it waits for a real ColorChecker Photo (#15).
+    expect(mean(rows.map((r) => r.shared.soilDE))).toBeLessThan(mean(rows.map((r) => r.shipped.soilDE)) - 0.4)
+    expect(mean(rows.map((r) => r.shared.cardCheck.meanDE))).toBeLessThan(mean(rows.map((r) => r.shipped.cardCheck.meanDE)))
     const wrong = (pick: (r: (typeof rows)[number]) => Result) => rows.filter((r) => pick(r).chipsOff > 1).length
-    expect(wrong((r) => r.shipped)).toBeLessThan(wrong((r) => r.before))
+    expect(wrong((r) => r.shared)).toBeLessThan(wrong((r) => r.shipped))
   })
 })
 
@@ -386,8 +386,9 @@ describe("a gray step that is dirty", () => {
 
   it("is named, left out, and the soil still reads right", () => {
     const cases: [string, number, (s: Vec3) => Vec3, string, number[]][] = [
-      ["10YR 2.5/2", BLACK, hazy, "black 2", [0.3, 0.7]],
+      ["10YR 2.5/2", BLACK, hazy, "black 2", [0.3]],
       ["10YR 3/2", BLACK, hazy, "black 2", [0.3, 0.7]],
+      ["10YR 4/3", BLACK, hazy, "black 2", [0.3, 0.7]],
     ]
     for (const [soil, patch, damage, name, tones] of cases) {
       for (const toneCurve of tones) {

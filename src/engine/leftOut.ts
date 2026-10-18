@@ -26,13 +26,13 @@ import { heldOutErrors, type Fit, type Reference } from "./correction"
 /** Most references left out: a few dirty Chips, not a Page that is dirty all over. */
 export const MAX_LEFT_OUT = 4
 /** Most steps of the ladder left out. A ladder always keeps enough steps to draw its curves. */
-const MAX_LADDER_LEFT_OUT = 2
+export const MAX_LADDER_LEFT_OUT = 2
 const MIN_LADDER_STEPS = 5
 
 /** An off-ladder reference is dirty when its held-out error is above this CIEDE2000 ... */
-const DIRTY_FLOOR = 4
+export const DIRTY_FLOOR = 4
 /** ... and above this many times the median held-out error of the references off the ladder. */
-const DIRTY_FACTOR = 3
+export const DIRTY_FACTOR = 3
 
 /** Leaving ladder steps out must bring their row-mates' typical error down to under this share of what it was ... */
 const LADDER_GAIN = 0.5
@@ -40,14 +40,6 @@ const LADDER_GAIN = 0.5
 const LADDER_MIN_GAIN = 1.5
 /** ... and each step left out must be missed by the curves drawn without it by at least this much. */
 const LADDER_OWN_MISS = 3
-/**
- * A step is also left out, whether or not it moves its row-mates, when the curves drawn without it
- * miss it by this much and those curves already fit its row-mates to within LADDER_ROW_FIT. A
- * curve that goes through every step is bent by a dirty one, which shows in the row-mates; a curve
- * that gives a far-off step less weight is not, and the step is only seen in how badly it misses.
- */
-const LADDER_CLEAR_MISS = 6
-const LADDER_ROW_FIT = 1.5
 /** A step is judged only if it has at least this many row-mates. */
 const MIN_ROW_MATES = 2
 /** Each ladder step left out costs this much in the comparison, so the fewest are left out. */
@@ -92,14 +84,12 @@ function nextDirtyLadderSteps(references: Reference[], rows: number[], fit: Fit,
     const without = rest.filter((_, k) => !out.includes(k))
     const before = typicalError(rest, mates, fit)
     const after = typicalError(without, mates.map((k) => k - out.filter((o) => o < k).length), fit)
+    if (after > LADDER_GAIN * before || before - after < LADDER_MIN_GAIN) continue
     // Each step must also be a real miss to the curves drawn without it: a clean step that merely
     // helps the comparison, by taking a model that cannot describe a row's Chips out of the ladder,
     // is predicted well.
     const correct = fit(without)
-    const misses = out.map((k) => colorDifference(correct(rest[k].measured), rest[k].truth))
-    const helpsRowMates = after <= LADDER_GAIN * before && before - after >= LADDER_MIN_GAIN
-    const clearlyDirty = after <= LADDER_ROW_FIT && misses.every((miss) => miss >= LADDER_CLEAR_MISS)
-    if (!((helpsRowMates && misses.every((miss) => miss >= LADDER_OWN_MISS)) || clearlyDirty)) continue
+    if (!out.every((k) => colorDifference(correct(rest[k].measured), rest[k].truth) >= LADDER_OWN_MISS)) continue
     const cost = after + LADDER_STEP_COST * out.length
     if (!best || cost < best.cost) best = { out, cost }
   }

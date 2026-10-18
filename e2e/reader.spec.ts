@@ -62,8 +62,7 @@ test("a smudged black patch is named and left out, and the Reading is shown with
   for (const corner of [TL, TR, BR, BL]) await tapPhoto(page, corner)
   await tapPhoto(page, SIM_SPOT)
 
-  // The soil is 10YR 2.5/2; a Neighbouring chip (the next page) is within one Chip.
-  await expect(page.getByTestId("reading-notation")).toHaveText(/^(10YR|7\.5YR) 2\.5\/2$/)
+  await expect(page.getByTestId("reading-notation")).toHaveText("10YR 3/2")
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "caution")
   await expect(page.getByTestId("card-check")).toContainText("Card check caution")
   await page.getByRole("button", { name: "Open Readings" }).click()

@@ -50,6 +50,13 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
   `ReadingsPanel`), plus the step indicator, example picker, bottom bar and theme toggle.
   `src/components/ui/` is shadcn/ui.
+- `src/components/method/`: the accuracy and method page (how a Reading is made, the warnings and
+  their numbers, the correction, limits, what leaves the phone, credits and license texts). It
+  reads its numbers from the engine's constants and its license texts from `LICENSE` and
+  `THIRD_PARTY_NOTICES.md`, so it cannot drift from them. The licenses of everything else the
+  app ships are written at build time by `vite-plugins/bundledLicenses.ts` (every package in the
+  build, with its own license text) to `licenses.json`, which the service worker caches too. It is a page of the same single HTML
+  file (`#method`), so it works offline with the rest.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
 - `e2e/`: the browser tests.
 - Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
@@ -113,15 +120,15 @@ that its code is not in the app bundle. No frame exists yet; switching it on lat
 it in (a dynamic import, so js-aruco2 stays out of the main chunk).
 
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
-patches (ColorChecker "after November 2014" reference values): one tone curve, shared by the three
-channels, is drawn through the six gray patches and undone, and a 3x3 matrix is fitted to all 24. A
-gray that looks dirty is named and left out. Then
-a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
-then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 over the Card's
-patches, each corrected by a fit made without it (leave one out): below 2 is good, up to 3.5 is
-caution (the corrected Reading is still the answer, with the raw one beside it) and above that it
-has failed. Both limits are provisional until a real Photo has been run. Why this correction and
-these limits, and how it compares with a plain 3x3 and root-polynomial correction:
+patches (ColorChecker "after November 2014" reference values): a curve for each channel is drawn
+through the six gray patches and undone, which removes the camera's tone curve, and a 3x3 matrix is
+fitted to all 24. A gray that looks dirty is named and left out. Then a conversion to Munsell with
+[munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0), then the nearest Chip by
+CIEDE2000. The Card check is the mean CIEDE2000 over the Card's patches, each corrected by a fit made
+without it (leave one out): below 2 is good, up to 3.5 is caution (the corrected Reading is still the
+answer, with the raw one beside it) and above that it has failed. Both limits are provisional until
+a real Photo has been run. Why this correction and these limits, and how it compares with a plain
+3x3, root-polynomial correction and one curve shared by the channels:
 [docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
 the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
 what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
@@ -190,7 +197,7 @@ shift (ADR 0001). The ColorChecker stays supported as the independent reference.
 hue, which is why the Reading suggests the Page the soil belongs on.
 
 The examples use a simulated camera, so real Photos will do worse: phones add tone curves, HDR
-and local processing that no per-channel curve and 3x3 correction can undo. A Card in the shot, in the same light as
+and local processing that no curve per channel and 3x3 correction can undo. A Card in the shot, in the same light as
 the soil, is needed for a corrected Reading.
 
 Offline on iPhone and iPad: an app added to the Home Screen has its own storage, separate from

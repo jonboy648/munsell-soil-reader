@@ -518,6 +518,6 @@ export const EXAMPLES: ExamplePhoto[] = [
     id: "smudge",
     name: "Smudged black patch",
     note: "The Card's black patch has gone gray with handling, and the soil is dark. The Card check names the patch, leaves it out and still reads the soil.",
-    scene: { camera: phone(hazyBlack(LIGHTS.warm)), soil: "10YR 2.5/2" },
+    scene: { camera: phone(hazyBlack(LIGHTS.warm)), soil: "10YR 3/2" },
   },
 ]

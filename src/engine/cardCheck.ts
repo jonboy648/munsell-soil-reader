@@ -8,9 +8,10 @@ import type { CardCheck, CardVerdict } from "./types"
 /**
  * The mean held-out CIEDE2000 below which the Card check is good. Provisional.
  *
- * A Photo of a clean Card from an ideal camera scores 1.8 or less, and one from a real sensor's
- * spectral response 1.6 to 2.9 (daylight about 2, tungsten about 3). Below 2 no real-sensor
- * Reading was more than a Chip off.
+ * A clean Card from an ideal simulated camera scores 0.5 to 0.8 (2.1 under a 20% light
+ * gradient); one from a real sensor's spectral response 2.0 to 3.1 (daylight 2.0 to 2.1,
+ * fluorescent 2.4 to 2.7, tungsten 2.8 to 3.1). Below 2 no real-sensor Reading was more than a
+ * Chip off. Jon's four real Pages score 1.6 to 2.3.
  */
 export const CARD_CHECK_GOOD = 2
 
@@ -18,9 +19,9 @@ export const CARD_CHECK_GOOD = 2
  * The mean above which the Card check has failed. From GOOD up to this is caution: the corrected
  * Reading is still the answer, with the raw one beside it. Provisional.
  *
- * Honest Photos reach 3.4 (a real sensor under a 20% light gradient). A Card that spoils the
- * Reading by more than a Chip (a dirty patch, a shadow, glare, corners out of order) scores
- * 3.3 or more, and nearly always well over.
+ * Clean Cards reach 3.48 (a real sensor under a 20% light gradient). A Card that spoils the
+ * Reading by more than a Chip (a dirty patch, a shadow, glare, corners out of order) scores 3.56
+ * or more. The gap is narrow, because the simulations are one camera; real Photos will say.
  */
 export const CARD_CHECK_CAUTION = 3.5
 

@@ -5,13 +5,17 @@ import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
 import { InstallHint } from "@/components/InstallHint"
+import { MethodPage } from "@/components/method/MethodPage"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
 import { SpotsPanel } from "@/components/SpotsPanel"
 import { StepIndicator } from "@/components/StepIndicator"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { buttonVariants } from "@/components/ui/button"
 import { UpdateNotice } from "@/components/UpdateNotice"
 import { examplePhoto, filePhoto } from "@/lib/photo"
+import { hrefOf, markOpenedHere, usePage } from "@/lib/route"
+import { useServiceWorker } from "@/lib/serviceWorker"
 import {
   CORNER_COUNT,
   canUndo,
@@ -23,6 +27,10 @@ import {
 import type { CardInfo } from "@/lib/verdict"
 
 export function App() {
+  const page = usePage()
+  // Followed here, above the page switch: a first visit that opens on the method page still
+  // installs the service worker, and its notices are not lost on the way between pages.
+  const serviceWorker = useServiceWorker()
   const [session, dispatch] = React.useReducer(sessionReducer, initialSession)
   const [problem, setProblem] = React.useState<string | null>(null)
   const step = stepOf(session)
@@ -62,13 +70,15 @@ export function App() {
     }
   }
 
+  if (page === "method") return <MethodPage />
+
   return (
     <div className="mx-auto flex min-h-svh max-w-xl flex-col">
       <header className="relative px-4 pt-[env(safe-area-inset-top)]">
         <h1 className="py-3 font-heading text-xl font-extrabold tracking-tight [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
-        <UpdateNotice hasPhoto={session.photo !== null} />
+        <UpdateNotice hasPhoto={session.photo !== null} status={serviceWorker} />
       </header>
 
       <main className="flex flex-1 flex-col gap-4 pb-44">
@@ -122,8 +132,16 @@ export function App() {
         </div>
 
         {/* At the bottom of the page, where a thumb reaches it. */}
-        <footer className="px-2">
+        <footer className="grid justify-items-start px-2">
           <InstallHint />
+          <a
+            href={hrefOf("method")}
+            onClick={markOpenedHere}
+            data-testid="method-link"
+            className={buttonVariants({ variant: "ghost", size: "lg", className: "h-11" })}
+          >
+            Accuracy, method and credits
+          </a>
           <ThemeToggle />
         </footer>
       </main>

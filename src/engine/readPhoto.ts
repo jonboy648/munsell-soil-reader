@@ -126,15 +126,15 @@ function fitPage(pixels: Pixels, hue: PageHue, taps: Corners, fit: Fit): CardFit
  * it is the corners rather than the light. The frame is one black surface, so in even light
  * every part of it is equally bright whatever the camera's tone curve does.
  */
-const FRAME_UNEVEN_STOPS = 0.3
-const FRAME_OFF_CARD_STOPS = 3
+export const FRAME_UNEVEN_STOPS = 0.3
+export const FRAME_OFF_CARD_STOPS = 3
 /**
  * A Page's white paper is as even as the frame, but the Page is big in the Photo, so the light
  * falls off across it: on Jon's four real Pages the paper's plane fit reads 0.11, 0.16, 0.27 and
  * 0.33 stops, over the frame's 0.3. Provisional, until real Photos are run (#15).
  */
-const PAGE_UNEVEN_STOPS = 0.45
-const PAGE_OFF_CARD_STOPS = 3
+export const PAGE_UNEVEN_STOPS = 0.45
+export const PAGE_OFF_CARD_STOPS = 3
 
 /**
  * What the quality checks need from a ColorChecker: its patches as references (the grays are

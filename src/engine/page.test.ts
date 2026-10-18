@@ -20,7 +20,7 @@ import { LIGHTS, PHONE_TONE_CURVE, simulatePhoto, type SimCamera, type SimScene,
 
 // ---- the soil book's grid, used only to judge "the same Chip or a Neighbouring chip" ----
 const PAGES = ["10R", "2.5YR", "5YR", "7.5YR", "10YR", "2.5Y", "5Y"]
-const VALUES = [2, 2.5, 3, 4, 5, 6, 7, 8]
+const VALUES = [2.5, 3, 4, 5, 6, 7, 8]
 const CHROMAS = [1, 2, 3, 4, 6, 8]
 
 /** Steps between two Chips on the grid: pages, plus value rows, plus chroma columns. */
@@ -414,16 +414,12 @@ describe("dirt on the dark end of the ladder", () => {
     ["3/1", { "10YR 3/1": 0.04 }],
     ["2/1", { "10YR 2/1": 0.04 }],
     ["3/1 and 2/1", { "10YR 3/1": 0.04, "10YR 2/1": 0.04 }],
-  ])("leaves out nothing but the hazed %s, and reads the dark soils within one Chip", (_name, hazed) => {
-    // The tone curve is one shape for all three channels, which a single hazed step cannot bend by
-    // itself, so a light haze on 3/1 may be left in the fit and still read right. Whatever is left
-    // out is the hazed step and nothing else, and then the check is caution.
+  ])("leaves out the hazed %s and only that, and reads the dark soils within one Chip", (_name, hazed) => {
     for (const soil of darkSoils) {
       const { check, reading } = dark({ hazed }, soil)
-      for (const name of check.leftOut) expect(Object.keys(hazed), soil).toContain(name)
+      expect(check.leftOut).toEqual(Object.keys(hazed))
       expect(check.suspectRow).toBeUndefined()
-      expect(check.verdict, soil).not.toBe("failed")
-      if (check.leftOut.length > 0) expect(check.verdict).toBe("caution")
+      expect(check.verdict).toBe("caution") // a ladder step was left out
       expect(withinOneChip(reading.corrected!.chip.notation, soil), soil).toBe(true)
     }
   })
@@ -436,8 +432,7 @@ describe("dirt on the dark end of the ladder", () => {
 
   it("leaves out a smudged light step and a hazed dark one together", () => {
     const { check, reading } = dark({ smudged: { "10YR 8/1": 0.3 }, hazed: { "10YR 3/1": 0.04 } }, "10YR 3/3")
-    expect(check.leftOut).toContain("10YR 8/1")
-    for (const name of check.leftOut) expect(["10YR 8/1", "10YR 3/1"]).toContain(name)
+    expect(check.leftOut).toEqual(["10YR 8/1", "10YR 3/1"])
     expect(check.verdict).toBe("caution")
     expect(withinOneChip(reading.corrected!.chip.notation, "10YR 3/3")).toBe(true)
   })

@@ -78,10 +78,10 @@ export function DecidesSection() {
           does not recalculate the tests with a species counted as FAC.
         </p>
         <p>
-          A judgment call: a plant identified only to its genus, where every species of the genus
-          has the same status (Sonchus spp.), counts in the prevalence index and in the 80 percent
-          of cover that must be identified and rated. The supplement says not to include species
-          that were not identified and does not say whether a genus is enough. A plant the list does
+          Decided on 2026-10-18: a plant identified only to its genus, where every species of the
+          genus has the same status (Sonchus spp.), counts in the prevalence index and in the 80
+          percent of cover that must be identified and rated. The supplement says not to include
+          species that were not identified and does not say whether a genus is enough. A plant the list does
           not find is left out of the index. A dominant that is not identified to species is kept in
           the dominance test and warned about, because leaving it out could let the test pass.
         </p>

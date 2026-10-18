@@ -115,10 +115,11 @@ test. Covers are compared in whole thousandths, so floating point never decides 
 - A plant with no status to use (`status` null) is left out of the stratum total, the ranking and the index, and
   its Dominant box stays blank. A dominant that is not identified to species is kept in the ranking and in B (a
   plant of unknown name counts as UPL, as recorded) and warned about: dropping it could let the test pass.
-- **Judgment call, for Jon to flip:** a plant identified to its genus only (`identified: "genus"`: Sonchus spp.,
-  every NCNE species FACU) is counted in the prevalence index and in the 80 percent. The supplement says not
-  to include "species that were not identified" (p. 28) and does not say whether a genus is enough. The switch
-  is one filter in `prevalenceIndex()`: `counted` is `p.status !== null && p.identified !== "none"`, and
+- **Decided by Jon, 2026-10-18: count genus-only plants when all species share a status.** A plant identified
+  to its genus only (`identified: "genus"`: Sonchus spp., every NCNE species FACU) is counted in the prevalence
+  index and in the 80 percent. The supplement says not to include "species that were not identified" (p. 28)
+  and does not say whether a genus is enough. The switch, kept here in case it is ever reversed, is one filter
+  in `prevalenceIndex()`: `counted` is `p.status !== null && p.identified !== "none"`, and
   `identified === "species"` would leave genus-only plants out. JF-1 (Sow thistle, 2 percent) reads A 84,
   B 212, 2.52 as it is, and A 82, B 204, 2.49 with the switch; the dominance test is the same either way.
 - The prevalence index is applied only when the dominance test fails and a hydric soil indicator is confirmed

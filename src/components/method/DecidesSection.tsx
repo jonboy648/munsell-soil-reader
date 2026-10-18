@@ -67,9 +67,27 @@ export function DecidesSection() {
           genus.
         </p>
         <p>
-          Not yet: the dominance test and the prevalence index, and the two Northcentral and
-          Northeast subregion exceptions (quaking aspen and red raspberry, which are rated
-          differently in the Northcentral Great Lakes).
+          The dominant species of each stratum are chosen by the supplement&apos;s 50/20 rule: the
+          most abundant plants until they pass half of the stratum&apos;s cover, and any plant that
+          is a fifth of it alone. A stratum under 5 percent cover is recorded and not used, unless it
+          is the only one. The Dominance Test, the Prevalence Index and the indicators follow the
+          supplement&apos;s order. The prevalence index is applied only when the dominance test
+          fails and hydric soil and wetland hydrology indicators are present, or when you apply it
+          and say why. The app suggests Hydrophytic Vegetation Present? and nothing is ticked on
+          the form until you confirm it. The tick for Morphological Adaptations is yours: the app
+          does not recalculate the tests with a species counted as FAC.
+        </p>
+        <p>
+          A judgment call: a plant identified only to its genus, where every species of the genus
+          has the same status (Sonchus spp.), counts in the prevalence index and in the 80 percent
+          of cover that must be identified and rated. The supplement says not to include species
+          that were not identified and does not say whether a genus is enough. A plant the list does
+          not find is left out of the index. A dominant that is not identified to species is kept in
+          the dominance test and warned about, because leaving it out could let the test pass.
+        </p>
+        <p>
+          Not yet: the two Northcentral and Northeast subregion exceptions (quaking aspen and red
+          raspberry, which are rated differently in the Northcentral Great Lakes).
         </p>
       </div>
     </Section>

@@ -199,6 +199,17 @@ test("says how a plant's status is found, and that the order of the neighbouring
   await expect(notes).toContainText("the order is an assumption")
 })
 
+test("says how the dominant species are chosen, when the prevalence index is applied, and the one judgment call about a genus", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("50/20 rule")
+  await expect(notes).toContainText("A stratum under 5 percent cover is recorded and not used, unless it is the only one.")
+  await expect(notes).toContainText("applied only when the dominance test fails and hydric soil and wetland hydrology indicators are present")
+  await expect(notes).toContainText("nothing is ticked on the form until you confirm it")
+  await expect(notes).toContainText("A judgment call: a plant identified only to its genus")
+  await expect(notes).toContainText("the 80 percent of cover that must be identified and rated")
+})
+
 test("says the 20-soil test has not been run, and marks what is not in this version", async ({ page }) => {
   await openMethodPage(page)
   await expect(page.getByTestId("soil-test-results")).toHaveText("The 20-soil test has not been run yet.")

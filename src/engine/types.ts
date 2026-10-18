@@ -75,6 +75,7 @@ export interface ReadPhotoInput {
 
 export interface ReadPhotoResult {
   cardCheck?: CardCheck // absent when the Card is 'none'
-  quality: QualityWarning[] // empty until the quality checks land
+  offCard?: true // present when the grays on the Card came out in the wrong order: the corners are probably off the Card
+  quality: QualityWarning[] // problems with the Photo; empty when it is good
   readings: Reading[]
 }

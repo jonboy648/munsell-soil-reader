@@ -1,5 +1,5 @@
 // Which of a Spot's two Readings to trust, and the plain words that say why.
-import type { CardCheck, ChipReading, Reading } from "@/engine"
+import type { CardCheck, ChipReading, QualityWarning, Reading } from "@/engine"
 
 export type Verdict = "good" | "failed" | "uncorrected"
 
@@ -16,12 +16,27 @@ const fmt = (n: number) => n.toFixed(1)
  * The corrected Reading when the Card check is good. Otherwise the raw Reading, flagged: a
  * failed correction must never be shown as the answer.
  */
-export function shownReading(reading: Reading, cardCheck: CardCheck | undefined): Shown {
+export function shownReading(
+  reading: Reading,
+  cardCheck: CardCheck | undefined,
+  cardWarnings: QualityWarning[] = [],
+  offCard = false,
+): Shown {
   if (reading.corrected && cardCheck?.ok) {
     return {
       verdict: "good",
       main: reading.corrected,
       why: `Each of the 24 Card patches, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
+    }
+  }
+  if (reading.corrected && cardCheck && cardWarnings.length > 0 && !offCard) {
+    // A problem with the Card is flagged, and it explains the failure better than a guess,
+    // unless the grays say the corners are off the Card: then the warnings were read from the
+    // wrong places, and the corner order is the likelier cause.
+    return {
+      verdict: "failed",
+      main: reading.raw,
+      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The problem flagged below is the likely cause. Showing the uncorrected Reading. Fix it and take the Photo again.`,
     }
   }
   if (reading.corrected && cardCheck) {

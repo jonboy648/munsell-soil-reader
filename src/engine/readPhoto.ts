@@ -3,7 +3,7 @@ import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
 import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
-import { fitCorrection, heldOutError, type Correction, type Fit, type Reference } from "./correction"
+import { fitCorrection, fitPageCorrection, heldOutError, type Correction, type Fit, type Reference } from "./correction"
 import { UnmeasuredBatchError, batchProblem, type Batch } from "./batch"
 import { frameQuality, frameReferences, insideWindow } from "./frameCard"
 import { leftOut } from "./leftOut"
@@ -197,16 +197,16 @@ export function readPhoto({
   pixels,
   card,
   spots,
-  correction = fitCorrection,
+  correction,
 }: ReadPhotoInput): ReadPhotoResult {
   const hue = card.kind === "page" ? pageHueOf(card.hue) : null
   const fit: CardFit | null =
     card.kind === "colorchecker"
-      ? fitCard(pixels, card.corners, correction)
+      ? fitCard(pixels, card.corners, correction ?? fitCorrection)
       : card.kind === "page"
-        ? fitPage(pixels, hue!, card.taps, correction)
+        ? fitPage(pixels, hue!, card.taps, correction ?? fitPageCorrection)
         : card.kind === "frame"
-          ? fitFrame(pixels, card.outline, card.batch, correction)
+          ? fitFrame(pixels, card.outline, card.batch, correction ?? fitCorrection)
           : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {

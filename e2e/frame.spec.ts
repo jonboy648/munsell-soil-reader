@@ -135,6 +135,25 @@ test("a tap far from every corner does not move the outline", async ({ page }) =
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
 })
 
+test("a Reading of the frame saves to the Log, which names the Card", async ({ page }) => {
+  await confirmedFrame(page)
+  await tapPhoto(page, SIM_FRAME_SPOT)
+  await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
+
+  await page.getByRole("button", { name: "Save to Log" }).click()
+  const sheet = page.getByRole("dialog", { name: "Save to Log", exact: true })
+  await sheet.getByLabel("Sample name or number").fill("F1")
+  await sheet.getByRole("radio", { name: "moist" }).click()
+  await sheet.getByRole("button", { name: /^Save \d+ Readings?$/ }).click()
+  await expect(sheet).toHaveCount(0)
+
+  await page.getByRole("button", { name: "Open Log" }).click()
+  const log = page.getByRole("dialog", { name: "Log", exact: true })
+  await expect(log).toContainText("F1")
+  await expect(log).toContainText("10YR 4/3")
+  await expect(log).toContainText("Frame")
+})
+
 test("a batch that has not been measured is refused, with the reason", async ({ page }) => {
   await page.goto("/")
   const onePixelPng = Buffer.from(

@@ -5,6 +5,7 @@ import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
 import { InstallHint } from "@/components/InstallHint"
+import { LogPanel } from "@/components/LogPanel"
 import { MethodPage } from "@/components/method/MethodPage"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
@@ -168,6 +169,7 @@ export function App() {
           ) : (
             <p className="text-base">Take or choose a Photo with the Card beside the soil.</p>
           )}
+          <LogPanel result={result} card={cardOf(session)} spots={session.spots} />
           <ExamplePicker activeId={session.photo?.exampleId} onPick={pickExample} />
         </div>
 

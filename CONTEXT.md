@@ -28,6 +28,14 @@ _Avoid_: chart, target, checker
 A printed card with a window for the soil, measured color patches around it and a marker in each corner; the app finds the markers itself, so no corners are tapped. Its patch colors belong to its print batch.
 _Avoid_: holder, jig, template
 
+**Batch**:
+One print run of the frame. Its patch colors are measured once, kept in a batch file named for the batch code printed on the frame, and used as the frame's true colors. A frame whose batch is not measured is refused as a card.
+_Avoid_: lot (that is the filament), edition
+
+**Outline**:
+The four outer corners of a frame's markers, as found in a photo and confirmed by the user, before any spot is read. Where the frame is, in the photo.
+_Avoid_: border, bounding box
+
 **Page**:
 One page of the soil book, holding chips in a grid. Most pages hold one hue, in rows of value and columns of chroma; the 10Y-5GY, Gley and White pages mix hues across the grid. A chip can be printed on more than one page. When a page is used as the card, its chips are the reference colors.
 _Avoid_: hue card, sheet
@@ -55,7 +63,7 @@ One color in the soil book, named by its notation (`10YR 4/3`) and its color nam
 _Avoid_: swatch, patch (patches belong to the card)
 
 **Card check**:
-How well the correction predicts each of the card's references when it is fitted without that reference (leave one out); either good or failed.
+How well the correction predicts each of the card's references when it is fitted without that reference (leave one out); good, caution or failed. Caution still shows the corrected reading, with the raw one beside it.
 _Avoid_: calibration score, fit quality
 
 **Neighbouring chip**:

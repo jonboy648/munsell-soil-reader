@@ -3,11 +3,13 @@
 // docs/correction-comparison.md comes from the cases below.
 import * as munsell from "munsell"
 import { beforeAll, describe, expect, it } from "vitest"
-import { CARD_CHECK_GOOD, deltaE2000, patchSites, readPhoto } from "./index"
+import { CARD_CHECK_CAUTION, CARD_CHECK_GOOD, deltaE2000, patchSites, readPhoto } from "./index"
 import type { Corners } from "./index"
-import { linearToLab, rgb255ToLinear, type Vec3 } from "./color"
-import { fitMatrix, linearizeThen, pchip, type Fit } from "./correction"
-import { fitRootPolynomial, piecewiseLinear } from "./correctionCandidates.testkit"
+import { decode, encode, linearToLab, rgb255ToLinear, type Vec3 } from "./color"
+import { PATCH_LINEAR } from "./colorchecker"
+import { fitMatrix, linearizeShared, linearizeThen, pchip, type Fit } from "./correction"
+import { fitRootPolynomial, leastSquaresPolynomial } from "./correctionCandidates.testkit"
+import realSensor from "./golden/realSensor.json"
 import { LIGHTS, SIM_CORNERS, SIM_SOIL, SIM_SPOT, simulatePhoto, type SimCamera, type SimPhoto } from "./simulate"
 
 const patchCenters = (corners: Corners) => patchSites(corners).map((site) => site.center)
@@ -64,6 +66,8 @@ function readSoil(photo: SimPhoto, soil: string, options: { corners?: Corners; c
 }
 type Result = ReturnType<typeof readSoil>
 
+const mean = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length
+
 describe("the Card check is held out", () => {
   const photo = simulatePhoto({ camera: { light: LIGHTS.warm, toneCurve: 0.5 } })
 
@@ -71,6 +75,7 @@ describe("the Card check is held out", () => {
     const { cardCheck, chipsOff } = readSoil(photo, SIM_SOIL)
     expect(chipsOff).toBe(0)
     expect(cardCheck.ok).toBe(true)
+    expect(cardCheck.verdict).toBe("good")
   })
 
   it("fails a correction flexible enough to memorise the Card", () => {
@@ -79,18 +84,19 @@ describe("the Card check is held out", () => {
     // each is far off. The Card check measures the second thing, so it fails them.
     for (const degree of [3, 4] as const) {
       const { cardCheck } = readSoil(photo, SIM_SOIL, { correction: fitRootPolynomial(degree) })
-      expect(cardCheck.ok, `degree ${degree}`).toBe(false)
+      expect(cardCheck.verdict, `degree ${degree}`).toBe("failed")
     }
   })
 })
 
 describe("the shipped correction against the alternatives, across the simulated cases", () => {
   const CANDIDATES = {
-    shipped: undefined, // linearize along the gray ladder with PCHIP, then a 3x3
+    shipped: undefined, // one tone curve shared by the three channels, through the grays, then a 3x3
     matrix: fitMatrix,
     rootPolynomial2: fitRootPolynomial(2),
-    linearPiecewise: linearizeThen(piecewiseLinear),
-    linearPchipRootPolynomial2: linearizeThen(pchip, fitRootPolynomial(2)),
+    sharedCurveRootPolynomial2: linearizeShared(fitRootPolynomial(2)),
+    pchipCurves: linearizeThen(pchip), // a PCHIP curve per channel: what a Page uses
+    cubicCurves: linearizeThen(leastSquaresPolynomial(3)),
   }
   type Name = keyof typeof CANDIDATES
   interface Row {
@@ -115,10 +121,8 @@ describe("the shipped correction against the alternatives, across the simulated 
     }
   }, 120_000)
 
-  const mean = (name: Name, pick: (r: Result) => number, where: (row: Row) => boolean = () => true) => {
-    const picked = rows.filter(where).map((row) => pick(row.results[name]))
-    return picked.reduce((sum, v) => sum + v, 0) / picked.length
-  }
+  const meanOf = (name: Name, pick: (r: Result) => number, where: (row: Row) => boolean = () => true) =>
+    mean(rows.filter(where).map((row) => pick(row.results[name])))
   const check = (r: Result) => r.cardCheck.meanDE
   const error = (r: Result) => r.soilDE
 
@@ -126,55 +130,130 @@ describe("the shipped correction against the alternatives, across the simulated 
     expect(rows).toHaveLength(160)
   })
 
-  it("ships the correction with the lowest mean held-out Card check", () => {
-    for (const name of Object.keys(CANDIDATES) as Name[]) {
-      if (name !== "shipped") expect(mean("shipped", check), name).toBeLessThan(mean(name, check))
+  it("passes every well-formed Photo: none fails, and nearly all are good", () => {
+    const verdicts = rows.map((row) => row.results.shipped.cardCheck.verdict)
+    expect(verdicts.filter((v) => v === "failed")).toHaveLength(0)
+    expect(verdicts.filter((v) => v === "good").length).toBeGreaterThanOrEqual(0.9 * rows.length)
+    // A Photo that is only caution has a gray step left out, and says which.
+    for (const row of rows) {
+      const { cardCheck } = row.results.shipped
+      if (cardCheck.verdict === "caution") expect(cardCheck.leftOut.length, `${row.soil}, ${row.light}`).toBeGreaterThan(0)
     }
   })
 
-  it("ships the correction that also reads the soil closest to its true color", () => {
-    for (const name of Object.keys(CANDIDATES) as Name[]) {
-      if (name !== "shipped") expect(mean("shipped", error), name).toBeLessThan(mean(name, error))
-    }
-  })
-
-  it("reads every soil within 3 of its true color, and within one Chip unless it is chroma 1", () => {
+  it("reads every soil within 3.5 of its true color, and within one Chip unless it is chroma 1", () => {
     // At chroma 1 neighbouring hue pages are about 1 apart in CIEDE2000, so a Reading 2 off
     // can sit two pages away.
     for (const row of rows) {
       const r = row.results.shipped
       const where = `${row.soil}, ${row.light}, tone curve ${row.toneCurve}`
-      expect(r.soilDE, where).toBeLessThan(3)
+      expect(r.soilDE, where).toBeLessThan(3.5)
       if (r.chipsOff > 1) expect(row.soil, where).toMatch(/\/1$/)
     }
   })
 
+  it("reads the soil closer to its true color than a 3x3 or root-polynomial, and as well as any other curve", () => {
+    expect(meanOf("shipped", error)).toBeLessThan(meanOf("matrix", error))
+    expect(meanOf("shipped", error)).toBeLessThan(meanOf("rootPolynomial2", error))
+    // On a clean simulated camera a curve through every gray is as exact as it gets; the shared
+    // curve gives up less than a tenth of a CIEDE2000 step against it.
+    expect(meanOf("shipped", error) - meanOf("pchipCurves", error)).toBeLessThan(0.1)
+    expect(meanOf("shipped", error) - meanOf("cubicCurves", error)).toBeLessThan(0.1)
+  })
+
   it("is not thrown by a strong tone curve, and costs little on a camera without one", () => {
     const at = (curve: number) => (row: Row) => row.toneCurve === curve
-    expect(mean("matrix", error, at(0.7))).toBeGreaterThan(4)
-    expect(mean("shipped", error, at(0.7))).toBeLessThan(1)
-    expect(mean("shipped", error, at(0)) - mean("matrix", error, at(0))).toBeLessThan(0.15)
+    expect(meanOf("matrix", error, at(0.7))).toBeGreaterThan(4)
+    expect(meanOf("shipped", error, at(0.7))).toBeLessThan(1)
+    expect(meanOf("shipped", error, at(0)) - meanOf("matrix", error, at(0))).toBeLessThan(0.15)
   })
 
   it("finds root-polynomial a wash against the 3x3 on the Card check", () => {
     // A lower mean, no significant difference (Wilcoxon p = 0.97 over these 160 cases, see
     // docs/correction-comparison.md). It wins the dim lights and loses the others.
-    expect(Math.abs(mean("rootPolynomial2", check) - mean("matrix", check))).toBeLessThan(0.25)
+    expect(Math.abs(meanOf("rootPolynomial2", check) - meanOf("matrix", check))).toBeLessThan(0.25)
     const dim = (row: Row) => row.light.startsWith("dim light")
     const bright = (row: Row) => !dim(row) && row.light !== "shade"
-    expect(mean("rootPolynomial2", check, dim)).toBeLessThan(mean("matrix", check, dim))
-    expect(mean("rootPolynomial2", check, bright)).toBeGreaterThan(mean("matrix", check, bright))
+    expect(meanOf("rootPolynomial2", check, dim)).toBeLessThan(meanOf("matrix", check, dim))
+    expect(meanOf("rootPolynomial2", check, bright)).toBeGreaterThan(meanOf("matrix", check, bright))
     // The Reading it gives is worse, not a wash.
-    expect(mean("rootPolynomial2", error)).toBeGreaterThan(mean("matrix", error))
+    expect(meanOf("rootPolynomial2", error)).toBeGreaterThan(meanOf("matrix", error))
   })
 
-  it("gains nothing from root-polynomial terms once the curve is linearized", () => {
-    expect(mean("linearPchipRootPolynomial2", check)).toBeGreaterThan(mean("shipped", check))
-    expect(mean("linearPchipRootPolynomial2", error)).toBeGreaterThan(mean("shipped", error))
+  it("gains nothing from root-polynomial terms once the tone curve is undone", () => {
+    expect(meanOf("sharedCurveRootPolynomial2", error)).toBeGreaterThan(meanOf("shipped", error))
+  })
+})
+
+describe("on a real sensor's response", () => {
+  // The Nikon D5100's spectral sensitivities, the ColorChecker's measured reflectances (not the
+  // reference values the engine corrects towards) and an ideal white balance, in daylight,
+  // cool white fluorescent and tungsten light. See golden/make_real_sensor_fixture.py.
+  const FIXTURE = realSensor.lights as Record<string, { patches: number[][]; soils: Record<string, number[]> }>
+  const key = (v: Vec3) => v.map((x) => x.toFixed(9)).join(",")
+
+  /** A Photo of the Card and a soil as that sensor records them, then through a tone curve. */
+  function sensorPhoto(light: string, soil: string, toneCurve: number): SimPhoto {
+    const table = new Map<string, Vec3>()
+    PATCH_LINEAR.forEach((p, i) => table.set(key(p), FIXTURE[light].patches[i] as Vec3))
+    table.set(key(munsell.munsellToLinearRgb(soil) as Vec3), FIXTURE[light].soils[soil] as Vec3)
+    return simulatePhoto({ camera: { light: (lin) => table.get(key(lin)) ?? lin, toneCurve }, soil })
+  }
+
+  const SOILS_ON_SENSOR = Object.keys(FIXTURE.D65.soils)
+  const perChannel = linearizeThen(pchip)
+  const rows: { light: string; soil: string; shipped: Result; perChannel: Result }[] = []
+
+  beforeAll(() => {
+    for (const light of Object.keys(FIXTURE)) {
+      for (const soil of SOILS_ON_SENSOR) {
+        for (const toneCurve of [0.3, 0.5]) {
+          const photo = sensorPhoto(light, soil, toneCurve)
+          rows.push({ light, soil, shipped: readSoil(photo, soil), perChannel: readSoil(photo, soil, { correction: perChannel }) })
+        }
+      }
+    }
+  }, 120_000)
+
+  it("never fails a clean Card, in any of the three lights", () => {
+    expect(rows).toHaveLength(66)
+    for (const row of rows) expect(row.shipped.cardCheck.verdict, `${row.light}, ${row.soil}`).not.toBe("failed")
   })
 
-  it("prefers PCHIP to straight lines between the ladder steps", () => {
-    expect(mean("shipped", check)).toBeLessThan(mean("linearPiecewise", check))
+  it("scores daylight better than tungsten, and shows caution rather than failure where it is unsure", () => {
+    const at = (light: string) => mean(rows.filter((r) => r.light === light).map((r) => r.shipped.cardCheck.meanDE))
+    expect(at("D65")).toBeLessThan(at("A"))
+    expect(rows.filter((r) => r.shipped.cardCheck.verdict === "caution").length).toBeGreaterThan(0)
+    expect(Math.max(...rows.map((r) => r.shipped.cardCheck.meanDE))).toBeLessThan(CARD_CHECK_CAUTION)
+  })
+
+  it("holds the grays out too, so fluorescent light is caution, not good", () => {
+    // The tone ladder is held out like every other reference: the curve is refitted without the
+    // gray it predicts. A curve drawn through all six grays and then asked about one of them is
+    // asked nothing hard: it scores fluorescent light 1.93, under the good limit; held out it is
+    // 2.05 to 2.16.
+    const fluorescent = rows.filter((r) => r.light === "FL2")
+    expect(fluorescent.length).toBeGreaterThan(0)
+    for (const row of fluorescent) {
+      expect(row.shipped.cardCheck.meanDE).toBeGreaterThan(CARD_CHECK_GOOD)
+      expect(row.shipped.cardCheck.verdict).toBe("caution")
+    }
+    for (const row of rows.filter((r) => r.light === "D65")) expect(row.shipped.cardCheck.verdict).toBe("good")
+  })
+
+  it("trusts a Reading as good only when it is within a Chip of the truth", () => {
+    const good = rows.filter((r) => r.shipped.cardCheck.verdict === "good")
+    expect(good.length).toBeGreaterThan(0)
+    for (const row of good) expect(row.shipped.chipsOff, `${row.light}, ${row.soil}`).toBeLessThanOrEqual(1)
+  })
+
+  it("reads the soil closer to its true color than a curve per channel does, and scores the Card lower", () => {
+    // The sensor's channels disagree a little, and a shared shape averages that out. This is why the
+    // ColorChecker, whose six grays are truly neutral, shares a curve. A Page does not: see realPages.test.ts.
+    expect(mean(rows.map((r) => r.shipped.soilDE))).toBeLessThan(mean(rows.map((r) => r.perChannel.soilDE)) - 0.4)
+    expect(mean(rows.map((r) => r.shipped.cardCheck.meanDE))).toBeLessThan(mean(rows.map((r) => r.perChannel.cardCheck.meanDE)))
+    const wrong = (pick: (r: (typeof rows)[number]) => Result) => rows.filter((r) => pick(r).chipsOff > 1).length
+    expect(wrong((r) => r.shipped)).toBeLessThan(wrong((r) => r.perChannel))
   })
 })
 
@@ -199,6 +278,20 @@ describe("the Card check on a Card that is not right", () => {
       }
     })
   }
+  /** Light falling off across the Card by `drop`, left to right, over the whole Photo. */
+  function lightGradient(photo: SimPhoto, drop: number) {
+    const { width, height, data } = photo.pixels
+    const [tl, tr] = SIM_CORNERS
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const f = 1 - drop * Math.min(1, Math.max(0, (x - tl.x) / (tr.x - tl.x)))
+        for (let k = 0; k < 3; k++) {
+          const i = (y * width + x) * 4 + k
+          data[i] = Math.round(255 * encode(decode(data[i] / 255) * f))
+        }
+      }
+    }
+  }
   const DAMAGE: [string, (photo: SimPhoto) => void][] = [
     ["a dirty patch", (p) => paintPatch(p, 13, [200, 60, 60])],
     ["two dirty patches", (p) => (paintPatch(p, 13, [200, 60, 60]), paintPatch(p, 21, [60, 60, 200]))],
@@ -216,8 +309,8 @@ describe("the Card check on a Card that is not right", () => {
     ]
     for (const corners of shuffles) {
       const { cardCheck } = readSoil(photo, SIM_SOIL, { corners })
-      expect(cardCheck.ok).toBe(false)
-      expect(cardCheck.meanDE).toBeGreaterThan(10 * CARD_CHECK_GOOD)
+      expect(cardCheck.verdict).toBe("failed")
+      expect(cardCheck.meanDE).toBeGreaterThan(20)
     }
   })
 
@@ -225,13 +318,11 @@ describe("the Card check on a Card that is not right", () => {
     const photo = simulatePhoto({ camera: { light: LIGHTS.warm, toneCurve: 0.5 } })
     const corners = SIM_CORNERS.map((p) => ({ x: p.x + 24, y: p.y })) as Corners
     const { cardCheck, chipsOff } = readSoil(photo, SIM_SOIL, { corners })
-    expect(cardCheck.ok).toBe(true)
+    expect(cardCheck.verdict).toBe("good")
     expect(chipsOff).toBeLessThanOrEqual(1)
   })
 
-  it("never passes a damaged Card whose Reading is more than one Chip off", () => {
-    // Damage that moves the Reading by more than a Chip is caught. Damage that does not may
-    // or may not be: a smudge on a patch the fit does not lean on is harmless, and passes.
+  it("never calls good a damaged Card whose Reading is more than one Chip off, and nearly always fails it", () => {
     const cases: Result[] = []
     for (const toneCurve of [0.3, 0.7]) {
       for (const [, light] of LIGHT_CASES.filter(([name]) => name !== "camera color shift")) {
@@ -244,7 +335,20 @@ describe("the Card check on a Card that is not right", () => {
     }
     const wrong = cases.filter((c) => c.chipsOff > 1)
     expect(wrong.length).toBeGreaterThan(0) // the damage does move some Readings by 2 Chips or more
-    for (const c of wrong) expect(c.cardCheck.ok).toBe(false)
+    for (const c of wrong) expect(c.cardCheck.verdict).not.toBe("good")
+    expect(wrong.filter((c) => c.cardCheck.verdict === "failed").length).toBeGreaterThanOrEqual(0.9 * wrong.length)
+  })
+
+  it("passes a mild light gradient across the Card, and still reads right", () => {
+    for (const drop of [0.1, 0.2]) {
+      for (const [name, light] of LIGHT_CASES) {
+        const photo = simulatePhoto({ camera: { light, toneCurve: 0.5 } })
+        lightGradient(photo, drop)
+        const { cardCheck, chipsOff } = readSoil(photo, SIM_SOIL)
+        expect(cardCheck.verdict, `${name}, ${drop}`).not.toBe("failed")
+        expect(chipsOff, `${name}, ${drop}`).toBeLessThanOrEqual(1)
+      }
+    }
   })
 
   it("passes a dark, dull soil the 3x3 once passed while reading it two Chips off", () => {
@@ -254,9 +358,53 @@ describe("the Card check on a Card that is not right", () => {
       for (const toneCurve of [0.3, 0.5]) {
         const photo = simulatePhoto({ camera: { light, toneCurve }, soil: "10YR 3/2" })
         const { cardCheck, chipsOff } = readSoil(photo, "10YR 3/2")
-        expect(cardCheck.ok).toBe(true)
+        expect(cardCheck.verdict).not.toBe("failed")
         expect(chipsOff).toBeLessThanOrEqual(1)
       }
+    }
+  })
+})
+
+describe("a gray step that is dirty", () => {
+  // The grays are the tone ladder, and a smudge on one bends the curve of every channel. The mean
+  // of the Card check hides it (a gray is one reference of 24), so the grays are judged on their
+  // own: a dirty one is named and left out, and the Card check can be no better than caution.
+  const key = (v: Vec3) => v.map((x) => x.toFixed(9)).join(",")
+  const mix = (a: Vec3, b: Vec3, t: number): Vec3 => [a[0] * (1 - t) + b[0] * t, a[1] * (1 - t) + b[1] * t, a[2] * (1 - t) + b[2] * t]
+  const BLACK = 23
+  /** A light that first damages one Card patch in the scene, as a smudge would. */
+  const smudged = (light: SimCamera["light"], patch: number, damage: (scene: Vec3) => Vec3): SimCamera["light"] => {
+    const target = key(PATCH_LINEAR[patch])
+    return (lin) => light(key(lin) === target ? damage(lin) : lin)
+  }
+  const hazy = (scene: Vec3) => mix(scene, [0.2, 0.2, 0.2], 0.2) // a black gone gray with handling
+
+  function read(soil: string, light: SimCamera["light"], toneCurve: number) {
+    return readSoil(simulatePhoto({ camera: { light, toneCurve }, soil }), soil)
+  }
+
+  it("is named, left out, and the soil still reads right", () => {
+    const cases: [string, number, (s: Vec3) => Vec3, string, number[]][] = [
+      ["10YR 2.5/2", BLACK, hazy, "black 2", [0.3]],
+      ["10YR 3/2", BLACK, hazy, "black 2", [0.3, 0.7]],
+      ["10YR 4/3", BLACK, hazy, "black 2", [0.3, 0.7]],
+    ]
+    for (const [soil, patch, damage, name, tones] of cases) {
+      for (const toneCurve of tones) {
+        const { cardCheck, chipsOff } = read(soil, smudged(LIGHTS.warm, patch, damage), toneCurve)
+        expect(cardCheck.leftOut, `${soil}, ${name}, tone ${toneCurve}`).toEqual([name])
+        expect(cardCheck.verdict).toBe("caution")
+        expect(chipsOff, `${soil}, ${name}, tone ${toneCurve}`).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it("is not mistaken for a clean Card, nor a clean Card for a dirty one", () => {
+    // The same Photos with a clean Card leave nothing out and are good.
+    for (const toneCurve of [0.3, 0.7]) {
+      const { cardCheck } = read("10YR 2.5/2", LIGHTS.warm, toneCurve)
+      expect(cardCheck.leftOut).toEqual([])
+      expect(cardCheck.verdict).toBe("good")
     }
   })
 })

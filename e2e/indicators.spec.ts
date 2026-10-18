@@ -8,7 +8,8 @@ import { JF1_ROWS } from "../src/delineation/fixtures/jf1"
 import { pdfRules, pdfText } from "../src/delineation/testing/pdfText"
 import { addLayer, createPoint, openProjects, recordJf1 } from "./projects"
 
-const JF1_VALUES = JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))
+// The Sampling Point box at the top of the page is drawn first, then the profile rows.
+const JF1_VALUES = ["JF-1", ...JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))]
 
 /** Download the Soil page and read it back: its bytes, and how many pages it has. */
 async function download(page: Page, sheet: Locator) {

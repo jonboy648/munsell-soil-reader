@@ -2,8 +2,9 @@
 // take this list, so they cannot disagree.
 import { regionOf } from "./regions"
 import { PROFILE_COLUMNS } from "./regions/types"
-import { fieldId, indicatorFieldId, type Form } from "./formFor"
+import { columnRoom, fieldId, indicatorFieldId, type Form } from "./formFor"
 import type { Project } from "./model"
+import { fit } from "./text"
 
 export interface Placement {
   id: string
@@ -12,26 +13,28 @@ export interface Placement {
   x: number
   /** Points from the top of the page to the baseline of the text. */
   baseline: number
-  /** Points. */
+  /** Points. The form's own size, or smaller when the text would not fit its column otherwise. */
   size: number
+  /** The most the text may take, in points, so that it stays inside its column. */
+  maxWidth: number
 }
 
-/** The non-blank values of the profile table, row by row, left to right, then the ticks. */
+/** The non-blank values of the page, top to bottom, left to right, then the ticks. */
 export function soilPlacements(project: Project, form: Form): Placement[] {
   const { soil } = regionOf(project.region)
   const placements: Placement[] = []
+  const place = (id: string, value: string, x: number, rule: number, maxWidth: number) => {
+    if (!value) return
+    const { text, size } = fit(value, maxWidth, soil.fontSize)
+    placements.push({ id, text, x, baseline: rule - soil.aboveRule, size, maxWidth })
+  }
+
+  const [pointLeft, pointRight] = soil.samplingPoint.column
+  place("soil.samplingPoint", form.fields["soil.samplingPoint"], pointLeft + soil.inset, soil.samplingPoint.rule, pointRight - pointLeft - 2 * soil.inset)
   soil.rowRules.forEach((rule, row) => {
     for (const column of PROFILE_COLUMNS) {
       const id = fieldId(row, column)
-      const text = form.fields[id]
-      if (!text) continue
-      placements.push({
-        id,
-        text,
-        x: soil.columns[column][0] + soil.inset,
-        baseline: rule - soil.aboveRule,
-        size: soil.fontSize,
-      })
+      place(id, form.fields[id], soil.columns[column][0] + soil.inset, rule, columnRoom(soil, column))
     }
   })
   // A tick is an X drawn on the printed blank, centered on it and sitting just above its line.
@@ -44,6 +47,7 @@ export function soilPlacements(project: Project, form: Form): Placement[] {
       x: (box.x[0] + box.x[1]) / 2 - width / 2,
       baseline: box.rule - soil.tick.aboveRule,
       size: soil.tick.size,
+      maxWidth: width,
     })
   }
   for (const indicator of regionOf(project.region).indicators) tick(indicatorFieldId(indicator.id), indicator.box)

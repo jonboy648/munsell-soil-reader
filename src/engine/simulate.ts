@@ -38,9 +38,10 @@ export const LIGHTS = {
 /**
  * A mild phone-like S-curve: mid-tone slope 1.15, slope 0.7 at black and white. A 3x3
  * correction copes with this. At 0.5 the warm-light case lands two Chips away, and at 0.7
- * every case does, which is what the root-polynomial correction in the spec is for.
+ * several do. Root-polynomial correction does not fix that on this simulated camera (see
+ * docs/correction-comparison.md), so the standard stays 0.3.
  */
-export const PHONE_TONE_CURVE = 0.3
+export const PHONE_TONE_CURVE = 0.5
 
 // ---- the scene ----
 export const SIM_WIDTH = 960
@@ -54,12 +55,75 @@ const patchCenter = (r: number, c: number): XY => ({
   y: CARD.y + r * PITCH + CARD.patch / 2,
 })
 
+const PATCH_CENTERS: XY[] = Array.from({ length: 24 }, (_, i) => patchCenter(Math.floor(i / 6), i % 6))
+
 /** The Card's corner patch centers in the order the user taps them: TL, TR, BR, BL. */
 export const SIM_CORNERS: Corners = [patchCenter(0, 0), patchCenter(0, 5), patchCenter(3, 5), patchCenter(3, 0)]
 /** The middle of the soil patch. */
 export const SIM_SPOT: XY = { x: SOIL_BOX.x + SOIL_BOX.w / 2, y: SOIL_BOX.y + SOIL_BOX.h / 2 }
 /** The Chip the simulated soil really is. */
 export const SIM_SOIL = "10YR 4/3"
+
+// ---- the camera's angle on the scene ----
+/**
+ * Degrees. Yaw turns the right side of the scene away from the camera, pitch turns the
+ * bottom away. Positive yaw keeps the Card near and the soil far, so both stay in the Photo.
+ */
+export interface SimTilt {
+  yaw: number
+  pitch: number
+}
+
+/** Pinhole focal length in Photo pixels: about 70 degrees across the Photo's width. */
+const FOCAL = 700
+/** The camera is this far from the middle of the Card, close enough for strong perspective. */
+const DISTANCE = 500
+/** The scene is turned about the middle of the Card's patch grid. */
+const [FIRST, LAST] = [patchCenter(0, 0), patchCenter(3, 5)]
+const PIVOT: XY = { x: (FIRST.x + LAST.x) / 2, y: (FIRST.y + LAST.y) / 2 }
+
+/** The scene is a flat plane. A view maps its points to the Photo and the Photo's pixels back. */
+interface View {
+  toPhoto: (u: number, v: number) => XY
+  /** Writes the scene point that Photo pixel (x, y) looks at into `out`; -Infinity above the horizon. */
+  toScene: (x: number, y: number, out: XY) => void
+}
+
+function tiltedView({ yaw, pitch }: SimTilt): View {
+  const rad = Math.PI / 180
+  const [sy, cy] = [Math.sin(yaw * rad), Math.cos(yaw * rad)]
+  const [sp, cp] = [Math.sin(pitch * rad), Math.cos(pitch * rad)]
+  // Where the scene's right, down and out-of-plane directions point after the turn.
+  const right = [cy, -sp * sy, cp * sy]
+  const down = [0, cp, sp]
+  const normal = [-sy, -sp * cy, cp * cy]
+  // A pixel's ray hits the plane at t = DISTANCE * normal.z / (ray . normal), which makes the
+  // scene point a ratio of two linear functions of the ray: the same for u (right) and v (down).
+  const across = (axis: number[], k: number) => normal[2] * axis[k] - axis[2] * normal[k]
+  const [ux, uy, vx, vy] = [across(right, 0), across(right, 1), across(down, 0), across(down, 1)]
+  return {
+    toPhoto: (u, v) => {
+      const a = u - PIVOT.x
+      const b = v - PIVOT.y
+      const z = DISTANCE + a * right[2] + b * down[2]
+      return {
+        x: SIM_WIDTH / 2 + (FOCAL * (a * right[0] + b * down[0])) / z,
+        y: SIM_HEIGHT / 2 + (FOCAL * (a * right[1] + b * down[1])) / z,
+      }
+    },
+    toScene: (x, y, out) => {
+      const rx = (x - SIM_WIDTH / 2) / FOCAL
+      const ry = (y - SIM_HEIGHT / 2) / FOCAL
+      const facing = normal[0] * rx + normal[1] * ry + normal[2]
+      if (facing <= 0) {
+        out.x = out.y = -Infinity
+        return
+      }
+      out.x = PIVOT.x + (DISTANCE * (ux * rx + uy * ry)) / facing
+      out.y = PIVOT.y + (DISTANCE * (vx * rx + vy * ry)) / facing
+    },
+  }
+}
 
 const mulberry32 = (seed: number) => () => {
   seed = (seed + 0x6d2b79f5) | 0
@@ -85,6 +149,8 @@ export interface SimPhoto {
   pixels: Pixels & { data: Uint8ClampedArray<ArrayBuffer> }
   /** Corner patch centers, TL, TR, BR, BL. Meaningless when the scene has no Card. */
   corners: Corners
+  /** Every ColorChecker patch's true center, row by row. Meaningless when the scene has no Card. */
+  patches: XY[]
   /** The middle of the soil patch. */
   spot: XY
 }
@@ -97,10 +163,14 @@ export interface SimScene {
   soil?: string
   /** Noise seed. Default 7. */
   seed?: number
+  /** Photograph the scene at an angle, so the Card is in perspective. Default: straight on. */
+  tilt?: SimTilt
 }
 
-export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7 }: SimScene): SimPhoto {
+export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7, tilt }: SimScene): SimPhoto {
   const rand = mulberry32(seed)
+  const view = tilt ? tiltedView(tilt) : null // null: straight on, scene point = Photo pixel
+  const looksAt: XY = { x: 0, y: 0 }
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
   const frame = shoot(camera, [0.012, 0.012, 0.012])
@@ -112,20 +182,28 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7 }
   const fy1 = CARD.y + 4 * PITCH - CARD.gap + 16
   for (let y = 0; y < SIM_HEIGHT; y++) {
     for (let x = 0; x < SIM_WIDTH; x++) {
+      // Where in the flat scene this pixel looks.
+      let u = x
+      let v = y
+      if (view) {
+        view.toScene(x, y, looksAt)
+        u = looksAt.x
+        v = looksAt.y
+      }
       let rgb = ground
       let noise = 12
-      if (card && x >= fx0 && x < fx1 && y >= fy0 && y < fy1) {
+      if (card && u >= fx0 && u < fx1 && v >= fy0 && v < fy1) {
         rgb = frame
         noise = 2
-        const cx = x - CARD.x
-        const cy = y - CARD.y
+        const cx = u - CARD.x
+        const cy = v - CARD.y
         const c = Math.floor(cx / PITCH)
         const r = Math.floor(cy / PITCH)
         if (cx >= 0 && cy >= 0 && cx % PITCH < CARD.patch && cy % PITCH < CARD.patch && c < 6 && r < 4) {
           rgb = patches[r * 6 + c]
         }
       }
-      if (x >= SOIL_BOX.x && x < SOIL_BOX.x + SOIL_BOX.w && y >= SOIL_BOX.y && y < SOIL_BOX.y + SOIL_BOX.h) {
+      if (u >= SOIL_BOX.x && u < SOIL_BOX.x + SOIL_BOX.w && v >= SOIL_BOX.y && v < SOIL_BOX.y + SOIL_BOX.h) {
         rgb = soilRgb
         noise = 5
       }
@@ -134,11 +212,17 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7 }
       data[i + 3] = 255
     }
   }
-  return { pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data }, corners: SIM_CORNERS, spot: SIM_SPOT }
+  const at = ({ x, y }: XY) => (view ? view.toPhoto(x, y) : { x, y })
+  return {
+    pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data },
+    corners: SIM_CORNERS.map(at) as Corners,
+    patches: PATCH_CENTERS.map(at),
+    spot: at(SIM_SPOT),
+  }
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard"
+export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -148,6 +232,9 @@ export interface ExamplePhoto {
 }
 
 const phone = (light: SimCamera["light"]): SimCamera => ({ light, toneCurve: PHONE_TONE_CURVE })
+
+/** A strong tilt: the right side of the scene turned 40 degrees away. */
+export const ANGLED_TILT: SimTilt = { yaw: 40, pitch: 0 }
 
 export const EXAMPLES: ExamplePhoto[] = [
   {
@@ -179,5 +266,11 @@ export const EXAMPLES: ExamplePhoto[] = [
     name: "No Card in the shot",
     note: "Nothing to correct against, so the Reading is off.",
     scene: { camera: phone(LIGHTS.warm), card: false },
+  },
+  {
+    id: "angled",
+    name: "Card at an angle",
+    note: "The Card is tilted away from the camera, about 40 degrees. Tap its four corner patches where they are; every patch still lands.",
+    scene: { camera: phone(LIGHTS.warm), tilt: ANGLED_TILT },
   },
 ]

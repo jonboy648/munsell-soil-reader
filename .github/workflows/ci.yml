@@ -1,7 +1,7 @@
 name: CI
 
 # Typecheck, the engine tests and the browser tests on every pull request.
-# Deploy is a separate workflow, added in its own ticket.
+# Deploy is a separate workflow (deploy.yml) that runs on pushes to main.
 on:
   pull_request:
 

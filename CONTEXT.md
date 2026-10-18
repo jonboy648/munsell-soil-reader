@@ -21,11 +21,15 @@ One picture of a sample with the card in it.
 _Avoid_: image, shot
 
 **Card**:
-The reference color target photographed beside the sample: either an X-Rite ColorChecker or a page of the soil book.
+The reference color target photographed with the sample: an X-Rite ColorChecker, a page of the soil book, or the frame.
 _Avoid_: chart, target, checker
 
+**Frame**:
+A printed card with a window for the soil, measured color patches around it and a marker in each corner; the app finds the markers itself, so no corners are tapped. Its patch colors belong to its print batch.
+_Avoid_: holder, jig, template
+
 **Page**:
-One page of the soil book, holding the chips of a single hue in rows of value and columns of chroma; when used as the card, its chips are the reference colors.
+One page of the soil book, holding chips in a grid. Most pages hold one hue, in rows of value and columns of chroma; the 10Y-5GY, Gley and White pages mix hues across the grid. A chip can be printed on more than one page. When a page is used as the card, its chips are the reference colors.
 _Avoid_: hue card, sheet
 
 **Spot**:
@@ -43,7 +47,7 @@ One color in the soil book, named by its notation (`10YR 4/3`) and its color nam
 _Avoid_: swatch, patch (patches belong to the card)
 
 **Card check**:
-How well the correction reproduces the card's own patches; either good or failed.
+How well the correction predicts each of the card's references when it is fitted without that reference (leave one out); either good or failed.
 _Avoid_: calibration score, fit quality
 
 **Neighbouring chip**:
@@ -51,5 +55,43 @@ A chip one step away from another in value, in chroma, or on the next page; a re
 _Avoid_: adjacent color, close match
 
 **Log**:
-The readings saved on the device, grouped by sample, which can be exported as a spreadsheet.
+Everything saved on the device: projects, sampling points, layers and their readings. It can be exported as a spreadsheet or as forms.
 _Avoid_: history, database, records
+
+### In the delineation
+
+**Project**:
+One wetland delineation job: a site, a region and subregion, the people doing it, and its sampling points.
+_Avoid_: job, site (when the whole delineation is meant)
+
+**Sampling point**:
+One place on a project where the soil, vegetation and hydrology are recorded; it fills one form.
+_Avoid_: plot (that is the vegetation plot), station, pit
+
+**Layer**:
+One depth range of soil at a sampling point, top and bottom in inches, with its matrix reading and any redox readings; one row of the form's profile description.
+_Avoid_: horizon, sample (when the depth range is meant)
+
+**Plot**:
+The vegetation plot at a sampling point: the plants of each stratum with their cover.
+_Avoid_: quadrat, transect
+
+**Indicator**:
+One named test from the regional supplement or the hydric soil field indicators (`A12 Thick Dark Surface`, `F3 Depleted Matrix`); the form has a box for each.
+_Avoid_: criterion, flag
+
+**Suggestion**:
+An indicator the app finds satisfied by the recorded data, shown with the rule it used; it becomes a tick on the form only when the user confirms it.
+_Avoid_: auto-fill, result
+
+**Form**:
+The USACE Wetland Determination Data Form for one sampling point, in its current official version for the project's region.
+_Avoid_: data sheet (the Excel version is the "automated data sheet"), report
+
+**Region**:
+One of the USACE regional supplements (Northcentral and Northeast, Midwest); it decides the form, the indicators and the plant list.
+_Avoid_: area, zone
+
+**Subregion**:
+The LRR or MLRA a project lies in; some indicators apply only in certain subregions.
+_Avoid_: district

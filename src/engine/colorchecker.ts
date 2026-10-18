@@ -7,7 +7,8 @@ import {
   mul,
   type Vec3,
 } from "./color"
-import type { Corners, XY } from "./types"
+import { gridSites, type Four, type GridPoint, type Site } from "./grid"
+import type { Corners } from "./types"
 
 export const PATCH_NAMES = [
   "dark skin", "light skin", "blue sky", "foliage", "blue flower", "bluish green",
@@ -40,21 +41,23 @@ export const NEUTRAL_PATCHES = [18, 19, 20, 21, 22, 23]
 export const PATCH_COLUMNS = 6
 export const PATCH_ROWS = 4
 
+/** Grid positions of the four patches the user taps: dark skin, bluish green, black, white. */
+const TAPPED_PATCHES: Four<GridPoint> = [
+  { col: 0, row: 0 },
+  { col: PATCH_COLUMNS - 1, row: 0 },
+  { col: PATCH_COLUMNS - 1, row: PATCH_ROWS - 1 },
+  { col: 0, row: PATCH_ROWS - 1 },
+]
+
+const ALL_PATCHES: GridPoint[] = Array.from({ length: PATCH_ROWS * PATCH_COLUMNS }, (_, i) => ({
+  col: i % PATCH_COLUMNS,
+  row: Math.floor(i / PATCH_COLUMNS),
+}))
+
 /**
- * Patch centers (row by row) from the four corner patch centers the user tapped, in this
- * order: top left (dark skin), top right (bluish green), bottom right (black), bottom left
- * (white). Bilinear between the corners.
+ * Where to read each patch (row by row), from the four corner patch centers the user
+ * tapped, in this order: top left (dark skin), top right (bluish green), bottom right
+ * (black), bottom left (white). A homography, so an angled Card still lands on every patch.
  */
-export function patchCenters([tl, tr, br, bl]: Corners): XY[] {
-  const out: XY[] = []
-  for (let r = 0; r < PATCH_ROWS; r++) {
-    for (let c = 0; c < PATCH_COLUMNS; c++) {
-      const u = c / (PATCH_COLUMNS - 1)
-      const v = r / (PATCH_ROWS - 1)
-      const at = (k: "x" | "y") =>
-        (1 - u) * (1 - v) * tl[k] + u * (1 - v) * tr[k] + u * v * br[k] + (1 - u) * v * bl[k]
-      out.push({ x: at("x"), y: at("y") })
-    }
-  }
-  return out
-}
+export const patchSites = (corners: Corners): Site[] =>
+  gridSites(TAPPED_PATCHES, corners, ALL_PATCHES)

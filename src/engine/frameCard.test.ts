@@ -3,6 +3,7 @@
 // would see: the Reading, the Card check, the warnings, and the refusal of an unmeasured batch.
 import { describe, expect, it } from "vitest"
 import { CARD_CHECK_GOOD, readPhoto } from "./index"
+import { frameWindowCentre } from "./index"
 import type { Batch, Corners, XY } from "./index"
 import { BatchFormatError, UnmeasuredBatchError, batchProblem, parseBatch } from "./batch"
 import { BATCH_COLUMNS, formatBatchCsv } from "./batchFile"
@@ -159,6 +160,19 @@ describe("readPhoto with the frame card", () => {
     const past: XY = { x: (tl.x + br.x) / 2, y: tl.y - 3 }
     expect(read(sim, { spots: [edge] }).readings[0].outsideWindow).toBeUndefined()
     expect(read(sim, { spots: [past] }).readings[0].outsideWindow).toBe(true)
+  })
+
+  it.each([
+    ["flat", undefined],
+    ["tilted 45 degrees to the side and 25 forward", { yaw: 45, pitch: 25 }],
+    ["tilted 35 degrees to the side and 25 back", { yaw: 35, pitch: -25 }],
+  ])("finds the middle of the window of a frame %s, where the soil is", (_name, tilt) => {
+    const sim = simulatePhoto({ ...WARM, tilt })
+    const middle = frameWindowCentre(sim.frame!.outline)
+    expect(Math.hypot(middle.x - sim.spot.x, middle.y - sim.spot.y)).toBeLessThan(1.5)
+    const result = read(sim, { spots: [middle] })
+    expect(result.readings[0].outsideWindow).toBeUndefined()
+    expect(withinOneChip(result.readings[0].corrected!.chip.notation, SIM_SOIL)).toBe(true)
   })
 
   it("keeps the window inside the window when the frame is tilted", () => {

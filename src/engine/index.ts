@@ -20,7 +20,7 @@ export {
 } from "./quality"
 export { deltaE2000 } from "./color"
 export { BatchFormatError, UnmeasuredBatchError, batchCodeOf, batchProblem, parseBatch } from "./batch"
-export { frameWindow, framePatchSites } from "./frameCard"
+export { frameWindow, frameWindowCentre, framePatchSites } from "./frameCard"
 export { BATCH_COLUMNS, BATCH_METHOD_CAMERA, FRAME_SLOTS, SWATCH_IDS, formatBatchCsv, parseBatchCsv, swatchSlot } from "./batchFile"
 export { batchRows, measureShot, summarizeShots, swatchRadius } from "./measure"
 export { DIRTY_FACTOR, DIRTY_FLOOR, MAX_LADDER_LEFT_OUT, MAX_LEFT_OUT } from "./leftOut"

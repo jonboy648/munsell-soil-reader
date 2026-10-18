@@ -16,8 +16,10 @@ export function SpotsPanel({ spotCount, inWindow = false }: Props) {
         </>
       ) : (
         <>
-          {spotCount === 1 ? "1 Spot" : `${spotCount} Spots`} read. Tap the soil again to read
-          another Spot, such as a mottle.
+          {spotCount === 1 ? "1 Spot" : `${spotCount} Spots`} read.{" "}
+          {inWindow
+            ? "The first went in the middle of the frame's window. Tap the soil to read another Spot, such as a mottle, or Undo to take the last one back and tap where you want."
+            : "Tap the soil again to read another Spot, such as a mottle."}
         </>
       )}
     </p>

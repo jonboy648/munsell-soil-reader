@@ -87,8 +87,9 @@ export function PageCard() {
       <p>
         <b>The Page Card has no accuracy figure yet.</b> It has been tried on simulated Pages, and on
         four real Pages from the maintainer's book (10YR, 7.5YR, 2.5Y and 5Y) with the corners
-        tapped by eye, as a sanity check only. A Photo of a real Page (issue #15) is its first real test, and the
-        20-soil test is the bar.
+        tapped by eye, as a sanity check only. The four Photos are kept as test fixtures, so what
+        is said below is pinned by tests. A Photo of a real Page (issue #15) is its first real
+        test, and the 20-soil test is the bar.
       </p>
       <ul className="grid list-disc gap-2 pl-5">
         <li>

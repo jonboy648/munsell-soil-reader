@@ -94,14 +94,23 @@ By tone curve strength, each cell is mean Reading error ΔE / cases within one C
 | one tone curve for all channels | 1.58 to 2.90 | 44 | 88 | 0 | 2.32 | 7 |
 
 In simulation the shared curve is clearly better on a real sensor: the sensor's channels disagree
-a little, and a shared shape averages that out. **On Jon's real Pages it is worse.** The gray
-ladder (the /1 column) fits a shared cubic with a root-mean-square residual of 0.06 to 0.17 in log
-units, against 0.04 to 0.10 for a cubic per channel, so the real phone's channels do not share a
-curve. And it does not find the smudges the Page's leave-out exists for. The 10YR Page with
-smudged 8/1 and 7/1 scores 2.12 with a curve per channel (it leaves out 8/1, 7/1 and 3/6) and 4.11,
-failed, with nothing left out, under the shared curve. (The 10YR Page on fabric goes the other way:
-failed with PCHIP, 3.50 and caution under the shared curve.) The real Pages decide, as they are the
-only real Photos: the shared curve waits for a real ColorChecker Photo.
+a little, and a shared shape averages that out. **On Jon's real Pages it is mixed, and fails where
+it matters.** The gray ladder (the /1 column) fits a shared cubic with a root-mean-square residual of
+0.06 to 0.17 in log units, against 0.04 to 0.10 for a cubic per channel, so the real phone's
+channels do not share one curve. And it does not find the smudges the Page's leave-out exists for.
+With the Page fit as it is on main (the ladder's curves, then a ridged 3x3):
+
+| Real Page | PCHIP per channel (ships) | one tone curve for all channels |
+|---|---|---|
+| 10YR on wood (smudged 8/1 and 7/1) | 2.79, caution, leaves out 8/1, 7/1, 3/6 | 4.66, failed, leaves out nothing |
+| 10YR on fabric | 3.98, failed, leaves out 8/1, 7/1 | 5.05, failed, leaves out nothing |
+| 7.5YR on wood | 2.98, failed (row guard) | 2.41, failed (row guard) |
+| 2.5Y on wood | 2.84, caution | 2.29, caution |
+| 5Y on wood | 1.83, good | 2.01, caution |
+
+The shared curve scores two Pages lower and cannot see a smudged ladder step, which is the case
+that decides whether a worn Page gives a corrected Reading at all. The real Pages are the only real
+Photos, so they decide: the shared curve waits for a real ColorChecker Photo.
 
 ### Damaged gray steps
 

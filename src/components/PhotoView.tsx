@@ -111,22 +111,20 @@ function draw(
 const NONE: string[] = []
 
 export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, leftOut = NONE, onTap }: Props) {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null)
+  const [canvas, setCanvas] = React.useState<HTMLCanvasElement | null>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
-  const { placing, handlers } = usePlacement(onTap)
+  const { placing, handlers } = usePlacement(canvas, onTap)
 
   React.useEffect(() => {
-    const canvas = canvasRef.current
     if (!canvas || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(([entry]) => setShownWidth(entry.contentRect.width))
     observer.observe(canvas)
     return () => observer.disconnect()
-  }, [pixels])
+  }, [canvas])
 
   React.useEffect(() => {
-    const canvas = canvasRef.current
     if (canvas && pixels) draw(canvas, pixels, corners, spots, spotRadii, cardKind, hue, leftOut)
-  }, [pixels, corners, spots, spotRadii, cardKind, hue, leftOut, shownWidth])
+  }, [canvas, pixels, corners, spots, spotRadii, cardKind, hue, leftOut, shownWidth])
 
   if (!pixels) {
     return (
@@ -136,19 +134,20 @@ export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, le
     )
   }
 
-  // touch-pinch-zoom: the page keeps pinch-zoom, but a finger on the Photo never pans it by
-  // itself; usePlacement scrolls the page when the finger swipes.
+  // touch-manipulation: a swipe on the Photo scrolls or pans the page and a pinch zooms it, as
+  // anywhere else; usePlacement stops that only while a point is being placed. (It is "auto"
+  // without double-tap zoom, which would turn two quick taps into a zoom.)
   return (
     <>
       <canvas
-        ref={canvasRef}
+        ref={setCanvas}
         width={pixels.width}
         height={pixels.height}
         {...handlers}
         role="img"
         aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
         data-testid="photo"
-        className="block h-auto w-full cursor-crosshair touch-pinch-zoom bg-muted select-none"
+        className="block h-auto w-full cursor-crosshair touch-manipulation bg-muted select-none"
       />
       {placing && <Magnifier placing={placing} />}
     </>

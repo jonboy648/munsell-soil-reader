@@ -21,14 +21,14 @@ export function shownReading(reading: Reading, cardCheck: CardCheck | undefined)
     return {
       verdict: "good",
       main: reading.corrected,
-      why: `After correction the 24 Card patches are off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
+      why: `Each of the 24 Card patches, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
     }
   }
   if (reading.corrected && cardCheck) {
     return {
       verdict: "failed",
       main: reading.raw,
-      why: `The Card patches are still off by ${fmt(cardCheck.meanDE)} after correction. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
+      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
     }
   }
   return {

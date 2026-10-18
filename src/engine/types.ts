@@ -1,5 +1,6 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
+import type { Fit } from "./correction"
 
 /** A point in Photo pixels, origin at the top left. */
 export type XY = { x: number; y: number }
@@ -60,7 +61,7 @@ export type QualityWarning = {
 }
 
 export interface CardCheck {
-  meanDE: number // mean CIEDE2000 between the corrected Card patches and their true colors
+  meanDE: number // mean CIEDE2000 between each Card reference and its true color, corrected by a fit made without it
   ok: boolean // good when meanDE is below CARD_CHECK_GOOD
 }
 
@@ -68,6 +69,8 @@ export interface ReadPhotoInput {
   pixels: Pixels
   card: Card
   spots: XY[]
+  /** The fit used to correct against the Card. For comparing corrections in tests; the app leaves it out. */
+  correction?: Fit
 }
 
 export interface ReadPhotoResult {

@@ -1,7 +1,7 @@
 // The Photo: shows it full width and turns taps into Photo coordinates. It also draws
 // what the user has marked (Card corners, the patch positions, Spots) over the Photo.
 import * as React from "react"
-import { patchCenters, patchRadius, spotRadius, type Corners, type XY } from "@/engine"
+import { patchSites, spotRadius, type Corners, type XY } from "@/engine"
 import { Magnifier } from "@/components/Magnifier"
 import { usePlacement } from "@/lib/placement"
 import { CORNER_COUNT } from "@/lib/session"
@@ -49,9 +49,8 @@ function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots
   const shown = canvas.getBoundingClientRect().width
   const px = shown > 0 ? canvas.width / shown : 1
   if (corners.length === CORNER_COUNT) {
-    const four = corners as Corners
-    const r = patchRadius(four)
-    for (const c of patchCenters(four)) ring(ctx, c, r, px * 0.6)
+    // Every patch where, and as large as, the engine reads it.
+    for (const { center, radius } of patchSites(corners as Corners)) ring(ctx, center, radius, px * 0.6)
   }
   corners.forEach((c, i) => {
     ring(ctx, c, 8 * px, px)

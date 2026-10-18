@@ -15,6 +15,7 @@ import { StepIndicator } from "@/components/StepIndicator"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { buttonVariants } from "@/components/ui/button"
 import { UpdateNotice } from "@/components/UpdateNotice"
+import { lookupBatch } from "@/lib/batches"
 import { examplePhoto, filePhoto } from "@/lib/photo"
 import { hrefOf, markOpenedHere, usePage } from "@/lib/route"
 import { useServiceWorker } from "@/lib/serviceWorker"
@@ -22,6 +23,7 @@ import {
   CORNER_COUNT,
   canUndo,
   cardOf,
+  frameDetailOf,
   initialSession,
   sessionReducer,
   stepOf,
@@ -40,15 +42,54 @@ export function App() {
   const step = stepOf(session)
 
   // One engine call per change of Photo, Card or Spots.
-  const { photo, noCard, cardKind, hue, corners, spots } = session
+  const { photo, noCard, cardKind, hue, corners, spots, frame } = session
   const result = React.useMemo(() => {
-    const card = cardOf({ photo, noCard, cardKind, hue, corners, spots })
+    const card = cardOf({ photo, noCard, cardKind, hue, corners, spots, frame })
     return photo && card && spots.length > 0
       ? readPhoto({ pixels: photo.pixels, card, spots })
       : null
-  }, [photo, noCard, cardKind, hue, corners, spots])
+  }, [photo, noCard, cardKind, hue, corners, spots, frame])
+
+  // The frame is the Card: look for it in the Photo. The finder (and js-aruco2) is loaded only
+  // now, so users who never choose the frame never download it.
+  React.useEffect(() => {
+    if (cardKind !== "frame" || !photo) return
+    let current = true
+    import("@/engine/frame").then(
+      ({ findCard }) => {
+        if (!current) return
+        let outline = null
+        try {
+          outline = findCard(photo.pixels)
+        } catch {
+          // A Photo the finder cannot read has no frame in it, as far as the user can tell.
+        }
+        dispatch({ type: "frameFound", outline })
+      },
+      () => current && dispatch({ type: "frameFound", outline: null, failed: true }),
+    )
+    return () => {
+      current = false
+    }
+  }, [cardKind, photo])
+
+  const frameDrawing = React.useMemo(
+    () => (cardKind === "frame" ? { outline: frame.outline, confirmed: frame.confirmed } : undefined),
+    [cardKind, frame.outline, frame.confirmed],
+  )
+  // The button that confirms the outline is below the Photo, so the page may have scrolled to it
+  // (on a phone it nearly always has); the next thing to do is tap the soil in the Photo.
+  const confirmOutline = () => {
+    dispatch({ type: "frameConfirm" })
+    window.scrollTo({ top: 0 })
+  }
+  const onBatchCode = (code: string) => {
+    dispatch({ type: "batchCode", code })
+    if (code.trim() !== "") void lookupBatch(code).then((answer) => dispatch({ type: "batchResult", code, result: answer }))
+  }
   const spotRadii = React.useMemo(() => result?.readings.map((r) => r.radius), [result])
-  const cardInfo: CardInfo = cardKind === "page" && hue ? { kind: "page", hue } : { kind: "colorchecker" }
+  const cardInfo: CardInfo =
+    cardKind === "frame" && !noCard ? { kind: "frame" } : cardKind === "page" && hue ? { kind: "page", hue } : { kind: "colorchecker" }
 
   // A new Photo is picked from controls below it; bring the Photo back into view.
   React.useEffect(() => {
@@ -60,8 +101,8 @@ export function App() {
     dispatch({
       type: "load",
       photo: examplePhoto(example),
-      noCard: example.scene.card === false,
-      cardKind: example.scene.page ? "page" : "colorchecker",
+      noCard: example.scene.card === false && !example.scene.frame,
+      cardKind: example.scene.frame ? "frame" : example.scene.page ? "page" : "colorchecker",
     })
   }
   const pickFile = async (file: File) => {
@@ -93,6 +134,7 @@ export function App() {
             cornerCount={CORNER_COUNT}
             noCard={session.noCard}
             cardKind={cardKind}
+            frameDetail={frameDetailOf(frame)}
             spotCount={session.spots.length}
           />
         </div>
@@ -105,6 +147,7 @@ export function App() {
           cardKind={cardKind}
           hue={hue}
           leftOut={result?.cardCheck?.leftOut}
+          frame={frameDrawing}
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
 
@@ -126,8 +169,11 @@ export function App() {
                 hue={hue}
                 onCardKind={(kind) => dispatch({ type: "cardKind", cardKind: kind })}
                 onHue={(h) => dispatch({ type: "hue", hue: h })}
+                frame={frame}
+                onBatchCode={onBatchCode}
+                onConfirmOutline={confirmOutline}
               />
-              {step === "spots" && <SpotsPanel spotCount={session.spots.length} />}
+              {step === "spots" && <SpotsPanel spotCount={session.spots.length} inWindow={cardKind === "frame" && !noCard} />}
             </>
           ) : (
             <p className="text-base">Take or choose a Photo with the Card beside the soil.</p>

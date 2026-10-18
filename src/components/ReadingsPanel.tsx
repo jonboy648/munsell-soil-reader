@@ -79,6 +79,15 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
         <CardCheckBadge verdict={verdict} cardCheck={result.cardCheck} />
       </div>
       <p className="text-sm text-muted-foreground">{why}</p>
+      {reading.outsideWindow && (
+        <p
+          data-testid="outside-window"
+          className="rounded-sm border border-foreground/40 border-l-4 border-l-foreground py-2 pr-3 pl-3 text-sm"
+        >
+          <b className="font-semibold">Outside the window.</b> This Spot is not on the soil in the frame's window, so it may
+          be a different soil, or in different light, from the one the frame is next to. The Reading is still corrected.
+        </p>
+      )}
       {leftOut.length > 0 && (
         <p className="text-sm" data-testid="left-out">
           <b className="font-semibold">Left out of the fit:</b>{" "}

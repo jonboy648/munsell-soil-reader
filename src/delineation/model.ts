@@ -24,10 +24,48 @@ export interface Layer {
   remarks: string
 }
 
+/** One of the three Field Observations: whether it was seen, and how deep (inches) when it was. */
+export interface Observation {
+  /** Yes, No, or null while it has not been answered. */
+  present: boolean | null
+  depth: number | null
+}
+
+/** What was recorded at a sampling point for the Hydrology section of page 1. */
+export interface Hydrology {
+  /** The indicators ticked, by id (`A1`, `B6`), and "other" for Other (Explain in Remarks). */
+  ticked: string[]
+  surfaceWater: Observation
+  waterTable: Observation
+  saturation: Observation
+  /** Describe Recorded Data (stream gauge, monitoring well, aerial photos, previous inspections). */
+  describe: string
+  remarks: string
+  /**
+   * Wetland Hydrology Present?, as the delineator answered it. The rule only suggests an answer; null
+   * until it is confirmed, and a form with no answer prints neither Yes nor No.
+   */
+  present: boolean | null
+}
+
+const noObservation = (): Observation => ({ present: null, depth: null })
+
+export const emptyHydrology: Hydrology = {
+  ticked: [],
+  surfaceWater: noObservation(),
+  waterTable: noObservation(),
+  saturation: noObservation(),
+  describe: "",
+  remarks: "",
+  present: null,
+}
+
 export interface SamplingPoint {
   id: string
   name: string
   layers: Layer[]
+  /** Absent until something is recorded for the Hydrology section. */
+  hydrology?: Hydrology
 }
 
 export interface Project {

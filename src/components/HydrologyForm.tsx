@@ -44,9 +44,22 @@ function IndicatorRow({ indicator, ticked, onTick }: { indicator: HydrologyIndic
 
 export function HydrologyForm({ project, point, change }: Props) {
   const region = regionOf(project.region)
-  const h = point.hydrology ?? emptyHydrology
-  const update = (fn: (hydrology: Hydrology) => Hydrology) =>
-    change(project.id, (p) => withPoint(p, point.id, (pt) => ({ ...pt, hydrology: fn(pt.hydrology ?? emptyHydrology) })))
+  // What the delineator sees changes at once; the Log is written behind it. A change from another tab
+  // is taken up when nothing of ours is waiting to be written.
+  const [h, setH] = React.useState<Hydrology>(point.hydrology ?? emptyHydrology)
+  const writing = React.useRef(0)
+  React.useEffect(() => {
+    if (writing.current === 0) setH(point.hydrology ?? emptyHydrology)
+  }, [point.hydrology])
+  const update = async (fn: (hydrology: Hydrology) => Hydrology) => {
+    setH(fn)
+    writing.current++
+    try {
+      await change(project.id, (p) => withPoint(p, point.id, (pt) => ({ ...pt, hydrology: fn(pt.hydrology ?? emptyHydrology) })))
+    } finally {
+      writing.current--
+    }
+  }
 
   // Text and depths are saved when the field is left, not on every key.
   const [describe, setDescribe] = React.useState(h.describe)

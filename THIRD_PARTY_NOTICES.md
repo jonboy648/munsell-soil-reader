@@ -1,3 +1,16 @@
+# Third-party notices
+
+Munsell Soil Reader is MIT licensed. It is built on the code and data below, which keep their
+own licenses.
+
+## munsell.js (MPL-2.0)
+
+The Munsell conversions use [munsell.js](https://github.com/privet-kitty/munsell.js) 1.1.7 by
+Hugo Sansaqua, from the npm package `munsell`. It is used unmodified as a bundled dependency
+(see `package.json`), so the app works offline. Its source is at the link above and in
+`node_modules/munsell/src` after `npm install`. Its license text, kept as shipped:
+
+```text
 Mozilla Public License Version 2.0
 ==================================
 
@@ -371,3 +384,25 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
   This Source Code Form is "Incompatible With Secondary Licenses", as
   defined by the Mozilla Public License, v. 2.0.
+
+```
+
+## ColorChecker reference values
+
+The X-Rite ColorChecker Classic reference colors ("after November 2014" CIE L*a*b*, D50) are
+X-Rite's published data, taken from the `colour-science/colour` dataset
+(`colour/characterisation/datasets/colour_checkers`, BSD-3-Clause).
+
+## Other dependencies
+
+These ship in the built app or build it. Each is used unmodified under its own license; the
+license text travels with the package in `node_modules`.
+
+| Package | License |
+| --- | --- |
+| React, React DOM | MIT |
+| Radix UI (`radix-ui`), vaul | MIT |
+| shadcn/ui components (copied into `src/components/ui`), `cn` | MIT |
+| Tailwind CSS, `tw-animate-css` | MIT |
+| lucide-react | ISC |
+| Archivo, Public Sans, IBM Plex Mono (via `@fontsource`) | SIL Open Font License 1.1 |

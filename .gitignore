@@ -1,3 +1,7 @@
-__pycache__/
+node_modules/
 dist/
+test-results/
+playwright-report/
+*.tsbuildinfo
+__pycache__/
 munsell-prototype.html

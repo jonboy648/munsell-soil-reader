@@ -1,0 +1,114 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource-variable/public-sans";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Field instrument. Every color token below has zero chroma: the chrome around a Photo is
+ * neutral gray, because a tinted surround biases how people judge soil color. Color on screen
+ * comes only from the Photo and from the color swatches. Dark is a neutral dark gray, not black.
+ */
+@theme inline {
+    --font-sans: "Public Sans Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-heading: "Archivo Variable", "Arial Narrow", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(0.94 0 0);
+    --foreground: oklch(0.18 0 0);
+    --card: oklch(0.985 0 0);
+    --card-foreground: oklch(0.18 0 0);
+    --popover: oklch(0.985 0 0);
+    --popover-foreground: oklch(0.18 0 0);
+    --primary: oklch(0.2 0 0);
+    --primary-foreground: oklch(0.97 0 0);
+    --secondary: oklch(0.9 0 0);
+    --secondary-foreground: oklch(0.2 0 0);
+    --muted: oklch(0.91 0 0);
+    --muted-foreground: oklch(0.44 0 0);
+    --accent: oklch(0.89 0 0);
+    --accent-foreground: oklch(0.2 0 0);
+    --destructive: oklch(0.2 0 0);
+    --border: oklch(0.82 0 0);
+    --input: oklch(0.82 0 0);
+    --ring: oklch(0.45 0 0);
+    --radius: 0.625rem;
+}
+
+.dark {
+    --background: oklch(0.24 0 0);
+    --foreground: oklch(0.93 0 0);
+    --card: oklch(0.285 0 0);
+    --card-foreground: oklch(0.93 0 0);
+    --popover: oklch(0.285 0 0);
+    --popover-foreground: oklch(0.93 0 0);
+    --primary: oklch(0.93 0 0);
+    --primary-foreground: oklch(0.2 0 0);
+    --secondary: oklch(0.33 0 0);
+    --secondary-foreground: oklch(0.93 0 0);
+    --muted: oklch(0.31 0 0);
+    --muted-foreground: oklch(0.72 0 0);
+    --accent: oklch(0.34 0 0);
+    --accent-foreground: oklch(0.93 0 0);
+    --destructive: oklch(0.93 0 0);
+    --border: oklch(0.42 0 0);
+    --input: oklch(0.42 0 0);
+    --ring: oklch(0.7 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    color-scheme: light;
+    }
+  html.dark {
+    color-scheme: dark;
+    }
+  button {
+    touch-action: manipulation;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+  }
+}

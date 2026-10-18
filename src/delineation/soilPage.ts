@@ -2,7 +2,7 @@
 // take this list, so they cannot disagree.
 import { regionOf } from "./regions"
 import { PROFILE_COLUMNS } from "./regions/types"
-import { columnRoom, fieldId, type Form } from "./formFor"
+import { columnRoom, fieldId, indicatorFieldId, type Form } from "./formFor"
 import type { Project } from "./model"
 import { fit } from "./text"
 
@@ -19,7 +19,7 @@ export interface Placement {
   maxWidth: number
 }
 
-/** The non-blank values of the page, top to bottom, left to right. */
+/** The non-blank values of the page, top to bottom, left to right, then the ticks. */
 export function soilPlacements(project: Project, form: Form): Placement[] {
   const { soil } = regionOf(project.region)
   const placements: Placement[] = []
@@ -37,5 +37,24 @@ export function soilPlacements(project: Project, form: Form): Placement[] {
       place(id, form.fields[id], soil.columns[column][0] + soil.inset, rule, columnRoom(soil, column))
     }
   })
+  // A tick is an X drawn on the printed blank, centered on it and sitting just above its line.
+  const tick = (id: Placement["id"], box: { x: readonly [number, number]; rule: number }) => {
+    if (!form.fields[id as keyof typeof form.fields]) return
+    const width = X_WIDTH * soil.tick.size
+    placements.push({
+      id,
+      text: "X",
+      x: (box.x[0] + box.x[1]) / 2 - width / 2,
+      baseline: box.rule - soil.tick.aboveRule,
+      size: soil.tick.size,
+      maxWidth: width,
+    })
+  }
+  for (const indicator of regionOf(project.region).indicators) tick(indicatorFieldId(indicator.id), indicator.box)
+  tick("soil.hydric.yes", soil.hydricPresent.yes)
+  tick("soil.hydric.no", soil.hydricPresent.no)
   return placements
 }
+
+/** The width of a capital X in Helvetica, in ems. */
+const X_WIDTH = 0.667

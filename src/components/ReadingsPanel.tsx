@@ -63,11 +63,11 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
           <p data-testid="drawer-notation" className="font-mono text-4xl leading-none font-semibold tracking-tight">
             {main.chip.notation}
           </p>
-          {main.chip.name && <p className="mt-1 text-base">{main.chip.name}</p>}
+          <p data-testid="drawer-name" className="mt-1 text-base">{main.chip.name}</p>
           <p className="mt-2 font-mono text-sm text-muted-foreground">exact {main.exact}</p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <ColorBlock rgb={main.rgb} label="Soil" />
+          <ColorBlock rgb={main.rgb} label={verdict === "good" ? "Corrected" : "Raw"} />
           <ColorBlock rgb={main.chipRgb} label="Chip" />
         </div>
       </div>
@@ -95,10 +95,11 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
       </table>
       <div>
         <p className="mb-1 text-xs text-muted-foreground">Top 3 Chips</p>
-        <ol className="flex flex-wrap gap-2">
+        <ol aria-label="Top 3 Chips" className="flex flex-wrap gap-2">
           {main.top3.map(({ chip, de }) => (
-            <li key={chip.notation} className="rounded-md border border-border px-2 py-1 font-mono text-sm">
-              {chip.notation} <span className="text-muted-foreground">{fmt(de)}</span>
+            <li key={chip.notation} className="rounded-md border border-border px-2 py-1 text-sm">
+              <span className="font-mono">{chip.notation}</span> {chip.name}{" "}
+              <span className="font-mono text-muted-foreground">{fmt(de)}</span>
             </li>
           ))}
         </ol>

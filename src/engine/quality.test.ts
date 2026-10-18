@@ -6,6 +6,7 @@ import { readPhoto } from "./index"
 import type { Card, Corners, XY } from "./index"
 import {
   LIGHTS,
+  PHONE_TONE_CURVE,
   SIM_CORNERS,
   SIM_SPOT,
   simPatchCenter as patch,
@@ -14,7 +15,7 @@ import {
   type SimScene,
 } from "./simulate"
 
-const camera = (light: SimCamera["light"] = LIGHTS.warm, toneCurve = 0.3): SimCamera => ({ light, toneCurve })
+const camera = (light: SimCamera["light"] = LIGHTS.warm, toneCurve = PHONE_TONE_CURVE): SimCamera => ({ light, toneCurve })
 const WARM: SimScene = { camera: camera() }
 /** The same light, scaled: more than 1 is over-exposed, less than 1 under. */
 const exposed = (gain: number, base: SimCamera["light"] = LIGHTS.warm): SimCamera["light"] => (lin) => {

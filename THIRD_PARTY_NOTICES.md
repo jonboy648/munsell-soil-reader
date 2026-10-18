@@ -387,11 +387,69 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ```
 
+## Soil-book Chip list (CC0 1.0)
+
+The Chips a Reading can land on, with their color names, start from
+[tomax31/Munsell-Soil-Color-Chart-palette](https://github.com/tomax31/Munsell-Soil-Color-Chart-palette)
+by Thomas Perrin, dedicated to the public domain under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). We took the Munsell codes and the
+English names only (file `munsell_soil_color_chart_palette.gpl`, commit
+`78e4757992ff47fd3c5c17c5573971612fbb3ec1`, 17 May 2026) and keep them as they came in
+`src/engine/chipList.ts`. That palette's RGB values are approximate and are not used: each
+Chip's color is computed from its notation with munsell.js.
+
+The CC0 list lacks the neutral Chips, the 10Y-5GY Page and the WHITE Page's lighter Chips,
+and has some stale names. The additions and corrections are in `src/engine/bookCorrections.ts`,
+checked against a physical Munsell Soil-Color Charts, 2009 Revision, 2015 Production,
+photographed 2026-10-18. That checking is not complete: the 10R Chips and the names on the 2.5Y
+and 5Y Pages are not yet checked against the book.
+
 ## ColorChecker reference values
 
 The X-Rite ColorChecker Classic reference colors ("after November 2014" CIE L*a*b*, D50) are
 X-Rite's published data, taken from the `colour-science/colour` dataset
 (`colour/characterisation/datasets/colour_checkers`, BSD-3-Clause).
+
+## Root-polynomial correction (BSD-3-Clause)
+
+`src/engine/correctionCandidates.testkit.ts` is a TypeScript port of the root-polynomial color
+correction in [colour-science](https://github.com/colour-science/colour), from
+`colour/characterisation/correction.py` (`polynomial_expansion_Finlayson2015`,
+`matrix_colour_correction_Finlayson2015`) and `colour/algebra` (`spow`). It implements the
+method of Finlayson, MacKiewicz and Hurlbert, "Color Correction Using Root-Polynomial
+Regression", IEEE Transactions on Image Processing 24(5), 2015. The port is used only by the
+tests, to compare the correction the app ships against root-polynomial; it is not in the built
+app. The port keeps colour-science's notice in the file, and
+`src/engine/golden/make_root_polynomial_golden.py` regenerates the colour-science numbers it is
+checked against. The license, as shipped:
+
+```text
+Copyright 2013 Colour Developers
+
+Redistribution and use in source and binary forms, with or without modification, are
+permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of
+conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of
+conditions and the following disclaimer in the documentation and/or other materials
+provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors may be used
+to endorse or promote products derived from this software without specific prior written
+permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS
+OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
 
 ## Other dependencies
 

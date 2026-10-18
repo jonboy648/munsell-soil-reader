@@ -1,5 +1,6 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
+import type { Fit } from "./correction"
 
 /** A point in Photo pixels, origin at the top left. */
 export type XY = { x: number; y: number }
@@ -22,12 +23,18 @@ export type Card =
   | { kind: "page"; hue: string; corners: Corners } // hue like '10YR'; not supported yet (ticket 8)
   | { kind: "none" }
 
+/** The Pages of the soil book (2009 Revision) that hold the Chips the engine knows. */
+export type ChipPage =
+  | "10R" | "2.5YR" | "5YR" | "7.5YR" | "10YR" | "2.5Y" | "5Y"
+  | "10Y-5GY" | "GLEY1" | "GLEY2" | "WHITE"
+
 export interface Chip {
-  notation: string // '10YR 4/3'
-  name: string // 'brown'; blank until the real Chip list lands
-  hue: string // '10YR', or 'N' for neutrals
+  notation: string // '10YR 4/3'; a neutral Chip has no chroma: 'N 5/'
+  name: string // 'brown'
+  hue: string // '10YR', '5GY', or 'N' for the neutral Chips
   value: number
-  chroma: number
+  chroma: number // 0 for a neutral Chip
+  pages: readonly ChipPage[] // the Pages of the soil book the Chip is printed on; N 8/ is on two
 }
 
 export type RgbTriple = [number, number, number]
@@ -54,7 +61,7 @@ export type QualityWarning = {
 }
 
 export interface CardCheck {
-  meanDE: number // mean CIEDE2000 between the corrected Card patches and their true colors
+  meanDE: number // mean CIEDE2000 between each Card reference and its true color, corrected by a fit made without it
   ok: boolean // good when meanDE is below CARD_CHECK_GOOD
 }
 
@@ -62,6 +69,8 @@ export interface ReadPhotoInput {
   pixels: Pixels
   card: Card
   spots: XY[]
+  /** The fit used to correct against the Card. For comparing corrections in tests; the app leaves it out. */
+  correction?: Fit
 }
 
 export interface ReadPhotoResult {

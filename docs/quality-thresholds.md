@@ -46,7 +46,7 @@ can reuse them without ColorChecker code in the engine.
 **What is blown.** A white that touches the top in one channel is normal: warm light puts the
 ColorChecker's white at 254/236/188, and the camera color shift puts it at 244/248/255 (247/250/255
 through the stronger tone curve of 0.5). Counting one channel at 250 or more flags both, though
-the Card check is good (1.8 and 1.4) and the Reading is right. So a pixel is blown when two
+the Card check is good (0.68 and 0.76, through the example tone curve of 0.5) and the Reading is right. So a pixel is blown when two
 channels are at 253 or more: both examples pass. The shift example flags at 5% more light, and
 the warm one at 30% more, when a second channel reaches the top. Crushed uses every channel: dark
 soil has almost no blue, so one channel at 0 is not a lost Spot. The one-channel rule (even at 253)
@@ -127,9 +127,9 @@ are each flagged: tested with reflections on three patches and a shadow over the
 
 **Card too small.** Patches are read in a circle of 20% of their pitch, from corners the user
 tapped, so a tap that is off puts the circle on a gap or a neighbor. In the simulated camera (no
-blur, flat patches) the Card check stayed good in 100 of 100 trials with tap errors of up to
-8 px at a pitch of 24.4 px, in 97 of 100 at 20.7 px, and in 66 of 100 at 17.8 px. With errors up to
-6 px it held to 17.8 px and fell to 87 of 100 at 14.8 px. So a pitch of about three times the tap
+blur, flat patches, tone curve 0.5) the Card check stayed good in 40 of 40 trials with tap errors
+of up to 8 px at a pitch of 24.4 px, in 38 of 40 at 20.7 px, and in 23 of 40 at 17.8 px. With
+errors up to 6 px it held in 40 of 40 down to 17.8 px and fell to 36 of 40 at 14.8 px. So a pitch of about three times the tap
 error is safe, and 24 px allows 8 px of error (about 2 screen pixels on a phone, where a 1600 px
 Photo is shown 4 times smaller). The spacing comes from the tapped corners (the smallest of
 the four sides over its patch count), not from the patch positions they imply: with the corners in
@@ -153,6 +153,20 @@ tried. With the exposure much further off and the corners also wrong, glare may 
 its place.
 
 ## Known limits
+
+Every one of these still leaves a signal: with the corners in any of the 23 wrong orders the Card
+check fails (24.8 or worse, against a limit of 2), so the Reading is shown uncorrected.
+
+- Three of the 23 wrong orders (`1023`, `3021` and `0321`, with 0, 1 and 1 inverted pairs) are not
+  told apart from the Card by the gray ladder, so the white and black it supplies are the wrong
+  patches. Their Card check reads 27.6, 34.0 and 31.2, and uneven light stays quiet for them (the
+  frame spread is 0.0, 5.9 and 5.8 stops).
+- With the corners in the wrong order and the exposure also far off, glare can be reported where
+  clipped is true. For a warm light at 1.3 times, all 23 orders report clipped; at 2 times, 19 do
+  and 4 report glare; at 4 times, 17 do and 6 report glare.
+- A shadow of about 2.3 stops that darkens the white end, or falls from right to left, inverts up
+  to 3 pairs of grays, so the ladder takes the Card for off the Card: uneven light and Card too
+  small are then skipped, and the Card check, which fails at that depth, is the signal.
 
 - Glare that covers the whole white patch is reported as clipped: a reflection on the white is the
   same to the engine as a white that is too bright.

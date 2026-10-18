@@ -36,7 +36,7 @@ test("a Reading shows the Chip's color name, three candidates and the two swatch
   const candidates = sheet.getByRole("list", { name: "Top 3 Chips" }).getByRole("listitem")
   await expect(candidates).toHaveCount(3)
   await expect(candidates.first()).toHaveText(/^10YR 4\/3 brown \d+\.\d$/)
-  for (const text of await candidates.allTextContents()) expect(text).toMatch(/^\S+ [\d.]+\/[\d.]+ [a-z ]+ \d+\.\d$/)
+  for (const text of await candidates.allTextContents()) expect(text).toMatch(/^\S+ [\d.]+\/[\d.]* [a-z ]+ \d+\.\d$/)
 
   // The corrected color sits beside the Chip's color: same row, corrected on the left. Both
   // boxes are read in one go, and polled, because the sheet is still sliding up at first.

@@ -389,14 +389,19 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ## Soil-book Chip list (CC0 1.0)
 
-The Chips a Reading can land on, with their color names, come from
+The Chips a Reading can land on, with their color names, start from
 [tomax31/Munsell-Soil-Color-Chart-palette](https://github.com/tomax31/Munsell-Soil-Color-Chart-palette)
 by Thomas Perrin, dedicated to the public domain under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). We took the Munsell codes and the
 English names only (file `munsell_soil_color_chart_palette.gpl`, commit
-`78e4757992ff47fd3c5c17c5573971612fbb3ec1`, 17 May 2026) and keep them in
+`78e4757992ff47fd3c5c17c5573971612fbb3ec1`, 17 May 2026) and keep them as they came in
 `src/engine/chipList.ts`. That palette's RGB values are approximate and are not used: each
 Chip's color is computed from its notation with munsell.js.
+
+The CC0 list lacks the neutral Chips and the 10Y-5GY Page and has some stale names. The
+additions and corrections are in `src/engine/bookCorrections.ts`, checked against a physical
+Munsell Soil-Color Charts, 2009 Revision, 2015 Production, photographed 2026-10-18. The
+10R, 2.5YR and 5YR Pages are not yet checked against the book.
 
 ## ColorChecker reference values
 

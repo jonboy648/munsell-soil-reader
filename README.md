@@ -53,9 +53,11 @@ How a Reading is made: the median of the tapped pixels, a white balance and then
 correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
 then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 of the corrected
-patches; below 3 is good. The Chips are the 315 in the soil book, with their color names, gley
-included (`src/engine/chipList.ts`, from the CC0 list by tomax31). Each Chip's color is computed
-from its notation, matching happens in Lab, and only the on-screen swatch is clamped to sRGB.
+patches; below 3 is good. The Chips are the 338 in the soil book, with their color names, gley
+and neutral included. They are the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips)
+plus the corrections checked against a physical book (`src/engine/bookCorrections.ts`: the
+neutral Chips, the 10Y-5GY Page and six stale names). Each Chip's color is computed from its
+notation, matching happens in Lab, and only the on-screen swatch is clamped to sRGB.
 
 ## Tests
 

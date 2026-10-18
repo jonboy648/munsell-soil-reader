@@ -85,6 +85,18 @@ describe("indicators that rest on texture", () => {
     expect(result.suggestions).toEqual([])
   })
 
+  test.each([
+    ["S1", "mucky sand", 2],
+    ["F1", "mucky silt loam", 4],
+  ])("%s: the same layer is under needs until its texture is recorded, then it is suggested", (id, texture, thickness) => {
+    const without = suggest(project(), point([L(0, thickness, "10YR 2/1")]))
+    expect(without.suggestions.map((s) => s.indicator)).not.toContain(id)
+    expect(without.needs.find((n) => n.indicator === id)!.needs[0]).toMatch(/texture/)
+    const withTexture = suggest(project(), point([L(0, thickness, "10YR 2/1", { texture })]))
+    expect(withTexture.suggestions.map((s) => s.indicator)).toContain(id)
+    expect(withTexture.needs.map((n) => n.indicator)).not.toContain(id)
+  })
+
   test("S1: mucky sand 2 in thick starting within 6 in", () => {
     expect(found([L(0, 2, "10YR 2/1", SANDY_MUCKY)])).toContain("S1")
     expect(found([L(0, 1.5, "10YR 2/1", SANDY_MUCKY)])).not.toContain("S1")

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, test } from "vitest"
 import { regionOf } from "../regions"
 import { VEG_COLUMNS } from "../regions/types"
-import { pdfRules, type Rule } from "../testing/pdfRules"
+import { pdfRules, type DrawnRule } from "../testing/pdfRules"
 import { pdfText } from "../testing/pdfText"
 import { STRATA } from "./strata"
 
@@ -13,8 +13,8 @@ const read = (name: string) => new Uint8Array(readFileSync(new URL(`../regions/n
 const NEAR = 0.3
 
 /** Whether the page draws a rule at this height that runs exactly this far. */
-const has = (rules: Rule[], top: number, span: readonly [number, number]) =>
-  rules.some((r) => Math.abs(r.top - top) < NEAR && Math.abs(r.x0 - span[0]) < NEAR && Math.abs(r.x1 - span[1]) < NEAR)
+const has = (rules: DrawnRule[], top: number, span: readonly [number, number]) =>
+  rules.some((r) => Math.abs(r.top - top) < NEAR && Math.abs(r.left - span[0]) < NEAR && Math.abs(r.right - span[1]) < NEAR)
 
 describe.each([
   ["the Vegetation page", "vegetation-page.pdf", page.pageNumber, true],
@@ -48,7 +48,7 @@ describe.each([
 
   test("the Remarks box is below the strata and holds the lines the region package says", async () => {
     const rules = await pdfRules(read(file))
-    const edges = rules.filter((r) => r.x0 < 36 && r.x1 > 575).map((r) => r.top)
+    const edges = rules.filter((r) => r.left < 36 && r.right > 575).map((r) => r.top)
     const [top, bottom] = [Math.min(...edges.filter((t) => t > 600)), Math.max(...edges)]
     const { firstBaseline, lastBaseline } = page.remarks
     expect(firstBaseline).toBeGreaterThan(top)

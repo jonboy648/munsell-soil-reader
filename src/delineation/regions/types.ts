@@ -35,6 +35,8 @@ export interface SoilPage {
   aboveRule: number
   /** The "Sampling Point" box at the top of the page: its rule's left and right ends, and its top. */
   samplingPoint: { column: readonly [number, number]; rule: number }
+  /** The Restrictive Layer box: the rules its Type and Depth are written on. */
+  restrictive: { type: TickBlank; depth: TickBlank }
   /** The top of the rule each row's values sit on, from the top of the page, first row first. */
   rowRules: readonly number[]
   /** The left and right ends of each column's rule. */
@@ -44,6 +46,51 @@ export interface SoilPage {
   /** Where a tick (an X) sits on its blank: its size, and the gap from the line up to its baseline. */
   tick: { size: number; aboveRule: number }
 }
+
+/** The header lines of page 1 that take typed text. */
+export const PAGE1_TEXT_FIELDS = [
+  "site",
+  "county",
+  "date",
+  "applicant",
+  "state",
+  "samplingPoint",
+  "investigators",
+  "sectionTownshipRange",
+  "landform",
+  "localRelief",
+  "slope",
+  "subregion",
+  "lat",
+  "long",
+  "datum",
+  "soilMapUnit",
+  "nwi",
+] as const
+
+/** The short blanks of page 1 that take one letter: a tick, or Y or N. */
+export const PAGE1_MARK_FIELDS = [
+  "normalYes",
+  "normalNo",
+  "disturbedVegetation",
+  "disturbedSoil",
+  "disturbedHydrology",
+  "problematicVegetation",
+  "problematicSoil",
+  "problematicHydrology",
+] as const
+
+export type Page1TextField = (typeof PAGE1_TEXT_FIELDS)[number]
+export type Page1MarkField = (typeof PAGE1_MARK_FIELDS)[number]
+export type Page1Field = Page1TextField | Page1MarkField
+
+/** A line to write on: the left and right ends of its rule, and the top of the rule from the top of the page. */
+export interface Rule {
+  left: number
+  right: number
+  rule: number
+}
+
 
 /** The columns of a Vegetation page's rows, left to right. "dominant" is the form's Dominant Species? column. */
 export const VEG_COLUMNS = ["name", "cover", "dominant", "status"] as const
@@ -252,6 +299,10 @@ export interface Page1 {
   aboveRule: number
   /** The size of the X that ticks a blank. */
   tickSize: number
+  /** The header's lines: the ones that take text and the short blanks that take a letter. */
+  fields: Record<Page1Field, Rule>
+  /** The Summary of Findings' Remarks box: its text's left and right edges and the baseline of its first line. */
+  summaryRemarks: { left: number; right: number; baseline: number }
   hydrology: HydrologyPage
 }
 

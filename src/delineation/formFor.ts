@@ -4,25 +4,39 @@
 // The Soil page: the Sampling Point box (`soil.samplingPoint`), its profile description table
 // (`soil.profile.<row>.<column>`, rows from 0), a tick for each confirmed hydric soil indicator
 // (`soil.indicator.<id>`), and the answer to "Hydric Soil Present?" once the user has confirmed it
-// (`soil.hydric.yes` or `.no`). Page 1's Hydrology section is `page1.hydrology.*`. The Vegetation pages
-// are filled from the plants (vegetation/vegetationFields.ts): `veg.<stratum>.<row>.<column>`, the
-// stratum's `plotSize` and `total`, `veg.samplingPoint` and `veg.remarks`. Every field is in `fields`,
-// blank when unknown, and every value is already text the PDF's font can print. Nothing is ticked that
-// the user has not confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left
-// unconfirmed go on the cover note.
+// (`soil.hydric.yes` or `.no`). Page 1: the header (`page1.<line>`, and `page1.summaryRemarks` for the
+// note of a pair) and the Hydrology section (`page1.hydrology.*`). The Vegetation pages are filled from
+// the plants (vegetation/vegetationFields.ts): `veg.<stratum>.<row>.<column>`, the stratum's `plotSize`
+// and `total`, `veg.samplingPoint` and `veg.remarks`. Every field is in `fields`, blank when unknown,
+// and every value is already text the PDF's font can print. Nothing is ticked that the user has not
+// confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left unconfirmed go on the
+// cover note.
+import { PROJECT_FIELDS, POINT_FIELDS, subregionText, writtenDate } from "./headerFields"
 import { regionOf } from "./regions"
-import { PROFILE_COLUMNS, type ProfileColumn, type SoilPage } from "./regions/types"
+import {
+  PAGE1_MARK_FIELDS,
+  PAGE1_TEXT_FIELDS,
+  PROFILE_COLUMNS,
+  type Page1,
+  type Page1Field,
+  type ProfileColumn,
+  type SoilPage,
+} from "./regions/types"
 import { hydrologyFor } from "./hydrology"
-import { printable, truncate, widthOf, wrap, written } from "./text"
-import { topToBottom, type LayerColor, type Project, type SamplingPoint } from "./model"
+import { fit, printable, truncate, widthOf, wrap, written } from "./text"
+import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
 import { indicatorLabel, suggest, type Suggestions } from "./rules/suggest"
 import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
+type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
 export type FieldId =
   | `soil.profile.${number}.${ProfileColumn}`
   | "soil.samplingPoint"
+  | "soil.restrictive.type"
+  | "soil.restrictive.depth"
   | `soil.indicator.${string}`
   | `soil.hydric.${"yes" | "no"}`
+  | Page1Id
   | `page1.hydrology.${string}`
   | VegFieldId
 
@@ -35,9 +49,11 @@ export interface FormWarning {
     | "too-many-rows"
     | "remarks-cut"
     | "text-changed"
+    | "field-cut"
     | "hydrology-observation"
     | "hydrology-answer"
     | VegWarning["kind"]
+    | "color-not-a-chip"
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
   text: string
@@ -110,6 +126,54 @@ export const columnRoom = (soil: SoilPage, column: ProfileColumn): number => {
   return right - left - 2 * soil.inset
 }
 
+/** How wide a line of page 1 takes text: the rule less a gap at each end. */
+export const ruleRoom = (page1: Page1, field: Page1Field): number => {
+  const { left, right } = page1.fields[field]
+  return right - left - 2 * page1.inset
+}
+
+const FLAG = { yes: "Y", no: "N", "": "" } as const satisfies Record<YesNo, string>
+
+/** Page 1's header as printed: the Project's lines, the Sampling point's, the Y, N and tick blanks. */
+function page1Fields(project: Project, point: SamplingPoint, warnings: FormWarning[]): Record<Page1Id, string> {
+  const { page1 } = regionOf(project.region)
+  const header: ProjectHeader = project.header
+  const out = {} as Record<Page1Id, string>
+  for (const field of [...PAGE1_TEXT_FIELDS, ...PAGE1_MARK_FIELDS]) out[`page1.${field}`] = ""
+
+  const put = (field: (typeof PAGE1_TEXT_FIELDS)[number], label: string, value: string) => {
+    const { text, replaced } = printable(value)
+    if (replaced) warnings.push({ kind: "text-changed", text: `${label}: the text has characters the form cannot print; they were replaced.` })
+    const shown = fit(text, ruleRoom(page1, field), page1.fontSize).text
+    if (shown !== text) warnings.push({ kind: "field-cut", text: `${label} is too long for its line on the form, so it is cut there.` })
+    out[`page1.${field}`] = shown
+  }
+  for (const { key, field, label } of PROJECT_FIELDS) {
+    put(field, label, key === "date" ? writtenDate(header.date) : String(header[key]))
+  }
+  put("subregion", "Subregion", subregionText(project.subregion))
+  for (const { key, field, label } of POINT_FIELDS) put(field, label, String(point[key]))
+
+  if (header.normalCircumstances === "yes") out["page1.normalYes"] = "X"
+  if (header.normalCircumstances === "no") out["page1.normalNo"] = "X"
+  out["page1.disturbedVegetation"] = FLAG[header.disturbed.vegetation]
+  out["page1.disturbedSoil"] = FLAG[header.disturbed.soil]
+  out["page1.disturbedHydrology"] = FLAG[header.disturbed.hydrology]
+  out["page1.problematicVegetation"] = FLAG[header.problematic.vegetation]
+  out["page1.problematicSoil"] = FLAG[header.problematic.soil]
+  out["page1.problematicHydrology"] = FLAG[header.problematic.hydrology]
+
+  // The Summary Remarks box starts with the pair, so both forms of a pair say so.
+  const pair = pairOf(project, point)
+  if (pair) {
+    const [mine, theirs] = pair.role === "wetland" ? ["Wetland", "upland"] : ["Upland", "wetland"]
+    out["page1.summaryRemarks"] = printable(`${mine} point, paired with the ${theirs} point ${pair.other.name}.`).text
+  } else {
+    out["page1.summaryRemarks"] = ""
+  }
+  return out
+}
+
 type Row = Partial<Record<ProfileColumn, string>>
 
 /** The note on the last printed row when layers were left off, kept within the Remarks column. */
@@ -136,7 +200,14 @@ export function formFor(project: Project, point: SamplingPoint): Form {
 
   layers.forEach((layer, i) => {
     const redox = (c: LayerColor | undefined): Row =>
-      c ? { redoxColor: c.notation, redoxPercent: written(c.percent) } : {}
+      c ? { redoxColor: c.notation, redoxPercent: written(c.percent), redoxType: c.type ?? "", redoxLoc: c.location ?? "" } : {}
+
+    // A color typed in that the soil book does not print is printed as typed, with a note.
+    for (const [name, color] of [["matrix", layer.matrix], ...layer.redox.map((c, k) => [`redox ${k + 1}`, c] as const)] as const) {
+      if (color?.exact) {
+        warnings.push({ kind: "color-not-a-chip", layer: i, text: `Layer ${i + 1}: the ${name} color ${color.notation} is not a Chip in the soil book. It is printed as entered.` })
+      }
+    }
 
     if (layer.bottom <= layer.top) {
       warnings.push({ kind: "bad-depth", layer: i, text: `Layer ${i + 1}: the bottom is not deeper than the top.` })
@@ -163,6 +234,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     const block: Row[] = [
       {
         depth: `${written(layer.top)}-${written(layer.bottom)}`,
+        ...(layer.texture ? { texture: layer.texture } : {}),
         ...(layer.matrix ? { matrixColor: layer.matrix.notation, matrixPercent: written(layer.matrix.percent) } : {}),
         ...redox(first),
       },
@@ -202,7 +274,18 @@ export function formFor(project: Project, point: SamplingPoint): Form {
   }
 
   const vegetation = vegetationFields(project, point, name.text)
-  const fields = { ...vegetation.fields, "soil.samplingPoint": name.text } as Record<FieldId, string>
+  const restrictive = point.restrictive
+  const restrictiveType = printable(restrictive?.type ?? "")
+  if (restrictiveType.replaced) {
+    warnings.push({ kind: "text-changed", text: "The restrictive layer type has characters the form cannot print; they were replaced." })
+  }
+  const fields = {
+    ...vegetation.fields,
+    ...page1Fields(project, point, warnings),
+    "soil.samplingPoint": name.text,
+    "soil.restrictive.type": restrictiveType.text,
+    "soil.restrictive.depth": restrictive?.depth == null ? "" : written(restrictive.depth),
+  } as Record<FieldId, string>
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }

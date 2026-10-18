@@ -1,13 +1,14 @@
 // Projects on disk, beside the Samples, in the same database (see logStore.ts). A Project is one
 // document with its Sampling points and Layers inside it, and every change is one read-modify-write
 // in a single transaction, so a second tab cannot overwrite it with an older copy.
-import type { Project } from "@/delineation/model"
+import { normalizeProject, type Project } from "@/delineation/model"
 import { PROJECTS, run } from "@/lib/logStore"
 
 export const listProjects = (): Promise<Project[]> =>
   run(PROJECTS, "readonly", (store) => {
     const request = store.getAll()
-    return () => request.result as Project[]
+    // A Project saved before the header and the point details existed has them filled in blank.
+    return () => (request.result as Project[]).map(normalizeProject)
   }).catch((error) => {
     // A Log that could not be updated has no projects store: there are none to show.
     if (error instanceof DOMException && error.name === "NotFoundError") return []
@@ -32,7 +33,7 @@ export const changeProject = (id: string, change: (project: Project) => Project)
     let updated: Project | undefined
     const get = store.get(id)
     get.onsuccess = () => {
-      if (get.result) store.put((updated = change(get.result as Project)))
+      if (get.result) store.put((updated = change(normalizeProject(get.result as Project))))
     }
     return () => updated
   })

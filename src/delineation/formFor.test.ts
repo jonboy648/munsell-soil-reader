@@ -10,9 +10,6 @@ import { widthOf } from "./text"
 const COLUMNS = ["depth", "matrixColor", "matrixPercent", "redoxColor", "redoxPercent"] as const
 const { soil } = regionOf("NCNE")
 
-/** The fields of the Soil page. (The form also holds the Vegetation pages' fields.) */
-const soilFields = (form: ReturnType<typeof formFor>) => Object.entries(form.fields).filter(([id]) => id.startsWith("soil."))
-
 const layer = (top: number, bottom: number, extra: Partial<Layer> = {}): Layer => ({
   id: `${top}-${bottom}`,
   top,
@@ -36,7 +33,7 @@ describe("JF-1 through the form engine", () => {
   test("every other field is blank, and the only things the form says are one suggestion and the question it leaves open", () => {
     const rows = soil.rowRules.length
     expect(rows).toBe(11)
-    const filled = soilFields(form).filter(([, text]) => text !== "")
+    const filled = Object.entries(form.fields).filter(([id, text]) => id.startsWith("soil.") && text !== "")
     expect(filled).toHaveLength(17)
     for (let row = 0; row < rows; row++) {
       for (const column of PROFILE_COLUMNS) {
@@ -88,7 +85,7 @@ describe("layers in any order, with problems, still make a form", () => {
 
   test("a point with no layers is a blank table with its name on the page", () => {
     const form = formFor(project, newPoint("SP-1"))
-    const filled = soilFields(form).filter(([, text]) => text !== "")
+    const filled = Object.entries(form.fields).filter(([id, text]) => id.startsWith("soil.") && text !== "")
     expect(filled).toEqual([["soil.samplingPoint", "SP-1"]])
     expect(form.warnings).toEqual([])
   })

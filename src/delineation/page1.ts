@@ -3,9 +3,10 @@
 // they sit on the page, top to bottom.
 import type { Form } from "./formFor"
 import type { Project } from "./model"
+import { headerPlacements } from "./page1Header"
 import { hydrologyPlacements } from "./page1Hydrology"
 import type { Placement } from "./soilPage"
 
 export function page1Placements(project: Project, form: Form): Placement[] {
-  return [...hydrologyPlacements(project, form)]
+  return [...headerPlacements(project, form), ...hydrologyPlacements(project, form)]
 }

@@ -15,6 +15,8 @@ export interface LayerColor {
   notation: string
   /** Percent of the Layer, 0 to 100. */
   percent: number
+  /** True for a color typed in that is a Munsell notation but not a Chip of the soil book. It prints as typed. */
+  exact?: true
   /** The saved Reading it came from. Absent when the color was typed in. */
   reading?: SavedReading
   /** A redox feature's type and location, when recorded. The indicator rules infer the type when it is not. */
@@ -35,6 +37,14 @@ export interface Layer {
   texture?: string
 }
 
+/** The Soil page's Restrictive Layer box. */
+export interface Restrictive {
+  /** A kind from the Field Book's list ("fragipan", "lithic bedrock"). */
+  type: string
+  /** Inches from the surface, or null while it is not known. */
+  depth: number | null
+}
+
 /** What the user decided about one indicator of the form. */
 export interface IndicatorChoice {
   state: "confirmed" | "rejected"
@@ -42,6 +52,15 @@ export interface IndicatorChoice {
   remark?: string
   /** True when the user ticked an indicator the app did not suggest. */
   manual?: boolean
+}
+
+/** The two halves of a pair of Sampling points: the one in the wetland and the one in the upland. */
+export type PairRole = "wetland" | "upland"
+
+/** A Sampling point's pair, kept on one of the two: this point's own role, and the other's id. */
+export interface Pair {
+  with: string
+  role: PairRole
 }
 
 /** One of the three Field Observations: whether it was seen, and how deep (inches) when it was. */
@@ -86,12 +105,55 @@ export interface SamplingPoint {
   layers: Layer[]
   /** The vegetation plot. Absent on a point saved before the Vegetation page existed: read it with `vegetationOf`. */
   vegetation?: Vegetation
+  /** Latitude and longitude as typed, and the datum they are in (WGS84 for a phone's GPS). */
+  lat: string
+  long: string
+  datum: string
+  /** Set on one point of a pair; the other one's form shows it too. */
+  pair?: Pair
   /** The user's decisions, by the indicator's id on the form. An indicator not in here is undecided. */
   indicators?: Record<string, IndicatorChoice>
   /** The user's answer to "Hydric Soil Present?". Unset until they confirm it. */
   hydricSoilPresent?: "yes" | "no"
   /** Absent until something is recorded for the Hydrology section. */
   hydrology?: Hydrology
+  /** The restrictive layer, if one was observed. */
+  restrictive?: Restrictive
+}
+
+export type YesNo = "" | "yes" | "no"
+
+/** The answer for each of vegetation, soil and hydrology. */
+export interface Conditions {
+  vegetation: YesNo
+  soil: YesNo
+  hydrology: YesNo
+}
+
+/** The fields at the top of page 1 that are the same for every Sampling point of a Project. */
+export interface ProjectHeader {
+  /** Project/Site. */
+  site: string
+  applicant: string
+  county: string
+  state: string
+  investigators: string
+  /** The sampling date, `yyyy-mm-dd` as a date field gives it, or blank. */
+  date: string
+  /** Section, Township, Range, typed as the user writes it. */
+  sectionTownshipRange: string
+  landform: string
+  localRelief: string
+  slope: string
+  soilMapUnit: string
+  /** The NWI classification. */
+  nwi: string
+  /** Are "Normal Circumstances" present? */
+  normalCircumstances: YesNo
+  /** Are vegetation, soil or hydrology significantly disturbed? */
+  disturbed: Conditions
+  /** Are vegetation, soil or hydrology naturally problematic? */
+  problematic: Conditions
 }
 
 /** The Land Resource Region (and MLRA, when it matters) a project lies in. Decides which indicators apply. */
@@ -106,20 +168,65 @@ export interface Project {
   region: RegionId
   /** Milliseconds since 1970. */
   createdAt: number
+  header: ProjectHeader
   points: SamplingPoint[]
   /** Picked once for the project. Until it is, an indicator that is limited to some subregions is not suggested. */
   subregion?: Subregion
 }
+
+const NO_CONDITIONS: Conditions = { vegetation: "", soil: "", hydrology: "" }
+
+export const emptyHeader = (site = ""): ProjectHeader => ({
+  site,
+  applicant: "",
+  county: "",
+  state: "",
+  investigators: "",
+  date: "",
+  sectionTownshipRange: "",
+  landform: "",
+  localRelief: "",
+  slope: "",
+  soilMapUnit: "",
+  nwi: "",
+  normalCircumstances: "",
+  disturbed: NO_CONDITIONS,
+  problematic: NO_CONDITIONS,
+})
 
 export const newProject = (name: string, region: RegionId): Project => ({
   id: crypto.randomUUID(),
   name: name.trim(),
   region,
   createdAt: Date.now(),
+  // The site starts as the project's name, and can be changed.
+  header: emptyHeader(name.trim()),
   points: [],
 })
 
-export const newPoint = (name: string): SamplingPoint => ({ id: crypto.randomUUID(), name: name.trim(), layers: [] })
+export const newPoint = (name: string): SamplingPoint => ({
+  id: crypto.randomUUID(),
+  name: name.trim(),
+  layers: [],
+  lat: "",
+  long: "",
+  datum: "",
+})
+
+/** A Project as stored by an earlier version, with the fields added since filled in blank. */
+export function normalizeProject(project: Project): Project {
+  const stored: Partial<ProjectHeader> = project.header ?? {}
+  return {
+    ...project,
+    header: {
+      ...emptyHeader(),
+      ...stored,
+      disturbed: { ...NO_CONDITIONS, ...stored.disturbed },
+      problematic: { ...NO_CONDITIONS, ...stored.problematic },
+    },
+    points: project.points.map((point) => ({ ...point, lat: point.lat ?? "", long: point.long ?? "", datum: point.datum ?? "" })),
+  }
+}
 
 /** The Project with one Sampling point changed. */
 export const withPoint = (project: Project, pointId: string, change: (point: SamplingPoint) => SamplingPoint): Project => ({
@@ -136,20 +243,44 @@ export const withVegetation = (point: SamplingPoint, change: (vegetation: Vegeta
   vegetation: change(vegetationOf(point)),
 })
 
+/**
+ * What a Sampling point is in its pair, and who the other half is: the role on its own record, or
+ * the opposite of the role on the record of a point that names it. Null when it is not in a pair, or
+ * when the other half has been deleted.
+ */
+export function pairOf(project: Project, point: SamplingPoint): { role: PairRole; other: SamplingPoint } | null {
+  const opposite = (role: PairRole): PairRole => (role === "wetland" ? "upland" : "wetland")
+  if (point.pair) {
+    const other = project.points.find((p) => p.id === point.pair?.with)
+    return other ? { role: point.pair.role, other } : null
+  }
+  const owner = project.points.find((p) => p.pair?.with === point.id)
+  return owner?.pair ? { role: opposite(owner.pair.role), other: owner } : null
+}
+
 /** The Layers from the surface down. */
 export const topToBottom = (layers: readonly Layer[]): Layer[] => [...layers].sort((a, b) => a.top - b.top)
 
-const STANDARD = /^(\d+(?:\.\d+)?(?:R|YR|Y|GY|G|BG|B|PB|P|RP))\s*(\d+(?:\.\d+)?\/\d+)$/
+const STANDARD = /^(\d+(?:\.\d+)?(?:R|YR|Y|GY|G|BG|B|PB|P|RP))\s*(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/
 const NEUTRAL = /^N\s*(\d+(?:\.\d+)?)\/?$/
 const GLEY = /^(GLEY[12])\s*(\d+(?:\.\d+)?\/(?:\d+[A-Z]+|N))$/
+
+/** 4.0 is written 4, as the soil book writes it. */
+const plain = (n: string) => String(Number(n))
 
 /** `10yr 4/2` as the notation prints (`10YR 4/2`), or null when it is not a soil-book notation. */
 export function notationOf(text: string): string | null {
   const t = text.trim().toUpperCase()
-  const standard = STANDARD.exec(t) ?? GLEY.exec(t)
-  if (standard) return `${standard[1]} ${standard[2]}`
+  const standard = STANDARD.exec(t)
+  if (standard) {
+    const [, hue, value, chroma] = standard
+    const letters = /[A-Z]+$/.exec(hue)![0]
+    return `${plain(hue.slice(0, -letters.length))}${letters} ${plain(value)}/${plain(chroma)}`
+  }
+  const gley = GLEY.exec(t)
+  if (gley) return `${gley[1]} ${gley[2]}`
   const neutral = NEUTRAL.exec(t)
-  return neutral ? `N ${neutral[1]}/` : null
+  return neutral ? `N ${plain(neutral[1])}/` : null
 }
 
 /** What is wrong with a Layer's depths, in plain words, or null when they are fine. */

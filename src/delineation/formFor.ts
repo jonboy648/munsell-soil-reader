@@ -29,6 +29,8 @@ type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
 export type FieldId =
   | `soil.profile.${number}.${ProfileColumn}`
   | "soil.samplingPoint"
+  | "soil.restrictive.type"
+  | "soil.restrictive.depth"
   | `soil.indicator.${string}`
   | `soil.hydric.${"yes" | "no"}`
   | Page1Id
@@ -46,6 +48,7 @@ export interface FormWarning {
     | "field-cut"
     | "hydrology-observation"
     | "hydrology-answer"
+    | "color-not-a-chip"
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
   text: string
@@ -192,7 +195,14 @@ export function formFor(project: Project, point: SamplingPoint): Form {
 
   layers.forEach((layer, i) => {
     const redox = (c: LayerColor | undefined): Row =>
-      c ? { redoxColor: c.notation, redoxPercent: written(c.percent) } : {}
+      c ? { redoxColor: c.notation, redoxPercent: written(c.percent), redoxType: c.type ?? "", redoxLoc: c.location ?? "" } : {}
+
+    // A color typed in that the soil book does not print is printed as typed, with a note.
+    for (const [name, color] of [["matrix", layer.matrix], ...layer.redox.map((c, k) => [`redox ${k + 1}`, c] as const)] as const) {
+      if (color?.exact) {
+        warnings.push({ kind: "color-not-a-chip", layer: i, text: `Layer ${i + 1}: the ${name} color ${color.notation} is not a Chip in the soil book. It is printed as entered.` })
+      }
+    }
 
     if (layer.bottom <= layer.top) {
       warnings.push({ kind: "bad-depth", layer: i, text: `Layer ${i + 1}: the bottom is not deeper than the top.` })
@@ -219,6 +229,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     const block: Row[] = [
       {
         depth: `${written(layer.top)}-${written(layer.bottom)}`,
+        ...(layer.texture ? { texture: layer.texture } : {}),
         ...(layer.matrix ? { matrixColor: layer.matrix.notation, matrixPercent: written(layer.matrix.percent) } : {}),
         ...redox(first),
       },
@@ -257,7 +268,17 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     warnings.push({ kind: "too-many-rows", text: "A layer has more redox colors than the form has rows. The rest are left off the page." })
   }
 
-  const fields = { ...page1Fields(project, point, warnings), "soil.samplingPoint": name.text } as Record<FieldId, string>
+  const restrictive = point.restrictive
+  const restrictiveType = printable(restrictive?.type ?? "")
+  if (restrictiveType.replaced) {
+    warnings.push({ kind: "text-changed", text: "The restrictive layer type has characters the form cannot print; they were replaced." })
+  }
+  const fields = {
+    ...page1Fields(project, point, warnings),
+    "soil.samplingPoint": name.text,
+    "soil.restrictive.type": restrictiveType.text,
+    "soil.restrictive.depth": restrictive?.depth == null ? "" : written(restrictive.depth),
+  } as Record<FieldId, string>
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }

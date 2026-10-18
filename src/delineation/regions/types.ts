@@ -34,6 +34,8 @@ export interface SoilPage {
   aboveRule: number
   /** The "Sampling Point" box at the top of the page: its rule's left and right ends, and its top. */
   samplingPoint: { column: readonly [number, number]; rule: number }
+  /** The Restrictive Layer box: the rules its Type and Depth are written on. */
+  restrictive: { type: TickBlank; depth: TickBlank }
   /** The top of the rule each row's values sit on, from the top of the page, first row first. */
   rowRules: readonly number[]
   /** The left and right ends of each column's rule. */

@@ -18,8 +18,8 @@ const firstChip = (hue: PageHue): string => {
   return `${value}/${chroma}`
 }
 
-/** Which Card the Reading was made against; the words differ between a ColorChecker and a Page. */
-export type CardInfo = { kind: "colorchecker" } | { kind: "page"; hue: PageHue }
+/** Which Card the Reading was made against; the words differ between a ColorChecker, a Page and the frame. */
+export type CardInfo = { kind: "colorchecker" } | { kind: "page"; hue: PageHue } | { kind: "frame" }
 
 /**
  * The corrected Reading when the Card check is good. Otherwise the raw Reading, flagged: a
@@ -32,12 +32,12 @@ export function shownReading(
   offCard = false,
   card: CardInfo = { kind: "colorchecker" },
 ): Shown {
-  const each = card.kind === "page" ? "Chip on the Page" : "Card patch"
+  const each = card.kind === "page" ? "Chip on the Page" : card.kind === "frame" ? "frame patch" : "Card patch"
   if (reading.corrected && cardCheck?.ok) {
     return {
       verdict: "good",
       main: reading.corrected,
-      why: `Each ${card.kind === "page" ? each : "of the 24 Card patches"}, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
+      why: `Each ${card.kind === "colorchecker" ? "of the 24 Card patches" : card.kind === "frame" ? "of the 18 frame patches" : each}, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
     }
   }
   if (reading.corrected && cardCheck?.suspectRow !== undefined) {
@@ -65,7 +65,9 @@ export function shownReading(
       why:
         card.kind === "page"
           ? `Each ${each}, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The four Chips were probably tapped out of order, the wrong hue was chosen, the Page is worn all over, or there is glare or shade on it. Showing the uncorrected Reading. Tap Start over and begin at the ${firstChip(card.hue)} Chip, top left.`
-          : `Each ${each}, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
+          : card.kind === "frame"
+            ? `Each ${each}, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The outline was probably not on the frame, or there is glare or shade on it, or the batch's colors are off. Showing the uncorrected Reading. Tap Start over and check that each outline corner sits on the outer corner of its marker.`
+            : `Each ${each}, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
     }
   }
   return {

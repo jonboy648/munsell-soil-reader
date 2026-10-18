@@ -126,13 +126,24 @@ pitch in radius, which the Page's tilt turns into an ellipse, so its narrowest h
 Photo is found from the local map of the grid and the Spot's circle is that, less a tap's error (a
 tenth of a pitch). Away from the Page the usual circle stands.
 
-The frame finder (`src/engine/frame.ts`, `findCard(pixels)`) finds a printed frame by its four
-ArUco markers, IDs 0 to 3 at the frame's top left, top right, bottom right and bottom left, and
-returns the Card's corner patches, or null when any marker is missing. It uses
-[js-aruco2](https://github.com/damianofalcioni/js-aruco2) and is built and tested on simulated
-Photos only. It is hidden: nothing in the app imports it, and `src/engine/frame.test.ts` checks
-that its code is not in the app bundle. No frame exists yet; switching it on later means wiring
-it in (a dynamic import, so js-aruco2 stays out of the main chunk).
+The frame (ADR 0003) is a Card of its own: a printed card with a soil window, 18 measured
+reference patches (six grays, twelve soil colors) and an ArUco marker in each corner. Choose
+"Frame" on the Card step and the app finds the frame itself, so no corners are tapped:
+`findCard(pixels)` in `src/engine/frame.ts` reads the four markers (IDs 0 to 3, top left to
+bottom left, with [js-aruco2](https://github.com/damianofalcioni/js-aruco2)) and returns the
+frame's outline, the markers' outer corners, or null when any marker is missing or one shows
+twice. The user confirms the outline, and can press-drag a corner onto its marker with the
+magnifier. The outline fixes a homography from the frame's layout in millimetres
+(`src/engine/frameLayout.json`, agent-fab's prototype 1) to the Photo, which places every patch,
+the window and the black base used for the evenness check. The grays are the tone ladder. The
+Spots go in the window; a Spot outside it is read, with a note.
+
+The patches' true colors come from the frame's batch: a CSV per print batch, found by the batch
+code printed on the frame ([docs/frame-batches.md](docs/frame-batches.md)). No batch has been
+measured yet, so a frame is refused as a Card, with a plain message, until one is. The practice
+Photos of the frame carry a made-up batch of their own. The finder and js-aruco2 are a chunk that
+loads only when the frame is chosen; `src/engine/frame.test.ts` checks the main bundle stays
+without it.
 
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
 patches (ColorChecker "after November 2014" reference values): each channel is linearized along

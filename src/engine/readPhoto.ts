@@ -4,6 +4,8 @@ import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
 import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
 import { fitCorrection, fitPageCorrection, heldOutError, type Correction, type Fit, type Reference } from "./correction"
+import { UnmeasuredBatchError, batchProblem, type Batch } from "./batch"
+import { frameQuality, frameReferences, insideWindow } from "./frameCard"
 import { leftOut } from "./leftOut"
 import {
   isPageHue,
@@ -83,16 +85,30 @@ interface CardFit {
   spotRadius?: (spot: XY, radius: number) => number
 }
 
-/** Fits the correction to a ColorChecker in the Photo and runs the Card check on it. */
-export function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
-  const references: Reference[] = patchSites(corners).map(({ center, radius }, i) => ({
-    measured: medianLinear(pixels, center, radius),
-    truth: PATCH_LINEAR[i],
-    ladder: NEUTRAL_PATCHES.includes(i),
-  }))
+/** The correction fitted to a Card's references, and the Card check it earns. */
+function fitReferences(references: Reference[], fit: Fit): CardFit {
   const meanDE = heldOutError(references, fit)
   const check: CardCheck = { meanDE, ok: meanDE < CARD_CHECK_GOOD }
   return { correct: fit(references), check }
+}
+
+/** Fits the correction to a ColorChecker in the Photo and runs the Card check on it. */
+export function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
+  return fitReferences(
+    patchSites(corners).map(({ center, radius }, i) => ({
+      measured: medianLinear(pixels, center, radius),
+      truth: PATCH_LINEAR[i],
+      ladder: NEUTRAL_PATCHES.includes(i),
+    })),
+    fit,
+  )
+}
+
+/** The frame: its patches, read where the outline puts them, against the colors its batch measured. */
+function fitFrame(pixels: Pixels, outline: Corners, batch: Batch, fit: Fit): CardFit {
+  const problem = batchProblem(batch)
+  if (problem) throw new UnmeasuredBatchError(problem)
+  return fitReferences(frameReferences(pixels, outline, batch), fit)
 }
 
 /**
@@ -190,7 +206,9 @@ export function readPhoto({
       ? fitCard(pixels, card.corners, correction ?? fitCorrection)
       : card.kind === "page"
         ? fitPage(pixels, hue!, card.taps, correction ?? fitPageCorrection)
-        : null
+        : card.kind === "frame"
+          ? fitFrame(pixels, card.outline, card.batch, correction ?? fitCorrection)
+          : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {
     const read = fit?.spotRadius?.(spot, radius) ?? radius
@@ -200,6 +218,7 @@ export function readPhoto({
     // The correction is strongest near the Page's own hue: point to the Page the soil belongs on.
     const better = hue && reading.corrected ? suggestedPage(hue, reading.corrected.chip) : undefined
     if (better) reading.betterPage = better
+    if (card.kind === "frame" && !insideWindow(card.outline, spot)) reading.outsideWindow = true
     return reading
   })
   const cardParts =
@@ -207,7 +226,9 @@ export function readPhoto({
       ? cardQuality(card.corners)
       : card.kind === "page"
         ? pageQuality(hue!, card.taps)
-        : { references: [] }
+        : card.kind === "frame"
+          ? frameQuality(card.outline, card.batch)
+          : { references: [] }
   const { warnings: quality, offCard } = checkQuality({
     pixels,
     spots: readings.map((r) => ({ at: r.spot, radius: r.radius })),

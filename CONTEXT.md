@@ -25,7 +25,7 @@ The reference color target photographed beside the sample: either an X-Rite Colo
 _Avoid_: chart, target, checker
 
 **Page**:
-One page of the soil book, holding the chips of a single hue in rows of value and columns of chroma; when used as the card, its chips are the reference colors.
+One page of the soil book, holding chips in a grid. Most pages hold one hue, in rows of value and columns of chroma; the 10Y-5GY, Gley and White pages mix hues across the grid. A chip can be printed on more than one page. When a page is used as the card, its chips are the reference colors.
 _Avoid_: hue card, sheet
 
 **Spot**:

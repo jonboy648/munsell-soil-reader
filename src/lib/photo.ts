@@ -3,7 +3,7 @@ import { simulatePhoto, type ExamplePhoto } from "@/engine/simulate"
 import type { LoadedPhoto } from "@/lib/session"
 
 /** Longest side of a Photo we keep. Bigger Photos are scaled down; phones shoot 4000+ px. */
-const MAX_SIDE = 1600
+export const MAX_SIDE = 1600
 
 export function examplePhoto(example: ExamplePhoto): LoadedPhoto {
   const { pixels, frame } = simulatePhoto(example.scene)

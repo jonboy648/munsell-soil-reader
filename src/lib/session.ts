@@ -1,6 +1,6 @@
 // What the user has done so far with one Photo: which Card they marked and which Spots they
 // tapped. A plain reducer, so the order of taps and undo live in one place.
-import type { Batch, Card, Corners, XY } from "@/engine"
+import type { Batch, Card, Corners, PageHue, XY } from "@/engine"
 
 export interface LoadedPhoto {
   name: string
@@ -11,8 +11,11 @@ export interface LoadedPhoto {
   batch?: Batch
 }
 
-/** Which Card is in the Photo: a ColorChecker, whose corners the user taps, or the frame, which the app finds. */
-export type CardKind = "colorchecker" | "frame"
+/**
+ * Which Card is in the Photo: a ColorChecker or a Page of the soil book, whose corners (a Page: its
+ * four Chips) the user taps, or the frame, which the app finds.
+ */
+export type CardKind = "colorchecker" | "page" | "frame"
 
 /** The frame's batch: typed by the user from the frame, then looked up. */
 export type BatchState =
@@ -41,7 +44,9 @@ export interface Session {
   /** The user said this Photo has no Card in it. */
   noCard: boolean
   cardKind: CardKind
-  /** Card corners tapped so far, in the order TL, TR, BR, BL. ColorChecker only. */
+  /** The hue of the Page, once the user has chosen it. Only a Page needs it. */
+  hue: PageHue | null
+  /** Card corners tapped so far, in the order TL, TR, BR, BL (a Page: its four Chips, see `pageModel`). The frame has none. */
   corners: XY[]
   spots: XY[]
   frame: FrameSession
@@ -66,6 +71,7 @@ export const initialSession: Session = {
   photo: null,
   noCard: false,
   cardKind: "colorchecker",
+  hue: null,
   corners: [],
   spots: [],
   frame: freshFrame(),
@@ -74,6 +80,7 @@ export const initialSession: Session = {
 export type SessionAction =
   | { type: "load"; photo: LoadedPhoto; noCard?: boolean; cardKind?: CardKind }
   | { type: "cardKind"; cardKind: CardKind }
+  | { type: "hue"; hue: PageHue }
   | { type: "frameFound"; outline: Corners | null; failed?: boolean }
   | { type: "frameConfirm" }
   | { type: "batchCode"; code: string }
@@ -102,6 +109,10 @@ export function stepOf(session: Session): Step {
   return session.corners.length < CORNER_COUNT ? "corners" : "spots"
 }
 
+/** True while a Page is chosen but its hue is not: nothing can be tapped until the Chips are known. */
+export const needsHue = (session: Pick<Session, "cardKind" | "hue" | "noCard">): boolean =>
+  session.cardKind === "page" && session.hue === null && !session.noCard
+
 /** The Card the engine should read against, or null while the corners are still being tapped or the frame is not ready. */
 export function cardOf(session: Session): Card | null {
   if (session.noCard) return { kind: "none" }
@@ -110,7 +121,9 @@ export function cardOf(session: Session): Card | null {
     return frameReady(session) && outline && batch.state === "ready" ? { kind: "frame", outline, batch: batch.batch } : null
   }
   if (session.corners.length === CORNER_COUNT) {
-    return { kind: "colorchecker", corners: session.corners as Corners }
+    const corners = session.corners as Corners
+    if (session.cardKind === "colorchecker") return { kind: "colorchecker", corners }
+    return session.hue ? { kind: "page", hue: session.hue, taps: corners } : null
   }
   return null
 }
@@ -151,6 +164,8 @@ export function sessionReducer(session: Session, action: SessionAction): Session
     case "cardKind":
       // The taps mean different places on a different Card, so they start over.
       return { ...session, cardKind: action.cardKind, noCard: false, corners: [], spots: [], frame: freshFrame(session.frame.batch) }
+    case "hue":
+      return { ...session, hue: action.hue, corners: [], spots: [] }
     case "frameFound":
       return { ...session, frame: { ...session.frame, searched: true, outline: action.outline, moves: [], confirmed: false, failed: action.failed ?? false } }
     case "frameConfirm":
@@ -165,7 +180,7 @@ export function sessionReducer(session: Session, action: SessionAction): Session
     case "tap":
       switch (stepOf(session)) {
         case "corners":
-          return { ...session, corners: [...session.corners, action.point] }
+          return needsHue(session) ? session : { ...session, corners: [...session.corners, action.point] }
         case "frame": {
           const { outline, confirmed, moves } = session.frame
           const moved = outline && !confirmed ? movedOutline(outline, action.point) : null

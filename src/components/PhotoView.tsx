@@ -1,15 +1,33 @@
 // The Photo: shows it full width and turns taps into Photo coordinates. It also draws
-// what the user has marked (Card corners, the patch positions, Spots) over the Photo.
+// what the user has marked (Card corners, the patch or Chip positions, Spots) over the Photo.
 import * as React from "react"
-import { framePatchSites, frameWindow, patchSites, spotRadius, type Corners, type XY } from "@/engine"
+import {
+  framePatchSites,
+  frameWindow,
+  pageModel,
+  pageSites,
+  patchSites,
+  spotRadius,
+  type Corners,
+  type PageHue,
+  type Site,
+  type XY,
+} from "@/engine"
 import { Magnifier } from "@/components/Magnifier"
 import { usePlacement } from "@/lib/placement"
-import { CORNER_COUNT } from "@/lib/session"
+import { CORNER_COUNT, type CardKind } from "@/lib/session"
 
 interface Props {
   pixels: ImageData | null
   corners: XY[]
   spots: XY[]
+  /** The radius each Spot was read with, once the engine has read it. */
+  spotRadii?: number[]
+  cardKind: CardKind
+  /** The Page's hue, once chosen. */
+  hue: PageHue | null
+  /** A Page: the Chips the Card check left out, as notation. */
+  leftOut?: string[]
   /** The frame's outline, once found; its patches are drawn when it is confirmed. */
   frame?: { outline: Corners | null; confirmed: boolean }
   onTap: (point: XY) => void
@@ -37,6 +55,21 @@ function polygon(ctx: CanvasRenderingContext2D, points: XY[], px: number) {
   }
 }
 
+/** A cross over a ring: this Chip is left out of the fit. */
+function leftOutMark(ctx: CanvasRenderingContext2D, p: XY, radius: number, px: number) {
+  const d = radius * 0.7
+  for (const [style, width] of [["#000", 3.5 * px], ["#fff", 1.75 * px]] as const) {
+    ctx.strokeStyle = style
+    ctx.lineWidth = width
+    ctx.beginPath()
+    ctx.moveTo(p.x - d, p.y - d)
+    ctx.lineTo(p.x + d, p.y + d)
+    ctx.moveTo(p.x - d, p.y + d)
+    ctx.lineTo(p.x + d, p.y - d)
+    ctx.stroke()
+  }
+}
+
 function label(ctx: CanvasRenderingContext2D, p: XY, text: string, px: number) {
   const r = 9 * px
   const at = { x: p.x + 15 * px, y: p.y - 15 * px }
@@ -54,7 +87,28 @@ function label(ctx: CanvasRenderingContext2D, p: XY, text: string, px: number) {
   ctx.fillText(text, at.x, at.y + px * 0.5)
 }
 
-function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots: XY[], frame: Props["frame"]) {
+/** Where the Card's patches or Chips are read, and which of them the Card check left out. */
+function cardSites(cardKind: CardKind, hue: PageHue | null, corners: XY[], leftOut: string[]) {
+  if (cardKind === "colorchecker") return { sites: patchSites(corners as Corners), skipped: [] as number[] }
+  if (!hue) return { sites: [] as Site[], skipped: [] as number[] }
+  const { chips } = pageModel(hue)
+  return {
+    sites: pageSites(hue, corners as Corners),
+    skipped: chips.flatMap((c, i) => (leftOut.includes(c.chip.notation) ? [i] : [])),
+  }
+}
+
+function draw(
+  canvas: HTMLCanvasElement,
+  pixels: ImageData,
+  corners: XY[],
+  spots: XY[],
+  spotRadii: number[] | undefined,
+  cardKind: CardKind,
+  hue: PageHue | null,
+  leftOut: string[],
+  frame: Props["frame"],
+) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   ctx.putImageData(pixels, 0, 0)
@@ -62,8 +116,12 @@ function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots
   const shown = canvas.getBoundingClientRect().width
   const px = shown > 0 ? canvas.width / shown : 1
   if (corners.length === CORNER_COUNT) {
-    // Every patch where, and as large as, the engine reads it.
-    for (const { center, radius } of patchSites(corners as Corners)) ring(ctx, center, radius, px * 0.6)
+    // Every patch or Chip where, and as large as, the engine reads it; a left-out Chip is crossed.
+    const { sites, skipped } = cardSites(cardKind, hue, corners, leftOut)
+    sites.forEach(({ center, radius }, i) => {
+      ring(ctx, center, radius, px * 0.6)
+      if (skipped.includes(i)) leftOutMark(ctx, center, radius, px * 0.6)
+    })
   }
   if (frame?.outline) {
     // The frame: its outline and window, and once it is confirmed every patch where the engine reads it.
@@ -79,30 +137,29 @@ function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots
     ring(ctx, c, 8 * px, px)
     label(ctx, c, String(i + 1), px)
   })
-  const r = spotRadius(pixels)
   spots.forEach((s, i) => {
-    ring(ctx, s, r, px)
+    ring(ctx, s, spotRadii?.[i] ?? spotRadius(pixels), px)
     label(ctx, s, String(i + 1), px)
   })
 }
 
-export function PhotoView({ pixels, corners, spots, frame, onTap }: Props) {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null)
+const NONE: string[] = []
+
+export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, leftOut = NONE, frame, onTap }: Props) {
+  const [canvas, setCanvas] = React.useState<HTMLCanvasElement | null>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
-  const { placing, handlers } = usePlacement(onTap)
+  const { placing, handlers } = usePlacement(canvas, onTap)
 
   React.useEffect(() => {
-    const canvas = canvasRef.current
     if (!canvas || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver(([entry]) => setShownWidth(entry.contentRect.width))
     observer.observe(canvas)
     return () => observer.disconnect()
-  }, [pixels])
+  }, [canvas])
 
   React.useEffect(() => {
-    const canvas = canvasRef.current
-    if (canvas && pixels) draw(canvas, pixels, corners, spots, frame)
-  }, [pixels, corners, spots, frame, shownWidth])
+    if (canvas && pixels) draw(canvas, pixels, corners, spots, spotRadii, cardKind, hue, leftOut, frame)
+  }, [canvas, pixels, corners, spots, spotRadii, cardKind, hue, leftOut, frame, shownWidth])
 
   if (!pixels) {
     return (
@@ -112,19 +169,20 @@ export function PhotoView({ pixels, corners, spots, frame, onTap }: Props) {
     )
   }
 
-  // touch-pinch-zoom: the page keeps pinch-zoom, but a finger on the Photo never pans it by
-  // itself; usePlacement scrolls the page when the finger swipes.
+  // touch-manipulation: a swipe on the Photo scrolls or pans the page and a pinch zooms it, as
+  // anywhere else; usePlacement stops that only while a point is being placed. (It is "auto"
+  // without double-tap zoom, which would turn two quick taps into a zoom.)
   return (
     <>
       <canvas
-        ref={canvasRef}
+        ref={setCanvas}
         width={pixels.width}
         height={pixels.height}
         {...handlers}
         role="img"
         aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
         data-testid="photo"
-        className="block h-auto w-full cursor-crosshair touch-pinch-zoom bg-muted select-none"
+        className="block h-auto w-full cursor-crosshair touch-manipulation bg-muted select-none"
       />
       {placing && <Magnifier placing={placing} />}
     </>

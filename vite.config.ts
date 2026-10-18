@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react"
 import type { Plugin } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
 import { defineConfig } from "vitest/config"
+import { bundledLicenses } from "./vite-plugins/bundledLicenses.ts"
 
 // js-aruco2 (the frame finder's marker reader) is a plain script with no import or export that
 // sets `AR` on `this`. The build takes such a file for an ES module, where `this` is undefined,
@@ -26,6 +27,20 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // The code the app ships, and its licenses, for the method page. The stylesheet comes from
+    // these packages, the fonts are files the module graph does not list, and the service worker is
+    // built in a second pass from the Workbox ones.
+    bundledLicenses([
+      "@fontsource-variable/archivo",
+      "@fontsource-variable/public-sans",
+      "@fontsource/ibm-plex-mono",
+      "tailwindcss",
+      "tw-animate-css",
+      "shadcn",
+      "workbox-core",
+      "workbox-precaching",
+      "workbox-routing",
+    ]),
     VitePWA({
       // A new service worker waits until the user taps Reload (see src/components/UpdateNotice.tsx), so a Reading in
       // progress is never swapped out from under them.

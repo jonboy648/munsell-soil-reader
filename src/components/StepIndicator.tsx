@@ -13,12 +13,12 @@ interface Props {
   spotCount: number
 }
 
-/** A compact two-step indicator: Card corners (the frame: its outline), then Spots. */
+/** A compact two-step indicator: Card corners (a Page: its Chips; the frame: its outline), then Spots. */
 export function StepIndicator({ step, cornersTapped, cornerCount, cardKind, frameDetail, noCard, spotCount }: Props) {
   const cardDone = step === "spots"
   const steps = [
     {
-      label: noCard ? "Card skipped" : cardKind === "frame" ? "Frame" : "Card corners",
+      label: noCard ? "Card skipped" : cardKind === "frame" ? "Frame" : cardKind === "page" ? "Page Chips" : "Card corners",
       detail: noCard ? "" : cardKind === "frame" ? frameDetail : `${cornersTapped}/${cornerCount}`,
       active: step === "corners" || step === "frame",
       done: cardDone,

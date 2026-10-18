@@ -1,6 +1,7 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
 import type { Fit } from "./correction"
+import type { PageHue } from "./page"
 
 /** A point in Photo pixels, origin at the top left. */
 export type XY = { x: number; y: number }
@@ -20,7 +21,9 @@ export interface Pixels {
 
 export type Card =
   | { kind: "colorchecker"; corners: Corners }
-  | { kind: "page"; hue: string; corners: Corners } // hue like '10YR'; not supported yet (ticket 8)
+  // The four Chips the user tapped, in the order of `pageModel(hue).taps`. Only the one-hue Pages
+  // (`PAGE_HUES`) work as a Card; any other Page throws UnsupportedCardError.
+  | { kind: "page"; hue: ChipPage; taps: Corners }
   | { kind: "none" }
 
 /** The Pages of the soil book (2009 Revision) that hold the Chips the engine knows. */
@@ -50,8 +53,16 @@ export interface ChipReading {
 
 export interface Reading {
   spot: XY
+  /** The radius of the circle the Spot was read from, in Photo pixels. */
+  radius: number
   raw: ChipReading
   corrected?: ChipReading // absent when the Card is 'none'
+  /**
+   * Set when the Card is a Page and the corrected Reading's nearest Chip is not printed on it:
+   * a hue Page to retake with, one that works as a Card (see `suggestedPage`). The correction is
+   * strongest near the Page's own hue, so retaking with this Page would give a better Reading.
+   */
+  betterPage?: PageHue
 }
 
 export type QualityWarning = {
@@ -63,6 +74,14 @@ export type QualityWarning = {
 export interface CardCheck {
   meanDE: number // mean CIEDE2000 between each Card reference and its true color, corrected by a fit made without it
   ok: boolean // good when meanDE is below CARD_CHECK_GOOD
+  /** Page only: the Chips the fit left out because they disagreed with the rest (smudged or worn). */
+  leftOut?: string[]
+  /**
+   * Page only: the value (8, 3, 2.5) of a row where two or more Chips off the /1 column had to be
+   * left out. Then `ok` is false whatever the mean says: the row's /1 Chip is probably dirty, or the
+   * row's Chips are darker or stronger than the /1 column can describe.
+   */
+  suspectRow?: number
 }
 
 export interface ReadPhotoInput {

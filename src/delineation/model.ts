@@ -49,6 +49,12 @@ export const newProject = (name: string, region: RegionId): Project => ({
 
 export const newPoint = (name: string): SamplingPoint => ({ id: crypto.randomUUID(), name: name.trim(), layers: [] })
 
+/** The Project with one Sampling point changed. */
+export const withPoint = (project: Project, pointId: string, change: (point: SamplingPoint) => SamplingPoint): Project => ({
+  ...project,
+  points: project.points.map((point) => (point.id === pointId ? change(point) : point)),
+})
+
 /** The Layers from the surface down. */
 export const topToBottom = (layers: readonly Layer[]): Layer[] => [...layers].sort((a, b) => a.top - b.top)
 

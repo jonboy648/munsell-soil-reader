@@ -1,6 +1,8 @@
 // The Readings: a peek at the latest one above the bottom bar, and every Spot's Reading in a
 // bottom sheet. Raw and corrected sit side by side, with the nearest Chip and the Card check.
+import * as React from "react"
 import { ChevronUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import type { ChipReading, ReadPhotoResult, RgbTriple } from "@/engine"
 import { CardCheckBadge } from "@/components/CardCheckBadge"
 import { QualityFlag, QualityWarnings, cardWarnings, warningsFor } from "@/components/QualityWarnings"
@@ -50,7 +52,7 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
   )
 }
 
-function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: number; card: CardInfo }) {
+function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResult; index: number; card: CardInfo; onAssign: () => void }) {
   const reading = result.readings[index]
   const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   const leftOut = result.cardCheck?.leftOut ?? []
@@ -120,16 +122,29 @@ function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: 
           ))}
         </ol>
       </div>
+      <Button variant="outline" className="h-11 text-base" onClick={onAssign}>
+        Assign to a layer
+      </Button>
     </section>
   )
 }
 
-export function ReadingsPanel({ result, card }: { result: ReadPhotoResult | null; card: CardInfo }) {
+export function ReadingsPanel({
+  result,
+  card,
+  onAssign,
+}: {
+  result: ReadPhotoResult | null
+  card: CardInfo
+  /** Called with the Spot's index; the panel closes first so the sheet can open over the page. */
+  onAssign: (index: number) => void
+}) {
+  const [open, setOpen] = React.useState(false)
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
   const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   return (
-    <Drawer>
+    <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
         <button
           type="button"
@@ -157,7 +172,16 @@ export function ReadingsPanel({ result, card }: { result: ReadPhotoResult | null
         </DrawerHeader>
         <div className="overflow-y-auto px-4 pb-6">
           {result.readings.map((_, i) => (
-            <SpotReading key={i} result={result} index={i} card={card} />
+            <SpotReading
+              key={i}
+              result={result}
+              index={i}
+              card={card}
+              onAssign={() => {
+                setOpen(false)
+                onAssign(i)
+              }}
+            />
           ))}
         </div>
       </DrawerContent>

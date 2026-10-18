@@ -4,6 +4,7 @@
 import * as React from "react"
 import type { Card, ReadPhotoResult, XY } from "@/engine"
 import { LogScreen } from "@/components/LogScreen"
+import { ProjectsSheet } from "@/components/ProjectsSheet"
 import { SaveToLogSheet, type SaveTarget } from "@/components/SaveToLogSheet"
 import { Button } from "@/components/ui/button"
 import { currentLocation, savedReadings, type Sample } from "@/lib/log"
@@ -48,6 +49,7 @@ export function LogPanel({ result, card, spots }: Props) {
   const [samples, setSamples] = React.useState<Sample[]>([]) // oldest first
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [projectsOpen, setProjectsOpen] = React.useState(false)
   // Spots a save is working on right now, so that nothing can save them a second time meanwhile.
   const [inFlight, setInFlight] = React.useState<XY[]>([])
   const saving = React.useRef<Attempt | null>(null)
@@ -68,6 +70,7 @@ export function LogPanel({ result, card, spots }: Props) {
   }, [])
   useBackClosesSheet(saveOpen, setSaveSheet)
   useBackClosesSheet(logOpen, setLogOpen)
+  useBackClosesSheet(projectsOpen, setProjectsOpen)
 
   const refresh = React.useCallback(async () => {
     try {
@@ -163,6 +166,9 @@ export function LogPanel({ result, card, spots }: Props) {
           Open Log
         </Button>
       </div>
+      <Button variant="outline" size="lg" className="h-12 text-base" onClick={() => setProjectsOpen(true)}>
+        Projects
+      </Button>
       <p className="text-sm" data-testid="log-pending">
         {pending}
       </p>
@@ -189,6 +195,7 @@ export function LogPanel({ result, card, spots }: Props) {
         samples={samples}
         onSave={save}
       />
+      <ProjectsSheet open={projectsOpen} onOpenChange={setProjectsOpen} />
       <LogScreen
         open={logOpen}
         onOpenChange={setLogOpen}

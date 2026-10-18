@@ -65,6 +65,12 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   name or note that it could mistake for a formula, number, time, date or TRUE/FALSE (`=1+1`, `001`,
   `1 A`, `Mar 5`) is shown with a leading apostrophe: the export adds it on purpose, so that
   Excel keeps the text as typed. It is not corruption.
+- `src/delineation/`: the wetland form. A Project holds Sampling points, which hold Layers (inches).
+  `formFor(project, point)` is the pure form engine: every printed field of the Soil page's profile
+  table, suggestions, conclusions and warnings. The region package (`regions/ncne/`) is data: the
+  official ENG Form 6116-8 page, as a PDF and an image, and where each field sits on it, measured
+  from the PDF. The PDF is the official page with the values drawn on it (pdf-lib, on the device),
+  and the on-screen preview draws the same list of placed values.
 - `e2e/`: the browser tests.
 - Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
   writes the web app manifest and a service worker that precaches every built file (code,

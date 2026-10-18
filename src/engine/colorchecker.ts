@@ -42,7 +42,7 @@ export const PATCH_COLUMNS = 6
 export const PATCH_ROWS = 4
 
 /** Grid positions of the four patches the user taps: dark skin, bluish green, black, white. */
-const TAPPED_PATCHES: Four<GridPoint> = [
+export const TAPPED_PATCHES: Four<GridPoint> = [
   { col: 0, row: 0 },
   { col: PATCH_COLUMNS - 1, row: 0 },
   { col: PATCH_COLUMNS - 1, row: PATCH_ROWS - 1 },

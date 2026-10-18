@@ -34,7 +34,10 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
   // short and in the OS temp folder: under the long test output path, Chromium's cache folders
   // pass Windows' path limit and the service worker never installs. Fixture teardown also runs
   // after a timeout, so neither the browser nor the folder is left behind.
-  fullChromium: async ({ baseURL }, use) => {
+  fullChromium: async ({ baseURL, browserName }, use) => {
+    // Chromium's installability check is read over the Chrome DevTools Protocol, and only Chromium
+    // has it. Skipped here, before the launch, because the other engines' jobs have no Chromium.
+    base.skip(browserName !== "chromium", "the installability check is Chromium's, read over CDP")
     const profile = mkdtempSync(join(tmpdir(), "munsell-"))
     const context = await chromium.launchPersistentContext(profile, {
       channel: "chromium",
@@ -250,13 +253,15 @@ test("the first visit says it is ready to work offline, once, and asks the brows
   page,
   site,
 }) => {
+  // Counted on the prototype: WebKit drops a property set on the storage object itself once
+  // nothing in the page holds that object, and the app asks for `navigator.storage` afresh.
   await page.addInitScript(() => {
-    const storage = navigator.storage
-    const persist = storage.persist.bind(storage)
+    const prototype = Object.getPrototypeOf(navigator.storage)
+    const persist = prototype.persist
     Object.assign(window, { persistCalls: 0 })
-    storage.persist = () => {
+    prototype.persist = function (this: StorageManager) {
       Object.assign(window, { persistCalls: (window as unknown as { persistCalls: number }).persistCalls + 1 })
-      return persist()
+      return persist.call(this)
     }
   })
   await openFirstVisit(page, site.url)
@@ -309,10 +314,14 @@ test.describe("iPhone and iPad", () => {
   })
 })
 
-test("other phones are not shown the iPhone hint", async ({ page }) => {
-  await page.goto("/")
-  await expect(page.getByRole("heading", { name: "Munsell Soil Reader" })).toBeVisible()
-  await expect(page.getByTestId("install-hint")).toHaveCount(0)
+test.describe("other phones", () => {
+  test.use({ userAgent: devices["Pixel 7"].userAgent })
+
+  test("are not shown the iPhone hint", async ({ page }) => {
+    await page.goto("/")
+    await expect(page.getByRole("heading", { name: "Munsell Soil Reader" })).toBeVisible()
+    await expect(page.getByTestId("install-hint")).toHaveCount(0)
+  })
 })
 
 test("a new deploy shows a Reload notice, and Reload switches to the new version", async ({ page, site }) => {

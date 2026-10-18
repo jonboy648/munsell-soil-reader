@@ -1,7 +1,7 @@
 name: CI
 
-# Typecheck, the engine tests and the browser tests on every pull request.
-# Deploy is a separate workflow (deploy.yml) that runs on pushes to main.
+# Typecheck and the engine tests once, then the browser tests on three engines, on every pull
+# request. Deploy is a separate workflow (deploy.yml) that runs on pushes to main.
 on:
   pull_request:
 
@@ -32,18 +32,49 @@ jobs:
       - name: Engine tests (Vitest)
         run: npm test
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+  # One job per engine, all of e2e/ on each, so a new spec joins every engine by being added.
+  # Chromium and Firefox run on Linux; WebKit runs on macOS, the closest to Safari that CI has.
+  # No job cancels the others, so one pull request shows every engine's result, and the
+  # workflow fails if any one of them fails.
+  browser:
+    name: Browser tests (${{ matrix.engine }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { engine: chromium, os: ubuntu-latest }
+          - { engine: firefox, os: ubuntu-latest }
+          - { engine: webkit, os: macos-latest }
+    steps:
+      - uses: actions/checkout@v7
 
-      # Builds the production bundle, serves it with vite preview, and drives it in Chromium.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install ${{ matrix.engine }}
+        run: npx playwright install --with-deps ${{ matrix.engine }}
+
+      # Builds the production bundle, serves it with vite preview, and drives it in this engine.
+      # A test that passes only on its retry fails the run (see failOnFlakyTests).
       - name: Browser tests (Playwright)
-        run: npm run test:e2e
+        run: npm run test:e2e -- --project=${{ matrix.engine }}
+
+      # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
+      - name: Summarize
+        if: always()
+        run: node scripts/e2e-summary.mjs e2e-results.json ${{ matrix.engine }} >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the Playwright report when a test fails
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.engine }}
           path: |
             playwright-report/
             test-results/

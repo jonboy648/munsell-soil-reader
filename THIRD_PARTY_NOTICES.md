@@ -387,6 +387,17 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 ```
 
+## Soil-book Chip list (CC0 1.0)
+
+The Chips a Reading can land on, with their color names, come from
+[tomax31/Munsell-Soil-Color-Chart-palette](https://github.com/tomax31/Munsell-Soil-Color-Chart-palette)
+by Thomas Perrin, dedicated to the public domain under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). We took the Munsell codes and the
+English names only (file `munsell_soil_color_chart_palette.gpl`, commit
+`78e4757992ff47fd3c5c17c5573971612fbb3ec1`, 17 May 2026) and keep them in
+`src/engine/chipList.ts`. That palette's RGB values are approximate and are not used: each
+Chip's color is computed from its notation with munsell.js.
+
 ## ColorChecker reference values
 
 The X-Rite ColorChecker Classic reference colors ("after November 2014" CIE L*a*b*, D50) are

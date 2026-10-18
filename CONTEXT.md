@@ -21,8 +21,12 @@ One picture of a sample with the card in it.
 _Avoid_: image, shot
 
 **Card**:
-The reference color target photographed beside the sample: either an X-Rite ColorChecker or a page of the soil book.
+The reference color target photographed with the sample: an X-Rite ColorChecker, a page of the soil book, or the frame.
 _Avoid_: chart, target, checker
+
+**Frame**:
+A printed card with a window for the soil, measured color patches around it and a marker in each corner; the app finds the markers itself, so no corners are tapped. Its patch colors belong to its print batch.
+_Avoid_: holder, jig, template
 
 **Page**:
 One page of the soil book, holding chips in a grid. Most pages hold one hue, in rows of value and columns of chroma; the 10Y-5GY, Gley and White pages mix hues across the grid. A chip can be printed on more than one page. When a page is used as the card, its chips are the reference colors.

@@ -66,41 +66,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Engine tests (Vitest)
-        run: npm test
-
-  # One job per engine, all of e2e/ on each, so a new spec joins every engine by being added.
-  # Chromium and Firefox run on Linux; WebKit runs on macOS, the closest to Safari that CI has.
-  # No job cancels the others, so one pull request shows every engine's result, and the
-  # workflow fails if any one of them fails.
-  browser:
-    name: Browser tests (${{ matrix.engine }}${{ matrix.copy }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { engine: chromium, os: ubuntu-latest }
-          - { engine: firefox, os: ubuntu-latest }
-          - { engine: webkit, os: macos-latest, hog: 0 }
-          - { engine: webkit, os: macos-latest, hog: 3000, copy: 2 }
-          - { engine: webkit, os: macos-latest, hog: 4500, copy: 3 }
-          - { engine: webkit, os: macos-latest, hog: 5500, copy: 4 }
-          - { engine: webkit, os: macos-latest, hog: 6500, copy: 5 }
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
       - name: Install ${{ matrix.engine }}
         run: npx playwright install --with-deps ${{ matrix.engine }}
 

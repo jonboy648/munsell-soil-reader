@@ -3,7 +3,7 @@ import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
 import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
-import { fitCorrection, heldOutError, type Correction, type Fit, type Reference } from "./correction"
+import { fitCorrection, fitPageCorrection, heldOutError, type Correction, type Fit, type Reference } from "./correction"
 import { leftOut } from "./leftOut"
 import {
   isPageHue,
@@ -83,7 +83,8 @@ interface CardFit {
   spotRadius?: (spot: XY, radius: number) => number
 }
 
-function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
+/** Fits the correction to a ColorChecker in the Photo and runs the Card check on it. */
+export function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
   const references: Reference[] = patchSites(corners).map(({ center, radius }, i) => ({
     measured: medianLinear(pixels, center, radius),
     truth: PATCH_LINEAR[i],
@@ -181,14 +182,14 @@ export function readPhoto({
   pixels,
   card,
   spots,
-  correction = fitCorrection,
+  correction,
 }: ReadPhotoInput): ReadPhotoResult {
   const hue = card.kind === "page" ? pageHueOf(card.hue) : null
   const fit: CardFit | null =
     card.kind === "colorchecker"
-      ? fitCard(pixels, card.corners, correction)
+      ? fitCard(pixels, card.corners, correction ?? fitCorrection)
       : card.kind === "page"
-        ? fitPage(pixels, hue!, card.taps, correction)
+        ? fitPage(pixels, hue!, card.taps, correction ?? fitPageCorrection)
         : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {

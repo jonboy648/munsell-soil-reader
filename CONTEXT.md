@@ -36,6 +36,14 @@ _Avoid_: hue card, sheet
 One tapped place on the soil in a photo; a sample can have several, for example on mottled soil.
 _Avoid_: point, sample (for the tapped place), ROI
 
+**Swatch**:
+One printed tile of a candidate filament, 20 mm, labelled `swatch_01` to `swatch_18` on its back. A swatch card carries them; photographed beside a ColorChecker, each is measured and, once chosen, becomes a patch of the frame.
+_Avoid_: sample (a Sample is soil), patch (patches belong to the card)
+
+**Batch file**:
+The measured CIELAB color (D50) of every patch of one frame print batch, as a CSV named for the batch code. Measurement mode writes it; the frame card reads it.
+_Avoid_: calibration file, reference list
+
 ### In the answer
 
 **Reading**:

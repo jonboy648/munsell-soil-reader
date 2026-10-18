@@ -31,6 +31,17 @@ export const BRADFORD_D50_TO_D65: Mat3 = [
   [-0.0282895, 1.0099416, 0.0210077],
   [0.0122982, -0.020483, 1.3299098],
 ]
+/** Inverse of a 3x3 matrix, by the adjugate. */
+const invert = (m: Mat3): Mat3 => {
+  const [[a, b, c], [d, e, f], [g, h, i]] = m
+  const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+  return [
+    [(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det],
+    [(f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det],
+    [(d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det],
+  ]
+}
+export const BRADFORD_D65_TO_D50: Mat3 = invert(BRADFORD_D50_TO_D65)
 export const WHITE_D65: Vec3 = [0.95047, 1, 1.08883]
 export const WHITE_D50: Vec3 = [0.96422, 1, 0.82521]
 
@@ -58,6 +69,18 @@ export const labToXyz = (lab: Vec3, white: Vec3): Vec3 => {
 }
 
 export const linearToLab = (lin: Vec3): Vec3 => xyzToLab(mul(M_RGB_XYZ, lin))
+
+/**
+ * CIELAB under D50 of a linear sRGB (D65) color, the white the ColorChecker's published values
+ * and the printing industry use. The inverse of how the engine turns those values into linear
+ * sRGB (Bradford D50 to D65).
+ */
+export const linearToLabD50 = (lin: Vec3): Vec3 =>
+  xyzToLab(mul(BRADFORD_D65_TO_D50, mul(M_RGB_XYZ, lin)), WHITE_D50)
+
+/** Linear sRGB (D65) of a CIELAB color under D50: how the engine reads the ColorChecker's values. */
+export const labD50ToLinear = (lab: Vec3): Vec3 =>
+  mul(M_XYZ_RGB, mul(BRADFORD_D50_TO_D65, labToXyz(lab, WHITE_D50)))
 
 /** Relative luminance (white is 1) of a linear sRGB color. */
 export const luminance = (lin: Vec3): number => mul(M_RGB_XYZ, lin)[1]

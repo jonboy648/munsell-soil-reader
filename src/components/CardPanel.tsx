@@ -30,8 +30,9 @@ interface Props {
   cardKind: CardKind
   /** The Page's hue, once chosen. */
   hue: PageHue | null
-  onCardKind: (kind: CardKind) => void
-  onHue: (hue: PageHue) => void
+  /** Absent where the Card is fixed (measurement mode), which hides the choice of Card. */
+  onCardKind?: (kind: CardKind) => void
+  onHue?: (hue: PageHue) => void
 }
 
 /** Two or more choices side by side, one pressed. Gray, so the choice never tints the Photo. */
@@ -165,7 +166,7 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: 
       </p>
     )
   }
-  const picker = (
+  const picker = onCardKind && onHue && (
     <div className="grid gap-2">
       <Choice
         label="Card"

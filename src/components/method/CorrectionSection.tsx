@@ -10,7 +10,8 @@ export function CorrectionSection() {
     <Section id="correction" title="Which correction, and why">
       <p>
         The app straightens the camera's tone curve along the Card's gray patches, then fits a 3x3
-        color matrix. Five corrections were compared on 160 simulated Photos (8 soils, 5 lights, 4
+        color matrix. (A Page of your book uses the same curves and a matrix held near one gain per
+        channel, for a reason given under the Card.) Five corrections were compared on 160 simulated Photos (8 soils, 5 lights, 4
         strengths of phone tone curve), each scored on how close it brought the soil to its true
         color. The soil is never part of the fit, so it is an honest test of the correction.
       </p>

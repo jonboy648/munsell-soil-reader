@@ -38,7 +38,8 @@ export const LIGHTS = {
 /**
  * A mild phone-like S-curve: mid-tone slope 1.15, slope 0.7 at black and white. A 3x3
  * correction copes with this. At 0.5 the warm-light case lands two Chips away, and at 0.7
- * every case does, which is what the root-polynomial correction in the spec is for.
+ * several do. Root-polynomial correction does not fix that on this simulated camera (see
+ * docs/correction-comparison.md), so the standard stays 0.3.
  */
 export const PHONE_TONE_CURVE = 0.3
 

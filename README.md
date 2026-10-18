@@ -52,15 +52,18 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 How a Reading is made: the median of the tapped pixels, a white balance and then a 3x3
 correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
-then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 of the corrected
-patches; below 3 is good. The Chip grid (10R to 5Y, values 2.5 to 8, chromas 1 to 8) still
+then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 over the Card's
+patches, each corrected by a fit made without it (leave one out); below 3 is good. A
+root-polynomial correction (Finlayson 2015, ported from colour-science, BSD-3) is in the engine
+but not used: it did not beat the 3x3, see [docs/correction-comparison.md](docs/correction-comparison.md).
+The Chip grid (10R to 5Y, values 2.5 to 8, chromas 1 to 8) still
 approximates the soil book; it is not the official Chip list and has no color names yet.
 
 ## Tests
 
 Two seams, and nothing else:
 
-- **Engine** (`src/engine/engine.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
+- **Engine** (`src/engine/engine.test.ts`, `src/engine/correction.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
   a Card and soil of a known Chip under a chosen light, exposure, color shift and tone curve,
   then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
 - **Browser** (`e2e/reader.spec.ts`): the production build in Chromium at a phone viewport. It

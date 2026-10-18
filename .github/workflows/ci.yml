@@ -46,16 +46,14 @@ jobs:
         include:
           - { engine: chromium, os: ubuntu-latest }
           - { engine: firefox, os: ubuntu-latest }
-          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 1 }
-          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 2 }
-          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 3 }
-          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 4 }
-          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 5 }
-          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 6 }
-          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 7 }
-          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 8 }
-          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 9 }
-          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 10 }
+          - { engine: webkit, os: macos-latest, arm: log, copy: 1 }
+          - { engine: webkit, os: macos-latest, arm: log, copy: 2 }
+          - { engine: webkit, os: macos-latest, arm: core, copy: 3 }
+          - { engine: webkit, os: macos-latest, arm: core, copy: 4 }
+          - { engine: webkit, os: macos-latest, arm: measure-magnifier, copy: 5 }
+          - { engine: webkit, os: macos-latest, arm: measure-magnifier, copy: 6 }
+          - { engine: webkit, os: macos-latest, arm: method, copy: 7 }
+          - { engine: webkit, os: macos-latest, arm: method, copy: 8 }
     steps:
       - uses: actions/checkout@v7
 
@@ -74,12 +72,14 @@ jobs:
       - name: Browser tests (Playwright)
         if: matrix.engine == 'webkit'
         run: |
-          # Temporary: ${{ matrix.arm }}
-          if [ "${{ matrix.arm }}" = "loop-alone" ]; then
-            npx playwright test e2e/zz-sw-loop.spec.ts --project=webkit --retries=0 --workers=1 || true
-          else
-            npx playwright test --project=webkit --retries=0 --workers=1 || true
-          fi
+          # Temporary: the service worker install loop after the "${{ matrix.arm }}" specs.
+          case "${{ matrix.arm }}" in
+            log) FILES="e2e/log.spec.ts" ;;
+            core) FILES="e2e/angled.spec.ts e2e/chips.spec.ts e2e/engine.spec.ts e2e/frame.spec.ts e2e/page.spec.ts e2e/quality.spec.ts e2e/reader.spec.ts" ;;
+            measure-magnifier) FILES="e2e/magnifier.spec.ts e2e/measure.spec.ts" ;;
+            method) FILES="e2e/method.spec.ts" ;;
+          esac
+          npx playwright test $FILES e2e/zz-sw-loop.spec.ts --project=webkit --retries=0 --workers=1 || true
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
       - name: Summarize

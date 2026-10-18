@@ -65,11 +65,11 @@ jobs:
       - name: Browser tests (Playwright)
         if: matrix.engine == 'webkit'
         run: |
-          # Temporary: slow the runner down with three busy loops, to see how a slow runner fails.
-          for n in 1 2 3; do (while :; do :; done) & done
-          for i in 1 2; do
+          # Temporary: whole suite, three passes, with a memory log every 5 seconds.
+          (while :; do echo "MEM $(date +%T) $(vm_stat | awk '/Pages free|Pages active|Pages wired|Pages occupied by compressor|Pageouts/ {printf "%s%s ", $2, $3}') $(ps -axo rss,comm | awk '/WebKit|webkit/ {s+=$1} END {printf "webkitMB=%d", s/1024}')"; sleep 5; done) &
+          for i in 1 2 3; do
             echo "=== LOOP $i"
-            npx playwright test e2e/method.spec.ts e2e/offline.spec.ts --project=webkit --retries=0 || true
+            npx playwright test --project=webkit --retries=0 || true
           done
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.

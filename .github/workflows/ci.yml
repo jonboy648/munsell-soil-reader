@@ -46,6 +46,46 @@ jobs:
         include:
           - { engine: chromium, os: ubuntu-latest }
           - { engine: firefox, os: ubuntu-latest }
+          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 1 }
+          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 2 }
+          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 3 }
+          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 4 }
+          - { engine: webkit, os: macos-latest, arm: loop-alone, copy: 5 }
+          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 6 }
+          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 7 }
+          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 8 }
+          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 9 }
+          - { engine: webkit, os: macos-latest, arm: after-suite, copy: 10 }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Engine tests (Vitest)
+        run: npm test
+
+  # One job per engine, all of e2e/ on each, so a new spec joins every engine by being added.
+  # Chromium and Firefox run on Linux; WebKit runs on macOS, the closest to Safari that CI has.
+  # No job cancels the others, so one pull request shows every engine's result, and the
+  # workflow fails if any one of them fails.
+  browser:
+    name: Browser tests (${{ matrix.engine }}${{ matrix.copy }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { engine: chromium, os: ubuntu-latest }
+          - { engine: firefox, os: ubuntu-latest }
           - { engine: webkit, os: macos-latest, hog: 0 }
           - { engine: webkit, os: macos-latest, hog: 3000, copy: 2 }
           - { engine: webkit, os: macos-latest, hog: 4500, copy: 3 }
@@ -69,16 +109,12 @@ jobs:
       - name: Browser tests (Playwright)
         if: matrix.engine == 'webkit'
         run: |
-          # Temporary: hold ${{ matrix.hog }} MB of memory while the service worker specs run.
-          if [ "${{ matrix.hog }}" != "0" ]; then
-            python3 -c "import time; x = bytearray(${{ matrix.hog }} * 1024 * 1024); [x.__setitem__(i, 1) for i in range(0, len(x), 4096)]; time.sleep(3000)" &
-            sleep 5
+          # Temporary: ${{ matrix.arm }}
+          if [ "${{ matrix.arm }}" = "loop-alone" ]; then
+            npx playwright test e2e/zz-sw-loop.spec.ts --project=webkit --retries=0 --workers=1 || true
+          else
+            npx playwright test --project=webkit --retries=0 --workers=1 || true
           fi
-          (while :; do echo "MEM $(date +%T) $(vm_stat | awk '/Pages free|Pages occupied by compressor|Pageouts/ {printf "%s%s ", $2, $3}')"; sleep 10; done) &
-          for i in 1 2 3; do
-            echo "=== LOOP $i hog=${{ matrix.hog }}"
-            npx playwright test e2e/method.spec.ts e2e/offline.spec.ts --project=webkit --retries=0 || true
-          done
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
       - name: Summarize

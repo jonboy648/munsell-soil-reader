@@ -40,7 +40,7 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 
 - Vite, React, TypeScript (strict), Tailwind CSS and shadcn/ui. The interface is neutral gray
   in light and dark, so it does not tint how you judge a color; color on screen comes only from
-  the Photo and from the Soil and Chip color blocks.
+  the Photo and from the Reading and Chip color blocks.
 - `src/engine/`: the reading engine. Pure TypeScript with no DOM and no React; the one main
   call is `readPhoto({ pixels, card, spots })`.
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
@@ -53,8 +53,9 @@ How a Reading is made: the median of the tapped pixels, a white balance and then
 correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
 then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 of the corrected
-patches; below 3 is good. The Chip grid (10R to 5Y, values 2.5 to 8, chromas 1 to 8) still
-approximates the soil book; it is not the official Chip list and has no color names yet.
+patches; below 3 is good. The Chips are the 315 in the soil book, with their color names, gley
+included (`src/engine/chipList.ts`, from the CC0 list by tomax31). Each Chip's color is computed
+from its notation, matching happens in Lab, and only the on-screen swatch is clamped to sRGB.
 
 ## Tests
 

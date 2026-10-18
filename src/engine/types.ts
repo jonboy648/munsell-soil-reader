@@ -24,8 +24,8 @@ export type Card =
 
 export interface Chip {
   notation: string // '10YR 4/3'
-  name: string // 'brown'; blank until the real Chip list lands
-  hue: string // '10YR', or 'N' for neutrals
+  name: string // 'brown'
+  hue: string // '10YR'; gley Chips have hues like '5GY'
   value: number
   chroma: number
 }

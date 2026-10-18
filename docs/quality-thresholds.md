@@ -17,8 +17,8 @@ move them. The least certain are marked **least certain**.
 | Blown pixel | Channels at 253 or more (8-bit) | 2 of 3 channels |
 | Crushed pixel | Channels at 5 or less | all 3 |
 | Glare on the Card | Blown pixels in a reference, against the Card's white | 5 points more than the white |
-| Clipped, highlights | Blown share of the Card's white | 50% or more |
-| Clipped, shadows | Crushed share of the Card's black | 50% or more |
+| Clipped, highlights | The Card white's median color | 2 channels at 254 or more |
+| Clipped, shadows | Crushed share of the Card's black patch, or of its black frame | 50% or more; frame: fewer than 3 of 15 places above the crush level |
 | Glare or clipped, on a Spot | Blown share of the Spot, and the Spot's own level | 5% blown; own level 245 or more is clipped |
 | Uneven light | How much a plane fitted to the Card's black frame, read at 15 places, rises across the Card, in stops | over 0.3 stops, up to 3 |
 | Card too small | Spacing between patches the tapped corners give | under 24 px |
@@ -50,7 +50,15 @@ the Card check is good (0.68 and 0.76, through the example tone curve of 0.5) an
 channels are at 253 or more: both examples pass. The shift example flags at 5% more light, and
 the warm one at 30% more, when a second channel reaches the top. Crushed uses every channel: dark
 soil has almost no blue, so one channel at 0 is not a lost Spot. The one-channel rule (even at 253)
-makes 31 of the 49 quality tests fail.
+makes 31 of the 54 quality tests fail.
+
+The white itself is judged by its median color, two channels at 254 or more, not by its blown
+share. Through the steepest tone curve (0.7) and JPEG 50, the shift light's white reads
+249/253/255: JPEG overshoot lifts the green channel a level and, by blown share, half the white
+crosses 253 and raises `clipped` on a clean Photo (the review saw 5 of 5 seeds). A median a level
+short of the line does not follow it, and a white that really is clipped is over: warm light at
+1.3 times reads 255/255/216 (at 1.2 times 255/252/209, still not clipped, and at 1.0 times
+254/240/193). None of the 396 clean Photos below raises `clipped`.
 
 **Glare against exposure.** Both are blown pixels, so the Card says which. White is the brightest
 thing on the Card in every channel, so under any exposure it is blown at least as much as any
@@ -107,9 +115,85 @@ Three earlier versions failed, each on the evidence below:
   by all of them. At the 30th percentile the plane's worst clean Photo read 0.20 where the
   spread's read 0.42.
 
-| Clean Photo, JPEG 50, noise x3 | Worst plane reading, stops |
-|---|---|
-| 5 seeds x 4 lights x tone curve 0.3, 0.5, 0.7, straight on | see table below |
+Clean Photos, all four lights, tone curves 0.3, 0.5 and 0.7, with the whole engine (any warning at
+all):
+
+| Photos | Straight on | Tilted (yaw 30, pitch 30) | Every corner tapped 10 px off |
+|---|---|---|---|
+| JPEG 50, noise x3: 5 seeds each, 60 per view | 0 | 1 | 0 |
+| JPEG 50, noise x1: 3 seeds each, 36 per view | 0 | 1 | 0 |
+| JPEG 75, noise x2: 3 seeds each, 36 per view | 0 | 0 | 0 |
+
+The one false alarm is the same Photo in both JPEG 50 rows: dim light through curve 0.7, tilted. Its
+frame sits at levels 8 to 11, where one level of JPEG or noise is 0.3 stops, and it is excluded
+from the clean-Photo test for that reason.
+
+Shadows (tone curve 0.5, JPEG 50, noise x3, 3 seeds x 4 lights = 12 per cell), flagged as uneven
+light:
+
+| Shadow | Straight on | Corners 10 px off |
+|---|---|---|
+| Ramp across the Card, light left 0.8 | 3 of 12 | 4 of 12 |
+| Ramp across the Card, light left 0.7 | 11 of 12 | 12 of 12 |
+| Edge down the middle, 0.8 | 12 of 12 | 12 of 12 |
+| Over the top two rows, 0.8 | 12 of 12 | 12 of 12 |
+| Over the gray row, 0.5 | 12 of 12 | 12 of 12 |
+| Over the white end (left column), 0.5 | 5 of 12 | 5 of 12 |
+
+So the limit of 0.3 stops finds an edge or a band of a fifth less light every time, a ramp of 30%
+less light (11 and 12 of 12), and misses a ramp of a fifth less light (a third of a stop) most of
+the time. Without JPEG the plane reads a ramp of 0.7 at 0.35, an edge of 0.7 at 0.60, the top rows at
+0.50 and the gray row at 0.28; at 0.5 they read 0.66, 1.21, 1.01 and 0.49. An edge reads about a
+fifth more than its size, since a plane through a step runs further than the step.
+
+Tap error and the cap. The reading holds with the whole Card tapped up to 0.2 of a patch off
+(15 px at a pitch of 74): clean readings 0.01 to 0.05 stops, JPEG 50 or not. At 0.3 of a patch the
+circles find too little frame and read 1.2 stops with the Card check still good (0.7): a false
+alarm, and the reason the tap tolerance of the patches (0.22 of a pitch) is not the frame's. With
+the taps one and a half patches off across and down it reads 4.1. Deep shadows read up to 2.3
+(an edge of 0.2) and half-a-patch errors 1.25, so the cap of 3 stops separates only the badly
+misplaced.
+
+Frame width. The simulated frame is 16% of the patch pitch wide, and a real ColorChecker's is not
+known here. With the 25th percentile and the limit 0.3, JPEG 50, noise x3 (clean: 32 straight, 32
+with every corner 10 px off; shadows: 8 of each):
+
+| Frame / pitch | Clean over 0.3 | Edge 0.8 | Top rows 0.8 | Ramp 0.8 |
+|---|---|---|---|---|
+| 16% (gap 12 px) | 0, 0 | 8, 8 | 8, 8 | 2, 3 |
+| 11% (gap 8 px) | 0, 0 | 6, 6 | 8, 7 | 0, 1 |
+| 8% (gap 6 px) | 0, 3 | 8, 7 | 6, 7 | 3, 6 |
+
+(straight on, then corners off). The 30th percentile read every clean Photo at the 8% frame as
+uneven; the 25th loses a little detection and gains that robustness. **Least certain:** Jon's real
+ColorChecker should settle the frame width and the percentile.
+
+Dark Photos. The black frame is the darkest thing in the Photo, and in a dim Photo it sits
+at the bottom of the tone curve, where one level of noise is a quarter stop or more. Places lost in
+the dark are not thrown away, since the shaded places are the ones that go dark: each counts at the
+crush level (5), as bright as it can be, so what the plane says is at most how uneven the light is.
+With fewer than 3 of the 15 places above that level there is nothing to compare, and the Card
+gets a `clipped` warning that says the light cannot be checked (JPEG 75, noise x1, 4 lights x 3
+seeds = 12 per row; "dark" is that warning or the crushed-black one):
+
+| Exposure | Clean: none / uneven / dark | Edge shadow 0.5: none / uneven / dark |
+|---|---|---|
+| 0.5 | 12 / 0 / 0 | 3 / 9 / 0 |
+| 0.35 | 9 / 0 / 3 | 0 / 9 / 3 |
+| 0.25 | 9 / 0 / 3 | 3 / 6 / 3 |
+| 0.15 | 0 / 0 / 12 | 0 / 0 / 12 |
+
+Before this, dropping every place with 5% or more crushed pixels removed exactly the shaded ones:
+at 0.25 times no place survived, a shadow edge of 0.5 was found in 0 of 3, and the check stayed
+silent. The dim-light Photos are the ones that read "dark" at 0.35 and 0.25 and miss a shadow at
+0.5; a shadow in a Photo two stops under-exposed is found in half the cases at best.
+
+Glare on the Card also lights the frame near it. Places within one patch spacing of a glared
+reference, or that are themselves blown, are left out, and the check needs 6 of the 15 to be left.
+Without that rule glare would raise uneven light as well. With it, glare and a shadow are each
+flagged: tested with reflections on three patches and a shadow over the top rows. The places and
+their radii follow the same homography as the patches, so a Card tilted 40 degrees (the `angled`
+example) reads clean, and a shadow or glare on it is still flagged (both tested).
 
 **Card too small.** Patches are read in a circle of 20% of their pitch, from corners the user
 tapped, so a tap that is off puts the circle on a gap or a neighbor. In the simulated camera (no
@@ -154,6 +238,17 @@ the 23 raises a warning on a clean Photo.
 - A shadow of about 2.3 stops that darkens the white end, or falls from right to left, inverts up
   to 3 pairs of grays, so the ladder takes the Card for off the Card: uneven light and Card too
   small are then skipped, and the Card check, which fails at that depth, is the signal.
+- The uneven-light reading rests on the black frame's width, which is the simulated 16% of the
+  patch pitch and not a measured ColorChecker. It holds down to 8% in the simulation (0 and 3 clean
+  Photos of 32 over the limit), but a real frame narrower than that, or taps more than 0.2 of a
+  patch off (a false alarm of 1.2 stops at 0.3, with the Card check still good), can raise uneven
+  light on an evenly lit Photo.
+- It misses a ramp of a fifth less light (3 or 4 of 12 found), and a shadow only over the outer
+  column of patches (5 of 12): the 15 places are inside the Card.
+- In dim light through a steep tone curve, tilted, with heavy JPEG, one clean Photo in 180 raises
+  uneven light: its frame is at levels 8 to 11, where one level is 0.3 stops. In Photos two stops
+  under-exposed or more, a shadow is found in half the cases at best, and Photos darker than that
+  get the "light cannot be checked" warning instead of an answer.
 - Glare that covers the whole white patch is reported as clipped: a reflection on the white is the
   same to the engine as a white that is too bright.
 - A single clipped channel (a red-heavy light blowing only red) is not flagged.

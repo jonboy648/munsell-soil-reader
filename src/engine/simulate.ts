@@ -5,6 +5,7 @@
 import * as munsell from "munsell"
 import { encode, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
+import { BOARD, MARKER_CELLS, MARKER_ORIGINS, MARKER_SIZE, markerCellIsWhite } from "./frameLayout"
 import { paintGlare, paintJpeg, paintShadow, type Glare, type Shadow } from "./simulateFaults"
 import type { Corners, Pixels, XY } from "./types"
 
@@ -79,13 +80,17 @@ export const SIM_SOIL = "10YR 4/3"
 export interface SimTilt {
   yaw: number
   pitch: number
+  /** How far the camera is from the middle of the Card, in scene pixels. Default DISTANCE. */
+  distance?: number
 }
 
 /** Pinhole focal length in Photo pixels: about 70 degrees across the Photo's width. */
 const FOCAL = 700
-/** The camera is this far from the middle of the Card, close enough for strong perspective. */
+/** By default the camera is this far from the middle of the Card, close enough for strong perspective. */
 const DISTANCE = 500
 /** The scene is turned about the middle of the Card's patch grid. */
+/** The usual-size Card's patch pitch: the printed frame is laid out in its grid steps. */
+const PITCH = cardLayout(1).pitch
 const [FIRST, LAST] = [simPatchCenter(0, 0), simPatchCenter(3, 5)]
 const PIVOT: XY = { x: (FIRST.x + LAST.x) / 2, y: (FIRST.y + LAST.y) / 2 }
 
@@ -96,7 +101,7 @@ interface View {
   toScene: (x: number, y: number, out: XY) => void
 }
 
-function tiltedView({ yaw, pitch }: SimTilt): View {
+function tiltedView({ yaw, pitch, distance = DISTANCE }: SimTilt): View {
   const rad = Math.PI / 180
   const [sy, cy] = [Math.sin(yaw * rad), Math.cos(yaw * rad)]
   const [sp, cp] = [Math.sin(pitch * rad), Math.cos(pitch * rad)]
@@ -104,7 +109,7 @@ function tiltedView({ yaw, pitch }: SimTilt): View {
   const right = [cy, -sp * sy, cp * sy]
   const down = [0, cp, sp]
   const normal = [-sy, -sp * cy, cp * cy]
-  // A pixel's ray hits the plane at t = DISTANCE * normal.z / (ray . normal), which makes the
+  // A pixel's ray hits the plane at t = distance * normal.z / (ray . normal), which makes the
   // scene point a ratio of two linear functions of the ray: the same for u (right) and v (down).
   const across = (axis: number[], k: number) => normal[2] * axis[k] - axis[2] * normal[k]
   const [ux, uy, vx, vy] = [across(right, 0), across(right, 1), across(down, 0), across(down, 1)]
@@ -112,7 +117,7 @@ function tiltedView({ yaw, pitch }: SimTilt): View {
     toPhoto: (u, v) => {
       const a = u - PIVOT.x
       const b = v - PIVOT.y
-      const z = DISTANCE + a * right[2] + b * down[2]
+      const z = distance + a * right[2] + b * down[2]
       return {
         x: SIM_WIDTH / 2 + (FOCAL * (a * right[0] + b * down[0])) / z,
         y: SIM_HEIGHT / 2 + (FOCAL * (a * right[1] + b * down[1])) / z,
@@ -126,8 +131,8 @@ function tiltedView({ yaw, pitch }: SimTilt): View {
         out.x = out.y = -Infinity
         return
       }
-      out.x = PIVOT.x + (DISTANCE * (ux * rx + uy * ry)) / facing
-      out.y = PIVOT.y + (DISTANCE * (vx * rx + vy * ry)) / facing
+      out.x = PIVOT.x + (distance * (ux * rx + uy * ry)) / facing
+      out.y = PIVOT.y + (distance * (vx * rx + vy * ry)) / facing
     },
   }
 }
@@ -184,6 +189,13 @@ export interface SimScene {
   jpeg?: number
   /** Photograph the scene at an angle, so the Card is in perspective. Default: straight on. */
   tilt?: SimTilt
+  /**
+   * Put the printed frame around the Card: a light board with an ArUco marker in each corner
+   * (see frameLayout.ts). Default false.
+   */
+  frame?: boolean
+  /** Which of the frame's markers, 0 to 3, are printed, so a test can lose some. Default all four. */
+  frameMarkers?: readonly number[]
 }
 
 export function simulatePhoto({
@@ -198,6 +210,8 @@ export function simulatePhoto({
   noise: noiseScale = 1,
   jpeg,
   tilt,
+  frame: framed = false,
+  frameMarkers = [0, 1, 2, 3],
 }: SimScene): SimPhoto {
   const rand = mulberry32(seed)
   const layout = cardLayout(cardScale, frameGap)
@@ -206,6 +220,7 @@ export function simulatePhoto({
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
   const frame = shoot(camera, [0.012, 0.012, 0.012])
+  const board = shoot(camera, [0.6, 0.6, 0.6])
   const patches = PATCH_LINEAR.map((lin) => shoot(camera, lin))
   const data = new Uint8ClampedArray(SIM_WIDTH * SIM_HEIGHT * 4)
   const fx0 = CARD.x - layout.frame
@@ -224,6 +239,22 @@ export function simulatePhoto({
       }
       let rgb = ground
       let noise = 12
+      if (framed) {
+        // Where in the Card's grid steps this scene point is.
+        const col = (u - FIRST.x) / PITCH
+        const row = (v - FIRST.y) / PITCH
+        if (col >= BOARD[0] && col < BOARD[1] && row >= BOARD[2] && row < BOARD[3]) {
+          rgb = board
+          noise = 2
+          for (const id of frameMarkers) {
+            const cellCol = Math.floor(((col - MARKER_ORIGINS[id].col) / MARKER_SIZE) * MARKER_CELLS)
+            const cellRow = Math.floor(((row - MARKER_ORIGINS[id].row) / MARKER_SIZE) * MARKER_CELLS)
+            if (cellCol >= 0 && cellRow >= 0 && cellCol < MARKER_CELLS && cellRow < MARKER_CELLS) {
+              rgb = markerCellIsWhite(id, cellRow, cellCol) ? board : frame
+            }
+          }
+        }
+      }
       if (card && u >= fx0 && u < fx1 && v >= fy0 && v < fy1) {
         rgb = frame
         noise = 2

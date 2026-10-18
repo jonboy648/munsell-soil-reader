@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest"
 import { shownReading } from "@/lib/verdict"
 import { deltaE2000, linearToLab, luminance, rgb255ToLinear, type Vec3 } from "./color"
 import { fitCorrection, type Fit } from "./correction"
-import { PAGE_HUES, pageModel, pagePaperSites, pageSites, readPhoto } from "./index"
+import { CARD_CHECK_CAUTION, PAGE_HUES, pageModel, pagePaperSites, pageSites, readPhoto } from "./index"
 import type { Corners, PageHue, Pixels, XY } from "./index"
 import { medianRgb255 } from "./sampling"
 import { LIGHTS, PHONE_TONE_CURVE, simulatePhoto } from "./simulate"
@@ -218,6 +218,27 @@ describe("the Card check on real Photos", () => {
     expect(check.meanDE).toBeGreaterThan(low)
     expect(check.meanDE).toBeLessThan(high)
     expect(check.ok).toBe(good)
+  })
+
+  it("gives each real Photo the verdict its score earns: the daylight Pages are good or caution, and only the broken ones fail", () => {
+    // The limits were set on simulated Photos, whose Pages score under 1. Real daylight Pages score
+    // 1.8 to 2.9, which is why there is a caution band: 10YR (2.79) and 2.5Y (2.84) show the corrected
+    // Reading with the raw one beside it, 5Y (1.83) is good, 7.5YR fails on its row guard whatever its
+    // mean (2.98), and the fabric Photo (3.98, uneven light) fails.
+    const verdicts = Object.fromEntries(Object.entries(FIXTURES).map(([name, f]) => [name, read(f).cardCheck!.verdict]))
+    expect(verdicts).toEqual({
+      "10YR on fabric": "failed",
+      "10YR on wood": "caution",
+      "7.5YR on wood": "failed",
+      "2.5Y on wood": "caution",
+      "5Y on wood": "good",
+    })
+    // None of the wood Photos fails on its mean: the one that fails there fails on its row.
+    for (const [name, f] of WOOD) {
+      const { meanDE, verdict } = read(f).cardCheck!
+      if (verdict === "failed") expect(read(f).cardCheck!.suspectRow, name).toBeDefined()
+      else expect(meanDE, name).toBeLessThan(CARD_CHECK_CAUTION)
+    }
   })
 
   it("10YR on fabric, in warm indoor light, fails by a wide margin, though it finds the smudged pair", () => {

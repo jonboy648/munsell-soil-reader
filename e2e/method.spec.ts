@@ -104,7 +104,7 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
 test("lists every credit with its license", async ({ page }) => {
   await openMethodPage(page)
   const credits = page.getByTestId("credit")
-  await expect(credits).toHaveCount(8)
+  await expect(credits).toHaveCount(9)
   const expected: [string, string][] = [
     ["Munsell Soil Reader", "MIT"],
     ["munsell.js", "MPL-2.0"],

@@ -1,13 +1,35 @@
 // The magnifier: a round, zoomed view of the Photo held beside the finger so the finger does
 // not hide it, with a crosshair at the exact point that will be placed on release. It sits
-// above the finger, or below it when there is no room above.
+// above the finger, or beside it, toward the side with more room, when there is none above.
 import * as React from "react"
+import type { XY } from "@/engine"
 import type { Placing } from "@/lib/placement"
 
 const LENS = 136 // diameter, in CSS pixels
 const ZOOM = 4 // times what the Photo looks like on screen
-const GAP = 28 // between the finger and the lens
+const GAP = 28 // between the finger and a lens above it
+const SIDE = 40 // between the finger and a lens beside it, clear of the thumb
 const MARGIN = 6 // kept clear at the screen edges
+
+/** Where the lens goes for a finger at `at`, in the fixed-position space of the page. */
+function lensPosition(at: XY): XY {
+  // The part of the page that is on screen, which is smaller than the page when pinch-zoomed.
+  const vv = window.visualViewport
+  const left = vv?.offsetLeft ?? 0
+  const top = vv?.offsetTop ?? 0
+  const width = vv?.width ?? document.documentElement.clientWidth
+  const height = vv?.height ?? window.innerHeight
+  const within = (v: number, from: number, span: number) =>
+    Math.min(Math.max(v, from + MARGIN), from + span - LENS - MARGIN)
+
+  const above = at.y - GAP - LENS
+  if (above >= top + MARGIN) return { x: within(at.x - LENS / 2, left, width), y: above }
+  const toRight = left + width - at.x >= at.x - left
+  return {
+    x: within(toRight ? at.x + SIDE : at.x - SIDE - LENS, left, width),
+    y: within(at.y - LENS / 2, top, height),
+  }
+}
 
 // White with a black edge, like the marks on the Photo: neutral, and visible on any soil.
 function outlined(ctx: CanvasRenderingContext2D, px: number, path: () => void) {
@@ -54,11 +76,7 @@ export function Magnifier({ placing }: { placing: Placing }) {
     if (ref.current) draw(ref.current, placing)
   }, [placing])
 
-  const above = placing.client.y - GAP - LENS
-  const left = Math.min(
-    Math.max(placing.client.x - LENS / 2, MARGIN),
-    document.documentElement.clientWidth - LENS - MARGIN,
-  )
+  const at = lensPosition(placing.client)
   const dpr = window.devicePixelRatio || 1
 
   return (
@@ -70,12 +88,7 @@ export function Magnifier({ placing }: { placing: Placing }) {
       data-testid="magnifier"
       data-zoom={ZOOM}
       className="pointer-events-none fixed z-50 rounded-full"
-      style={{
-        left,
-        top: above >= MARGIN ? above : placing.client.y + GAP,
-        width: LENS,
-        height: LENS,
-      }}
+      style={{ left: at.x, top: at.y, width: LENS, height: LENS }}
     />
   )
 }

@@ -90,7 +90,8 @@ export function PhotoView({ pixels, corners, spots, onTap }: Props) {
     )
   }
 
-  // touch-none: a press on the Photo places a point; it never scrolls the page.
+  // touch-pinch-zoom: the page keeps pinch-zoom, but a finger on the Photo never pans it by
+  // itself; usePlacement scrolls the page when the finger swipes.
   return (
     <>
       <canvas
@@ -98,11 +99,10 @@ export function PhotoView({ pixels, corners, spots, onTap }: Props) {
         width={pixels.width}
         height={pixels.height}
         {...handlers}
-        onContextMenu={(e) => e.preventDefault()}
         role="img"
         aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
         data-testid="photo"
-        className="block h-auto w-full cursor-crosshair touch-none bg-muted select-none"
+        className="block h-auto w-full cursor-crosshair touch-pinch-zoom bg-muted select-none"
       />
       {placing && <Magnifier placing={placing} />}
     </>

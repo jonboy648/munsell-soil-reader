@@ -37,7 +37,7 @@ jobs:
   # No job cancels the others, so one pull request shows every engine's result, and the
   # workflow fails if any one of them fails.
   browser:
-    name: Browser tests (${{ matrix.engine }})
+    name: Browser tests (${{ matrix.engine }}${{ matrix.copy }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -47,6 +47,11 @@ jobs:
           - { engine: chromium, os: ubuntu-latest }
           - { engine: firefox, os: ubuntu-latest }
           - { engine: webkit, os: macos-latest }
+          - { engine: webkit, os: macos-latest, copy: 2 }
+          - { engine: webkit, os: macos-latest, copy: 3 }
+          - { engine: webkit, os: macos-latest, copy: 4 }
+          - { engine: webkit, os: macos-latest, copy: 5 }
+          - { engine: webkit, os: macos-latest, copy: 6 }
     steps:
       - uses: actions/checkout@v7
 
@@ -67,7 +72,7 @@ jobs:
         run: |
           # Temporary: whole suite, three passes, with a memory log every 5 seconds.
           (while :; do echo "MEM $(date +%T) $(vm_stat | awk '/Pages free|Pages active|Pages wired|Pages occupied by compressor|Pageouts/ {printf "%s%s ", $2, $3}') $(ps -axo rss,comm | awk '/WebKit|webkit/ {s+=$1} END {printf "webkitMB=%d", s/1024}')"; sleep 5; done) &
-          for i in 1 2 3; do
+          for i in 1 2; do
             echo "=== LOOP $i"
             npx playwright test --project=webkit --retries=0 || true
           done

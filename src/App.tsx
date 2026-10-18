@@ -5,13 +5,17 @@ import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
 import { InstallHint } from "@/components/InstallHint"
+import { MethodPage } from "@/components/method/MethodPage"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
 import { SpotsPanel } from "@/components/SpotsPanel"
 import { StepIndicator } from "@/components/StepIndicator"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { buttonVariants } from "@/components/ui/button"
 import { UpdateNotice } from "@/components/UpdateNotice"
 import { examplePhoto, filePhoto } from "@/lib/photo"
+import { hrefOf, markOpenedHere, usePage } from "@/lib/route"
+import { useServiceWorker } from "@/lib/serviceWorker"
 import {
   CORNER_COUNT,
   canUndo,
@@ -20,20 +24,27 @@ import {
   sessionReducer,
   stepOf,
 } from "@/lib/session"
+import type { CardInfo } from "@/lib/verdict"
 
 export function App() {
+  const page = usePage()
+  // Followed here, above the page switch: a first visit that opens on the method page still
+  // installs the service worker, and its notices are not lost on the way between pages.
+  const serviceWorker = useServiceWorker()
   const [session, dispatch] = React.useReducer(sessionReducer, initialSession)
   const [problem, setProblem] = React.useState<string | null>(null)
   const step = stepOf(session)
 
   // One engine call per change of Photo, Card or Spots.
-  const { photo, noCard, corners, spots } = session
+  const { photo, noCard, cardKind, hue, corners, spots } = session
   const result = React.useMemo(() => {
-    const card = cardOf({ photo, noCard, corners, spots })
+    const card = cardOf({ photo, noCard, cardKind, hue, corners, spots })
     return photo && card && spots.length > 0
       ? readPhoto({ pixels: photo.pixels, card, spots })
       : null
-  }, [photo, noCard, corners, spots])
+  }, [photo, noCard, cardKind, hue, corners, spots])
+  const spotRadii = React.useMemo(() => result?.readings.map((r) => r.radius), [result])
+  const cardInfo: CardInfo = cardKind === "page" && hue ? { kind: "page", hue } : { kind: "colorchecker" }
 
   // A new Photo is picked from controls below it; bring the Photo back into view.
   React.useEffect(() => {
@@ -42,7 +53,12 @@ export function App() {
 
   const pickExample = (example: ExamplePhoto) => {
     setProblem(null)
-    dispatch({ type: "load", photo: examplePhoto(example), noCard: example.scene.card === false })
+    dispatch({
+      type: "load",
+      photo: examplePhoto(example),
+      noCard: example.scene.card === false,
+      cardKind: example.scene.page ? "page" : "colorchecker",
+    })
   }
   const pickFile = async (file: File) => {
     try {
@@ -54,13 +70,15 @@ export function App() {
     }
   }
 
+  if (page === "method") return <MethodPage />
+
   return (
     <div className="mx-auto flex min-h-svh max-w-xl flex-col">
       <header className="relative px-4 pt-[env(safe-area-inset-top)]">
         <h1 className="py-3 font-heading text-xl font-extrabold tracking-tight [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
-        <UpdateNotice hasPhoto={session.photo !== null} />
+        <UpdateNotice hasPhoto={session.photo !== null} status={serviceWorker} />
       </header>
 
       <main className="flex flex-1 flex-col gap-4 pb-44">
@@ -70,6 +88,7 @@ export function App() {
             cornersTapped={session.corners.length}
             cornerCount={CORNER_COUNT}
             noCard={session.noCard}
+            cardKind={cardKind}
             spotCount={session.spots.length}
           />
         </div>
@@ -78,6 +97,10 @@ export function App() {
           pixels={session.photo?.pixels ?? null}
           corners={session.corners}
           spots={session.spots}
+          spotRadii={spotRadii}
+          cardKind={cardKind}
+          hue={hue}
+          leftOut={result?.cardCheck?.leftOut}
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
 
@@ -92,7 +115,14 @@ export function App() {
               <p className="text-sm text-muted-foreground" data-testid="photo-name">
                 {session.photo.name}
               </p>
-              <CardPanel tapped={session.corners.length} noCard={session.noCard} />
+              <CardPanel
+                tapped={session.corners.length}
+                noCard={session.noCard}
+                cardKind={cardKind}
+                hue={hue}
+                onCardKind={(kind) => dispatch({ type: "cardKind", cardKind: kind })}
+                onHue={(h) => dispatch({ type: "hue", hue: h })}
+              />
               {step === "spots" && <SpotsPanel spotCount={session.spots.length} />}
             </>
           ) : (
@@ -102,14 +132,22 @@ export function App() {
         </div>
 
         {/* At the bottom of the page, where a thumb reaches it. */}
-        <footer className="px-2">
+        <footer className="grid justify-items-start px-2">
           <InstallHint />
+          <a
+            href={hrefOf("method")}
+            onClick={markOpenedHere}
+            data-testid="method-link"
+            className={buttonVariants({ variant: "ghost", size: "lg", className: "h-11" })}
+          >
+            Accuracy, method and credits
+          </a>
           <ThemeToggle />
         </footer>
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-xl">
-        <ReadingsPanel result={result} />
+        <ReadingsPanel result={result} card={cardInfo} />
         <BottomBar
           onFile={pickFile}
           onUndo={() => dispatch({ type: "undo" })}

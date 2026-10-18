@@ -1,10 +1,12 @@
 // Placing a point on the Photo with a finger, a pen or a mouse.
 //
 // A mouse press shows the magnifier at once: dragging adjusts the point, releasing places it.
-// A finger or pen is also how the user scrolls and pinch-zooms, so it has to be told apart:
-//   tap    lifted before HOLD_MS, still within SLOP: places the point where it came down
+// A finger or pen is also how the user scrolls, pans a pinch-zoomed page and pinch-zooms, and the
+// browser does all of that itself, so the Photo only has to tell them apart from placing:
+//   tap    lifted before HOLD_MS, still within SLOP: places the point where it came down, unless
+//          a finger had just scrolled the page: then it only stopped the page coasting
 //   hold   stays within SLOP for HOLD_MS: the magnifier shows, dragging adjusts, lifting places
-//   swipe  leaves SLOP first: nothing is placed and the page scrolls with the finger
+//   swipe  leaves SLOP first: nothing is placed, and the browser scrolls or pans the page
 //   pinch  a second finger, or the browser taking the gesture over: nothing is placed
 import * as React from "react"
 import type { XY } from "@/engine"
@@ -12,6 +14,7 @@ import type { XY } from "@/engine"
 const HOLD_MS = 200
 const SLOP = 10 // CSS pixels a finger may wander and still be a tap or a hold
 const EDGE = 24 // CSS pixels past the Photo's edge that still count as on it
+const COASTING_MS = 300 // a finger coming down this soon after the page last moved is stopping it
 
 /** A point being placed: where the pointer is now, in Photo pixels and on screen. */
 export interface Placing {
@@ -25,8 +28,8 @@ interface Gesture {
   canvas: HTMLCanvasElement
   from: XY // on screen, where the pointer came down
   at: XY // on screen, where it is now
-  scrolled: XY // on screen, how far a swipe has scrolled the page so far
   mode: "pending" | "placing" | "swiping"
+  stopsScroll: boolean // came down on a page a finger had just scrolled
   timer: number
 }
 
@@ -50,9 +53,12 @@ function placingOf(g: Gesture): Placing | null {
 
 const clientOf = (e: React.PointerEvent | PointerEvent): XY => ({ x: e.clientX, y: e.clientY })
 
-export function usePlacement(onPlace: (point: XY) => void) {
+export function usePlacement(canvas: HTMLCanvasElement | null, onPlace: (point: XY) => void) {
   const [placing, setPlacing] = React.useState<Placing | null>(null)
   const gesture = React.useRef<Gesture | null>(null)
+  const pageMovedAt = React.useRef(-Infinity) // when the page last scrolled, panned or zoomed
+  const fingerMovedPage = React.useRef(false) // a finger scrolled or zoomed it since one came down
+  const stopsScroll = React.useRef(false) // the finger that is down came down on a coasting page
 
   const end = () => {
     if (gesture.current) window.clearTimeout(gesture.current.timer)
@@ -60,17 +66,58 @@ export function usePlacement(onPlace: (point: XY) => void) {
     setPlacing(null)
   }
 
-  // A second finger is a pinch, wherever it lands.
   React.useEffect(() => {
-    const onAnyDown = (e: PointerEvent) => {
-      if (gesture.current && e.pointerId !== gesture.current.pointerId) end()
+    const pageMoved = () => {
+      pageMovedAt.current = performance.now()
     }
+    // The browser takes a finger over (a pointercancel) to scroll, pan or zoom the page. The
+    // scroll events follow on the next frame, which a quick tap can beat, so the page counts as
+    // moving from here.
+    const onAnyCancel = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return
+      fingerMovedPage.current = true
+      pageMoved()
+    }
+    const onAnyDown = (e: PointerEvent) => {
+      // A second finger is a pinch, wherever it lands.
+      if (gesture.current && e.pointerId !== gesture.current.pointerId) end()
+      // A swipe coasts after the finger lifts, and the natural way to stop it is a tap. That is
+      // not a point to place. Only a finger's scroll counts: the app scrolls the page itself, to
+      // the top when a new Photo comes, and a tap right after that is meant.
+      stopsScroll.current =
+        e.pointerType !== "mouse" &&
+        fingerMovedPage.current &&
+        performance.now() - pageMovedAt.current < COASTING_MS
+      fingerMovedPage.current = false
+    }
+    const vv = window.visualViewport
+    window.addEventListener("scroll", pageMoved)
+    vv?.addEventListener("scroll", pageMoved) // panning a pinch-zoomed page
+    vv?.addEventListener("resize", pageMoved) // zooming it
+    window.addEventListener("pointercancel", onAnyCancel, true)
     window.addEventListener("pointerdown", onAnyDown, true)
     return () => {
+      window.removeEventListener("scroll", pageMoved)
+      vv?.removeEventListener("scroll", pageMoved)
+      vv?.removeEventListener("resize", pageMoved)
+      window.removeEventListener("pointercancel", onAnyCancel, true)
       window.removeEventListener("pointerdown", onAnyDown, true)
       if (gesture.current) window.clearTimeout(gesture.current.timer)
     }
   }, [])
+
+  // Once the hold has fired, dragging the finger adjusts the point and must not also scroll or
+  // pan the page. The browser decides that at the first touchmove, and only a listener that is
+  // not passive can cancel it (React's own touch handlers are passive). It is on the Photo alone,
+  // so scrolling anywhere else stays on the browser's fast path.
+  React.useEffect(() => {
+    if (!canvas) return
+    const keepPut = (e: TouchEvent) => {
+      if (gesture.current?.mode === "placing" && e.cancelable) e.preventDefault()
+    }
+    canvas.addEventListener("touchmove", keepPut, { passive: false })
+    return () => canvas.removeEventListener("touchmove", keepPut)
+  }, [canvas])
 
   const handlers = {
     onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -84,8 +131,8 @@ export function usePlacement(onPlace: (point: XY) => void) {
         canvas: e.currentTarget,
         from: at,
         at,
-        scrolled: at,
         mode: e.pointerType === "mouse" ? "placing" : "pending",
+        stopsScroll: stopsScroll.current,
         timer: 0,
       }
       gesture.current = g
@@ -106,10 +153,6 @@ export function usePlacement(onPlace: (point: XY) => void) {
       if (g.mode === "pending" && Math.hypot(g.at.x - g.from.x, g.at.y - g.from.y) > SLOP) {
         window.clearTimeout(g.timer)
         g.mode = "swiping"
-      }
-      if (g.mode === "swiping") {
-        window.scrollBy(g.scrolled.x - g.at.x, g.scrolled.y - g.at.y)
-        g.scrolled = g.at
       } else if (g.mode === "placing") {
         setPlacing(placingOf(g))
       }
@@ -118,7 +161,7 @@ export function usePlacement(onPlace: (point: XY) => void) {
       const g = gesture.current
       if (!g || g.pointerId !== e.pointerId) return
       end()
-      if (g.mode === "swiping") return
+      if (g.mode === "swiping" || (g.mode === "pending" && g.stopsScroll)) return
       // A tap places the point where it came down; a hold, where it is lifted.
       const point = photoPoint(g.canvas, g.mode === "pending" ? g.from : clientOf(e))
       if (point) onPlace(point)

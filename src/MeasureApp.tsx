@@ -21,18 +21,12 @@ import { MeasureResults } from "@/components/MeasureResults"
 import { PhotoView } from "@/components/PhotoView"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
+import { MEASURE_METHOD } from "@/lib/measureMethod"
 import { initialMeasure, measureReducer } from "@/lib/measureSession"
 import { examplePhoto, filePhoto } from "@/lib/photo"
 import { CORNER_COUNT, canUndo, stepOf } from "@/lib/session"
 
 const fmt = (n: number) => n.toFixed(1)
-
-const METHOD = [
-  "Each shot is corrected against the ColorChecker with the same correction and Card check as the main reader. Each swatch is read from the corrected Photo, and the shots whose Card check is good are averaged. A shot whose Card check is not good is left out and listed.",
-  "Numbers are CIELAB under D50, the scale the ColorChecker's published values use. The spread is the sample standard deviation of each channel across the shots, in the same units.",
-  "A camera has three broad channels where a spectrophotometer measures the whole spectrum, so two materials that match for the camera can differ for the eye. This metamerism leaves roughly 1 to 2 dE00 (CIEDE2000) of systematic error, which taking more shots does not average away. That is why the first lot's swatch card is also sent to a measurement service once (the decision on issue #50): if the camera is within about 1 dE00 of it, the camera method stands for later lots; if not, a spectrophotometer is bought.",
-  "Shoot in soft daylight, from different places, with nothing clipped or in shadow. A swatch lighter than the ColorChecker's white or darker than its black is read past what the Card can vouch for, and the Card check does not see that: in simulated Photos a swatch as light as the white read up to 5 dE00 out under a strong camera color shift.",
-]
 
 export default function MeasureApp() {
   const [state, dispatch] = React.useReducer(measureReducer, initialMeasure)
@@ -51,7 +45,11 @@ export default function MeasureApp() {
         : null,
     [photo, corners, spots, labels],
   )
-  const radiusOf = React.useCallback((spot: XY) => swatchRadius(corners as Corners, spot), [corners])
+  const spotRadii = React.useMemo(
+    () => (corners.length === CORNER_COUNT ? spots.map((spot) => swatchRadius(corners as Corners, spot)) : undefined),
+    [corners, spots],
+  )
+  const spotLabels = React.useMemo(() => labels.map((id) => String(Number(id.slice("swatch_".length)))), [labels])
 
   React.useEffect(() => {
     if (photo) window.scrollTo({ top: 0 })
@@ -88,8 +86,10 @@ export default function MeasureApp() {
           pixels={photo?.pixels ?? null}
           corners={corners}
           spots={spots}
-          spotLabels={labels.map((id) => String(Number(id.slice("swatch_".length))))}
-          radiusOf={radiusOf}
+          spotRadii={spotRadii}
+          spotLabels={spotLabels}
+          cardKind="colorchecker"
+          hue={null}
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
 
@@ -105,7 +105,7 @@ export default function MeasureApp() {
             </p>
           )}
           {photo && <p className="text-sm text-muted-foreground" data-testid="photo-name">{photo.name}</p>}
-          {photo && step === "corners" && <CardPanel tapped={corners.length} noCard={false} />}
+          {photo && step === "corners" && <CardPanel tapped={corners.length} noCard={false} cardKind="colorchecker" hue={null} />}
           {photo && step === "spots" && (
             <div className="grid gap-3">
               <p className="text-base" data-testid="swatch-prompt">
@@ -161,7 +161,7 @@ export default function MeasureApp() {
           <details className="rounded-lg border border-border bg-card p-3 text-sm" data-testid="method">
             <summary className="cursor-pointer font-semibold">How this is measured</summary>
             <div className="mt-2 grid gap-2 text-muted-foreground">
-              {METHOD.map((paragraph) => (
+              {MEASURE_METHOD.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>

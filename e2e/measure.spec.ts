@@ -145,3 +145,13 @@ test("the method says what the camera cannot see and who checks the first lot", 
   await expect(page.getByTestId("method")).toContainText("first lot")
   await expect(page.getByTestId("method")).toContainText("#50")
 })
+
+test("the method page carries the same text, for whoever makes the frames", async ({ page }) => {
+  await page.goto("/#method")
+  const section = page.locator("#measuring")
+  await expect(section).toContainText("Measuring the frame's colors")
+  await expect(section).toContainText("1 to 2 dE00")
+  await expect(section).toContainText("metamerism")
+  await expect(section).toContainText("sent to a measurement service once")
+  await expect(section).toContainText("?measure")
+})

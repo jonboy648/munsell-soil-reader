@@ -62,6 +62,10 @@ _Avoid_: calibration score, fit quality
 A chip one step away from another in value, in chroma, or on the next page; a reading "within one chip" is the same chip or a neighbouring one.
 _Avoid_: adjacent color, close match
 
+**Left out**:
+A Chip on the Page that the fit sets aside because it disagrees with the rest, as a smudged or worn Chip does; the Card check names the Chips it left out.
+_Avoid_: ignored, excluded, rejected
+
 **Log**:
 Everything saved on the device: projects, sampling points, layers and their readings. It can be exported as a spreadsheet or as forms.
 _Avoid_: history, database, records

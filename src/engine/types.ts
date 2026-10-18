@@ -1,5 +1,6 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
+import type { Batch } from "./batch"
 import type { Fit } from "./correction"
 
 /** A point in Photo pixels, origin at the top left. */
@@ -21,6 +22,12 @@ export interface Pixels {
 export type Card =
   | { kind: "colorchecker"; corners: Corners }
   | { kind: "page"; hue: string; corners: Corners } // hue like '10YR'; not supported yet (ticket 8)
+  /**
+   * The frame (ADR 0003): a card with its own measured patches. `outline` is the outer corners of
+   * its four markers, top left, top right, bottom right, bottom left (what `findCard` returns,
+   * or the user's adjustment of it). `batch` holds the measured colors of its patches.
+   */
+  | { kind: "frame"; outline: Corners; batch: Batch }
   | { kind: "none" }
 
 /** The Pages of the soil book (2009 Revision) that hold the Chips the engine knows. */
@@ -52,6 +59,8 @@ export interface Reading {
   spot: XY
   raw: ChipReading
   corrected?: ChipReading // absent when the Card is 'none'
+  /** Set when the Card is the frame and the Spot is not inside its window: not the soil in the window. */
+  outsideWindow?: true
 }
 
 export type QualityWarning = {

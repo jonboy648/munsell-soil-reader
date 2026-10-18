@@ -31,6 +31,11 @@ export const BRADFORD_D50_TO_D65: Mat3 = [
   [-0.0282895, 1.0099416, 0.0210077],
   [0.0122982, -0.020483, 1.3299098],
 ]
+export const BRADFORD_D65_TO_D50: Mat3 = [
+  [1.0478112, 0.0228866, -0.050127],
+  [0.0295424, 0.9904844, -0.0170491],
+  [-0.0092345, 0.0150436, 0.7521316],
+]
 export const WHITE_D65: Vec3 = [0.95047, 1, 1.08883]
 export const WHITE_D50: Vec3 = [0.96422, 1, 0.82521]
 
@@ -58,6 +63,17 @@ export const labToXyz = (lab: Vec3, white: Vec3): Vec3 => {
 }
 
 export const linearToLab = (lin: Vec3): Vec3 => xyzToLab(mul(M_RGB_XYZ, lin))
+
+/**
+ * CIELAB under D50, the way reference colors are published, to linear sRGB (D65), Bradford-adapted.
+ * Not clamped: a color outside the sRGB gamut comes out with a channel below 0 or above 1.
+ */
+export const labD50ToLinear = (lab: Vec3): Vec3 =>
+  mul(M_XYZ_RGB, mul(BRADFORD_D50_TO_D65, labToXyz(lab, WHITE_D50)))
+
+/** The inverse of labD50ToLinear. */
+export const linearToLabD50 = (lin: Vec3): Vec3 =>
+  xyzToLab(mul(BRADFORD_D65_TO_D50, mul(M_RGB_XYZ, lin)), WHITE_D50)
 
 /** Relative luminance (white is 1) of a linear sRGB color. */
 export const luminance = (lin: Vec3): number => mul(M_RGB_XYZ, lin)[1]

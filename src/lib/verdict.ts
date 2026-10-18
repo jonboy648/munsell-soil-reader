@@ -3,6 +3,9 @@ import type { CardCheck, ChipReading, QualityWarning, Reading } from "@/engine"
 
 export type Verdict = "good" | "failed" | "uncorrected"
 
+/** Which Card the Readings are against, for the words that name it. */
+export type CardInfo = { kind: "colorchecker" } | { kind: "frame" }
+
 export interface Shown {
   verdict: Verdict
   /** The Reading to show as the answer. */
@@ -21,12 +24,14 @@ export function shownReading(
   cardCheck: CardCheck | undefined,
   cardWarnings: QualityWarning[] = [],
   offCard = false,
+  card: CardInfo = { kind: "colorchecker" },
 ): Shown {
+  const frame = card.kind === "frame"
   if (reading.corrected && cardCheck?.ok) {
     return {
       verdict: "good",
       main: reading.corrected,
-      why: `Each of the 24 Card patches, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
+      why: `Each of the ${frame ? "18 frame" : "24 Card"} patches, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
     }
   }
   if (reading.corrected && cardCheck && cardWarnings.length > 0 && !offCard) {
@@ -36,14 +41,16 @@ export function shownReading(
     return {
       verdict: "failed",
       main: reading.raw,
-      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The problem flagged below is the likely cause. Showing the uncorrected Reading. Fix it and take the Photo again.`,
+      why: `Each ${frame ? "frame" : "Card"} patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The problem flagged below is the likely cause. Showing the uncorrected Reading. Fix it and take the Photo again.`,
     }
   }
   if (reading.corrected && cardCheck) {
     return {
       verdict: "failed",
       main: reading.raw,
-      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
+      why: frame
+        ? `Each frame patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The outline was probably not on the frame, or there is glare or shade on it, or the batch's colors are off. Showing the uncorrected Reading. Tap Start over and check that each outline corner sits on the outer corner of its marker.`
+        : `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The corners were probably tapped out of order, or there is glare or shade on the Card. Showing the uncorrected Reading. Tap Start over and begin at the brown patch.`,
     }
   }
   return {

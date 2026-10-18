@@ -6,11 +6,12 @@ import type { LoadedPhoto } from "@/lib/session"
 const MAX_SIDE = 1600
 
 export function examplePhoto(example: ExamplePhoto): LoadedPhoto {
-  const { pixels } = simulatePhoto(example.scene)
+  const { pixels, frame } = simulatePhoto(example.scene)
   return {
     name: `Example: ${example.name.toLowerCase()} (simulated camera)`,
     exampleId: example.id,
     pixels: new ImageData(pixels.data, pixels.width, pixels.height),
+    ...(frame ? { batch: frame.batch } : {}),
   }
 }
 

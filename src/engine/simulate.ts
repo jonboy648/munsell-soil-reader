@@ -3,9 +3,19 @@
 // Ported from the prototype's paintExample, plus a non-linear tone curve (the prototype's
 // camera was linear, which flatters the results).
 import * as munsell from "munsell"
-import { encode, mul, type Mat3, type Vec3 } from "./color"
+import type { Batch } from "./batch"
+import { encode, linearToLabD50, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
-import { BOARD, MARKER_CELLS, MARKER_ORIGINS, MARKER_SIZE, markerCellIsWhite } from "./frameLayout"
+import {
+  FRAME_MARKERS,
+  FRAME_PATCHES,
+  FRAME_SIZE_MM,
+  MARKER_CELLS,
+  OUTLINE_MM,
+  WINDOW_MM,
+  markerCellIsWhite,
+} from "./frameLayout"
+import type { Four } from "./grid"
 import { paintGlare, paintJpeg, paintShadow, type Glare, type Shadow } from "./simulateFaults"
 import type { Corners, Pixels, XY } from "./types"
 
@@ -89,8 +99,6 @@ const FOCAL = 700
 /** By default the camera is this far from the middle of the Card, close enough for strong perspective. */
 const DISTANCE = 500
 /** The scene is turned about the middle of the Card's patch grid. */
-/** The usual-size Card's patch pitch: the printed frame is laid out in its grid steps. */
-const PITCH = cardLayout(1).pitch
 const [FIRST, LAST] = [simPatchCenter(0, 0), simPatchCenter(3, 5)]
 const PIVOT: XY = { x: (FIRST.x + LAST.x) / 2, y: (FIRST.y + LAST.y) / 2 }
 
@@ -101,7 +109,7 @@ interface View {
   toScene: (x: number, y: number, out: XY) => void
 }
 
-function tiltedView({ yaw, pitch, distance = DISTANCE }: SimTilt): View {
+function tiltedView({ yaw, pitch, distance = DISTANCE }: SimTilt, pivot: XY): View {
   const rad = Math.PI / 180
   const [sy, cy] = [Math.sin(yaw * rad), Math.cos(yaw * rad)]
   const [sp, cp] = [Math.sin(pitch * rad), Math.cos(pitch * rad)]
@@ -115,8 +123,8 @@ function tiltedView({ yaw, pitch, distance = DISTANCE }: SimTilt): View {
   const [ux, uy, vx, vy] = [across(right, 0), across(right, 1), across(down, 0), across(down, 1)]
   return {
     toPhoto: (u, v) => {
-      const a = u - PIVOT.x
-      const b = v - PIVOT.y
+      const a = u - pivot.x
+      const b = v - pivot.y
       const z = distance + a * right[2] + b * down[2]
       return {
         x: SIM_WIDTH / 2 + (FOCAL * (a * right[0] + b * down[0])) / z,
@@ -131,8 +139,8 @@ function tiltedView({ yaw, pitch, distance = DISTANCE }: SimTilt): View {
         out.x = out.y = -Infinity
         return
       }
-      out.x = PIVOT.x + (distance * (ux * rx + uy * ry)) / facing
-      out.y = PIVOT.y + (distance * (vx * rx + vy * ry)) / facing
+      out.x = pivot.x + (distance * (ux * rx + uy * ry)) / facing
+      out.y = pivot.y + (distance * (vx * rx + vy * ry)) / facing
     },
   }
 }
@@ -157,19 +165,77 @@ function shoot(camera: SimCamera, lin: Vec3): Vec3 {
   return [out[0], out[1], out[2]]
 }
 
+// ---- the frame card ----
+/** The frame card in the scene: where its top left corner is, and how many scene pixels a millimetre is. */
+const FRAME_AT = { x: 105, y: 50, scale: 5 }
+const frameScene = ({ x, y }: XY): XY => ({ x: FRAME_AT.x + x * FRAME_AT.scale, y: FRAME_AT.y + y * FRAME_AT.scale })
+const WINDOW_MIDDLE: XY = { x: (WINDOW_MM[0].x + WINDOW_MM[2].x) / 2, y: (WINDOW_MM[0].y + WINDOW_MM[2].y) / 2 }
+/** The middle of the soil in the frame card's window, in the scene (and in a straight-on Photo). */
+export const SIM_FRAME_SPOT: XY = frameScene(WINDOW_MIDDLE)
+/**
+ * How far back the camera stands from a tilted frame card (SimTilt.distance): far enough that the
+ * whole card stays in the Photo at 45 degrees to the side and 25 degrees forward or back, and
+ * near enough that the far side's markers are still big enough to read (they are not, from 1200).
+ */
+export const FRAME_DISTANCE = 1000
+
+/** A frame card in the scene, with its window full of the scene's soil. */
+export interface SimFrame {
+  /** Which of its four markers, 0 to 3, are printed, so a test can lose some. Default all four. */
+  markers?: readonly number[]
+  /**
+   * How far the batch's measured values are from the tiles' true colors: a measurement error, in
+   * CIELAB units, spread over L, a and b with alternating signs. Default 0: measured exactly.
+   */
+  batchError?: number
+}
+
+const SIM_BATCH_CODE = "SIM-1"
+
+/** The color a patch is printed as: its aim, a Munsell notation ("N9.5 white" is the neutral N 9.5/). */
+function aimLinear(aim: string): Vec3 {
+  const gray = /^N([\d.]+)/.exec(aim)
+  return munsell.munsellToLinearRgb(gray ? `N ${gray[1]}/` : aim) as Vec3
+}
+
+/**
+ * A made-up batch for the simulated frame card: every patch measured as its aim, plus
+ * `error` as above. Not a real measurement, and it says so in its method.
+ */
+export function simFrameBatch(error = 0): Batch {
+  return {
+    code: SIM_BATCH_CODE,
+    patches: FRAME_PATCHES.filter((p) => p.kind !== "reserved").map((p, i) => {
+      const lab = linearToLabD50(aimLinear(p.aim)).map((v, k) => v + ((i + k) % 2 === 0 ? error : -error))
+      return { id: p.id, lab: lab as Vec3, sd: 0.2, n: 3, method: "made up for the simulated camera", date: "2026-01-01" }
+    }),
+  }
+}
+
 export interface SimPhoto {
   pixels: Pixels & { data: Uint8ClampedArray<ArrayBuffer> }
-  /** Corner patch centers, TL, TR, BR, BL. Meaningless when the scene has no Card. */
+  /** Corner patch centers, TL, TR, BR, BL. Meaningless when the scene has no ColorChecker. */
   corners: Corners
-  /** Every ColorChecker patch's true center, row by row. Meaningless when the scene has no Card. */
+  /** Every ColorChecker patch's true center, row by row. Meaningless when the scene has no ColorChecker. */
   patches: XY[]
-  /** The middle of the soil patch. */
+  /** The middle of the soil patch (of the soil in the window, in a frame card scene). */
   spot: XY
+  /** Where the frame card really is. Present when the scene has one. */
+  frame?: {
+    /** The outer corners of its four markers, TL, TR, BR, BL: what the finder should return. */
+    outline: Corners
+    /** Its window, TL, TR, BR, BL. */
+    window: Four<XY>
+    /** The true center of each reference patch, by ID. */
+    patches: Record<string, XY>
+    /** The made-up batch that goes with it. */
+    batch: Batch
+  }
 }
 
 export interface SimScene {
   camera: SimCamera
-  /** Put a ColorChecker in the shot. Default true. */
+  /** Put a ColorChecker in the shot. Default true. Ignored when there is a frame card, which is the Card then. */
   card?: boolean
   /** The soil's true Chip, as Munsell notation. Default SIM_SOIL. */
   soil?: string
@@ -189,13 +255,8 @@ export interface SimScene {
   jpeg?: number
   /** Photograph the scene at an angle, so the Card is in perspective. Default: straight on. */
   tilt?: SimTilt
-  /**
-   * Put the printed frame around the Card: a light board with an ArUco marker in each corner
-   * (see frameLayout.ts). Default false.
-   */
-  frame?: boolean
-  /** Which of the frame's markers, 0 to 3, are printed, so a test can lose some. Default all four. */
-  frameMarkers?: readonly number[]
+  /** Put the frame card in the shot instead of the ColorChecker, with the soil in its window. */
+  frame?: SimFrame
 }
 
 export function simulatePhoto({
@@ -210,18 +271,24 @@ export function simulatePhoto({
   noise: noiseScale = 1,
   jpeg,
   tilt,
-  frame: framed = false,
-  frameMarkers = [0, 1, 2, 3],
+  frame: frameCard,
 }: SimScene): SimPhoto {
   const rand = mulberry32(seed)
   const layout = cardLayout(cardScale, frameGap)
-  const view = tilt ? tiltedView(tilt) : null // null: straight on, scene point = Photo pixel
+  const view = tilt
+    ? tiltedView(
+        { ...tilt, distance: tilt.distance ?? (frameCard ? FRAME_DISTANCE : DISTANCE) },
+        frameCard ? frameScene({ x: FRAME_SIZE_MM.width / 2, y: FRAME_SIZE_MM.height / 2 }) : PIVOT,
+      )
+    : null // null: straight on, scene point = Photo pixel
   const looksAt: XY = { x: 0, y: 0 }
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
   const frame = shoot(camera, [0.012, 0.012, 0.012])
-  const board = shoot(camera, [0.6, 0.6, 0.6])
   const patches = PATCH_LINEAR.map((lin) => shoot(camera, lin))
+  const white = shoot(camera, [0.75, 0.75, 0.75])
+  const printed = new Set(frameCard?.markers ?? [0, 1, 2, 3])
+  const tiles = FRAME_PATCHES.filter((p) => p.kind !== "reserved").map((p) => ({ patch: p, rgb: shoot(camera, aimLinear(p.aim)) }))
   const data = new Uint8ClampedArray(SIM_WIDTH * SIM_HEIGHT * 4)
   const fx0 = CARD.x - layout.frame
   const fx1 = CARD.x + 6 * layout.pitch - layout.gap + layout.frame
@@ -239,36 +306,45 @@ export function simulatePhoto({
       }
       let rgb = ground
       let noise = 12
-      if (framed) {
-        // Where in the Card's grid steps this scene point is.
-        const col = (u - FIRST.x) / PITCH
-        const row = (v - FIRST.y) / PITCH
-        if (col >= BOARD[0] && col < BOARD[1] && row >= BOARD[2] && row < BOARD[3]) {
-          rgb = board
+      if (frameCard) {
+        // Where on the card this pixel looks, in millimetres.
+        const mx = (u - FRAME_AT.x) / FRAME_AT.scale
+        const my = (v - FRAME_AT.y) / FRAME_AT.scale
+        if (mx >= 0 && mx < FRAME_SIZE_MM.width && my >= 0 && my < FRAME_SIZE_MM.height) {
+          rgb = frame // the black base
           noise = 2
-          for (const id of frameMarkers) {
-            const cellCol = Math.floor(((col - MARKER_ORIGINS[id].col) / MARKER_SIZE) * MARKER_CELLS)
-            const cellRow = Math.floor(((row - MARKER_ORIGINS[id].row) / MARKER_SIZE) * MARKER_CELLS)
-            if (cellCol >= 0 && cellRow >= 0 && cellCol < MARKER_CELLS && cellRow < MARKER_CELLS) {
-              rgb = markerCellIsWhite(id, cellRow, cellCol) ? board : frame
-            }
+          for (const marker of FRAME_MARKERS) {
+            if (!printed.has(marker.id)) continue
+            const [lx, ly] = [mx - marker.corners[0].x, my - marker.corners[0].y]
+            if (lx < -marker.quiet || ly < -marker.quiet || lx >= marker.side + marker.quiet || ly >= marker.side + marker.quiet) continue
+            const [cx, cy] = [Math.floor(lx / marker.cell), Math.floor(ly / marker.cell)]
+            const inside = cx >= 0 && cy >= 0 && cx < MARKER_CELLS && cy < MARKER_CELLS
+            rgb = !inside || markerCellIsWhite(marker.id, cy, cx) ? white : frame
+          }
+          for (const { patch, rgb: tile } of tiles) {
+            if (Math.abs(mx - patch.center.x) < patch.size / 2 && Math.abs(my - patch.center.y) < patch.size / 2) rgb = tile
+          }
+          if (mx >= WINDOW_MM[0].x && mx < WINDOW_MM[2].x && my >= WINDOW_MM[0].y && my < WINDOW_MM[2].y) {
+            rgb = soilRgb
+            noise = 5
           }
         }
-      }
-      if (card && u >= fx0 && u < fx1 && v >= fy0 && v < fy1) {
-        rgb = frame
-        noise = 2
-        const cx = u - CARD.x
-        const cy = v - CARD.y
-        const c = Math.floor(cx / layout.pitch)
-        const r = Math.floor(cy / layout.pitch)
-        if (cx >= 0 && cy >= 0 && cx % layout.pitch < layout.patch && cy % layout.pitch < layout.patch && c < 6 && r < 4) {
-          rgb = patches[r * 6 + c]
+      } else {
+        if (card && u >= fx0 && u < fx1 && v >= fy0 && v < fy1) {
+          rgb = frame
+          noise = 2
+          const cx = u - CARD.x
+          const cy = v - CARD.y
+          const c = Math.floor(cx / layout.pitch)
+          const r = Math.floor(cy / layout.pitch)
+          if (cx >= 0 && cy >= 0 && cx % layout.pitch < layout.patch && cy % layout.pitch < layout.patch && c < 6 && r < 4) {
+            rgb = patches[r * 6 + c]
+          }
         }
-      }
-      if (u >= SOIL_BOX.x && u < SOIL_BOX.x + SOIL_BOX.w && v >= SOIL_BOX.y && v < SOIL_BOX.y + SOIL_BOX.h) {
-        rgb = soilRgb
-        noise = 5
+        if (u >= SOIL_BOX.x && u < SOIL_BOX.x + SOIL_BOX.w && v >= SOIL_BOX.y && v < SOIL_BOX.y + SOIL_BOX.h) {
+          rgb = soilRgb
+          noise = 5
+        }
       }
       const i = (y * SIM_WIDTH + x) * 4
       for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise * noiseScale)
@@ -279,16 +355,27 @@ export function simulatePhoto({
   paintGlare(data, SIM_WIDTH, SIM_HEIGHT, glare)
   if (jpeg !== undefined) paintJpeg(data, SIM_WIDTH, SIM_HEIGHT, jpeg)
   const at = ({ x, y }: XY) => (view ? view.toPhoto(x, y) : { x, y })
+  const onCard = (mm: XY) => at(frameScene(mm))
   return {
     pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data },
     corners: layout.corners.map(at) as Corners,
     patches: Array.from({ length: 24 }, (_, i) => at(layout.center(Math.floor(i / 6), i % 6))),
-    spot: at(SIM_SPOT),
+    spot: at(frameCard ? SIM_FRAME_SPOT : SIM_SPOT),
+    ...(frameCard
+      ? {
+          frame: {
+            outline: OUTLINE_MM.map(onCard) as Corners,
+            window: WINDOW_MM.map(onCard) as Four<XY>,
+            patches: Object.fromEntries(tiles.map(({ patch }) => [patch.id, onCard(patch.center)])),
+            batch: simFrameBatch(frameCard.batchError),
+          },
+        }
+      : {}),
   }
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare"
+export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "frame" | "frame-angled" | "frame-hidden"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -350,5 +437,23 @@ export const EXAMPLES: ExamplePhoto[] = [
         { at: { x: SIM_SPOT.x + 25, y: SIM_SPOT.y }, radius: 50, strength: 1.5 },
       ],
     },
+  },
+  {
+    id: "frame",
+    name: "Frame as the Card",
+    note: "The printed frame is a Card of its own. The app finds its four markers, so no corners are tapped: confirm the outline, then tap the soil in the window. The frame's batch is made up for this practice Photo.",
+    scene: { camera: phone(LIGHTS.warm), frame: {} },
+  },
+  {
+    id: "frame-angled",
+    name: "Frame at an angle",
+    note: "The frame is tilted away from the camera, about 40 degrees. The outline follows it, and every patch still lands.",
+    scene: { camera: phone(LIGHTS.warm), frame: {}, tilt: ANGLED_TILT },
+  },
+  {
+    id: "frame-hidden",
+    name: "Frame with a marker hidden",
+    note: "One of the frame's four markers is not in the Photo, so the app cannot find the frame and says why.",
+    scene: { camera: phone(LIGHTS.warm), frame: { markers: [0, 1, 3] } },
   },
 ]

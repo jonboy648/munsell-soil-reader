@@ -12,7 +12,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
-import { shownReading } from "@/lib/verdict"
+import { shownReading, type CardInfo } from "@/lib/verdict"
 
 const css = (rgb: RgbTriple) => `rgb(${rgb.join(",")})`
 const fmt = (n: number) => n.toFixed(1)
@@ -50,9 +50,9 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
   )
 }
 
-function SpotReading({ result, index }: { result: ReadPhotoResult; index: number }) {
+function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: number; card: CardInfo }) {
   const reading = result.readings[index]
-  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard)
+  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   return (
     <section aria-label={`Spot ${index + 1}`} className="grid gap-3 border-t border-border py-4 first:border-t-0">
       <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -75,6 +75,15 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
         <CardCheckBadge verdict={verdict} cardCheck={result.cardCheck} />
       </div>
       <p className="text-sm text-muted-foreground">{why}</p>
+      {reading.outsideWindow && (
+        <p
+          data-testid="outside-window"
+          className="rounded-sm border border-foreground/40 border-l-4 border-l-foreground py-2 pr-3 pl-3 text-sm"
+        >
+          <b className="font-semibold">Outside the window.</b> This Spot is not on the soil in the frame's window, so it may
+          be a different soil, or in different light, from the one the frame is next to. The Reading is still corrected.
+        </p>
+      )}
       <QualityWarnings warnings={warningsFor(result.quality, index)} />
       <table className="w-full text-sm">
         <thead>
@@ -108,10 +117,10 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
   )
 }
 
-export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
+export function ReadingsPanel({ result, card = { kind: "colorchecker" } }: { result: ReadPhotoResult | null; card?: CardInfo }) {
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
-  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality), result.offCard)
+  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   return (
     <Drawer>
       <DrawerTrigger asChild>
@@ -141,7 +150,7 @@ export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
         </DrawerHeader>
         <div className="overflow-y-auto px-4 pb-6">
           {result.readings.map((_, i) => (
-            <SpotReading key={i} result={result} index={i} />
+            <SpotReading key={i} result={result} index={i} card={card} />
           ))}
         </div>
       </DrawerContent>

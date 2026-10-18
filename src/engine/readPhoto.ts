@@ -4,6 +4,8 @@ import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
 import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
 import { fitCorrection, heldOutError, type Fit, type Reference } from "./correction"
+import { UnmeasuredBatchError, batchProblem, type Batch } from "./batch"
+import { frameQuality, frameReferences, insideWindow } from "./frameCard"
 import { checkQuality, type Evenness, type QualityReference } from "./quality"
 import { medianLinear, spotRadius } from "./sampling"
 import type {
@@ -57,15 +59,29 @@ function readColor(lin: Vec3): ChipReading {
   }
 }
 
-function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
-  const references: Reference[] = patchSites(corners).map(({ center, radius }, i) => ({
-    measured: medianLinear(pixels, center, radius),
-    truth: PATCH_LINEAR[i],
-    ladder: NEUTRAL_PATCHES.includes(i),
-  }))
+/** The correction fitted to a Card's references, and the Card check it earns. */
+function fitReferences(references: Reference[], fit: Fit) {
   const meanDE = heldOutError(references, fit)
   const check: CardCheck = { meanDE, ok: meanDE < CARD_CHECK_GOOD }
   return { correct: fit(references), check }
+}
+
+function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
+  return fitReferences(
+    patchSites(corners).map(({ center, radius }, i) => ({
+      measured: medianLinear(pixels, center, radius),
+      truth: PATCH_LINEAR[i],
+      ladder: NEUTRAL_PATCHES.includes(i),
+    })),
+    fit,
+  )
+}
+
+/** The frame: its patches, read where the outline puts them, against the colors its batch measured. */
+function fitFrame(pixels: Pixels, outline: Corners, batch: Batch, fit: Fit) {
+  const problem = batchProblem(batch)
+  if (problem) throw new UnmeasuredBatchError(problem)
+  return fitReferences(frameReferences(pixels, outline, batch), fit)
 }
 
 /**
@@ -105,15 +121,26 @@ export function readPhoto({
   correction = fitCorrection,
 }: ReadPhotoInput): ReadPhotoResult {
   if (card.kind === "page") throw new UnsupportedCardError("Page")
-  const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners, correction) : null
+  const fit =
+    card.kind === "colorchecker"
+      ? fitCard(pixels, card.corners, correction)
+      : card.kind === "frame"
+        ? fitFrame(pixels, card.outline, card.batch, correction)
+        : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {
     const lin = medianLinear(pixels, spot, radius)
     const reading: Reading = { spot, raw: readColor(lin) }
     if (fit) reading.corrected = readColor(fit.correct(lin))
+    if (card.kind === "frame" && !insideWindow(card.outline, spot)) reading.outsideWindow = true
     return reading
   })
-  const cardParts = card.kind === "colorchecker" ? cardQuality(card.corners) : { references: [] }
+  const cardParts =
+    card.kind === "colorchecker"
+      ? cardQuality(card.corners)
+      : card.kind === "frame"
+        ? frameQuality(card.outline, card.batch)
+        : { references: [] }
   const { warnings: quality, offCard } = checkQuality({ pixels, spots, spotRadius: radius, ...cardParts })
   return { ...(fit ? { cardCheck: fit.check } : {}), ...(offCard ? { offCard } : {}), quality, readings }
 }

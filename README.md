@@ -51,6 +51,21 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   `src/components/ui/` is shadcn/ui.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
 - `e2e/`: the browser tests.
+- Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
+  writes the web app manifest and a service worker that precaches every built file (code,
+  styles, the bundled fonts, icons and any data files by type), so the app opens with no
+  network after the first visit. The app registers the worker itself
+  (`src/lib/serviceWorker.ts`) and says "Ready to work offline" once the first install is done.
+  A new deploy downloads in the background and an "Update ready" notice follows; the app looks
+  for one whenever it returns to the front or the network returns, and registers again if a
+  first install failed. The notices ("Ready to work offline", "Update ready") sit in the header
+  and replace the title while they show, so they are as big as the title and nothing below them,
+  the Photo included, moves or is covered; a layout test holds that. Reload clears the Photo and
+  the taps, so with a Photo loaded the notice says "Reload clears this Photo", and "Later" hides
+  it until the app next returns to the front. Reload switches only the window where it was
+  tapped. The site is served at the root of
+  soil.joncackler.com, so the base is `/`. The icons in `public/` are drawn by
+  `node scripts/make-icons.mjs` and committed.
 
 The Card's patches are found from the four corner taps with a homography (a perspective
 transform, `src/engine/grid.ts`), so a Card photographed at an angle still lands on every patch,
@@ -83,6 +98,11 @@ Two seams, and nothing else:
   tilt, then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
 - **Browser** (`e2e/*.spec.ts`): the production build at a phone viewport. It picks an example,
   taps corners and Spots by coordinates and reads the text on screen.
+  `e2e/offline.spec.ts` covers install and offline: the manifest, Chromium's installability
+  check, a Reading with the network off, and the notices for the first install and for each kind
+  of new deploy (served through a small proxy that publishes new versions of the app). The
+  browser tests run with service workers blocked (`playwright.config.ts`), so other specs never
+  see these notices; the offline spec turns them back on.
 
 The browser tests run on three engines, one Playwright project each (`playwright.config.ts`):
 
@@ -122,6 +142,13 @@ tap itself (see `tapPhoto` in `e2e/angled.spec.ts`) and allow for half a CSS pix
 The examples use a simulated camera, so real Photos will do worse: phones add tone curves, HDR
 and local processing that no per-channel curve and 3x3 correction can undo. A Card in the shot, in the same light as
 the soil, is needed for a corrected Reading.
+
+Offline on iPhone and iPad: an app added to the Home Screen has its own storage, separate from
+Safari's, so it does not get the offline copy Safari already downloaded. After Add to Home
+Screen, open the icon once with signal; after that it works with no signal. In a Safari tab (not
+the Home Screen app), Safari can delete the offline copy after seven days of Safari use without
+opening this site; opening it with signal brings it back. The Home Screen app is not affected.
+The app shows a hint about the first limit on iOS, outside the installed app.
 
 The first version of this page lives on the `prototype/logic` branch.
 

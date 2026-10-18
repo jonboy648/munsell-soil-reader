@@ -1,11 +1,47 @@
 import { resolve } from "node:path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
+import { VitePWA } from "vite-plugin-pwa"
 import { defineConfig } from "vitest/config"
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  // The site is served at the root of soil.joncackler.com, so assets, the manifest scope and the
+  // service worker scope are all "/".
+  base: "/",
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      // A new service worker waits until the user taps Reload (see src/components/UpdateNotice.tsx), so a Reading in
+      // progress is never swapped out from under them.
+      registerType: "prompt",
+      // The app registers the worker itself (src/lib/serviceWorker.ts).
+      injectRegister: false,
+      manifest: {
+        id: "/",
+        name: "Munsell Soil Reader",
+        short_name: "Munsell Soil Reader",
+        description: "Read the Munsell soil color of a Sample in a Photo, corrected against a Card.",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        // The light theme's background gray (--background). Gray only, like the interface.
+        theme_color: "#ebebeb",
+        background_color: "#ebebeb",
+        icons: [
+          { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      },
+      workbox: {
+        // Everything the app needs, matched by type so data files and example Photos added
+        // later are cached without touching this list. Fonts are the bundled woff2 files.
+        globPatterns: ["**/*.{html,js,css,woff2,png,svg,jpg,jpeg,webp,json,csv,webmanifest}"],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       "@": resolve(import.meta.dirname, "./src"),

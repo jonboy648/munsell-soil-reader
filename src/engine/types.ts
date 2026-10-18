@@ -66,6 +66,6 @@ export interface ReadPhotoInput {
 
 export interface ReadPhotoResult {
   cardCheck?: CardCheck // absent when the Card is 'none'
-  quality: QualityWarning[] // empty until the quality checks land
+  quality: QualityWarning[] // problems with the Photo; empty when it is good
   readings: Reading[]
 }

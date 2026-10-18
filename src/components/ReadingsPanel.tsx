@@ -3,6 +3,7 @@
 import { ChevronUp } from "lucide-react"
 import type { ChipReading, ReadPhotoResult, RgbTriple } from "@/engine"
 import { CardCheckBadge } from "@/components/CardCheckBadge"
+import { QualityFlag, QualityWarnings, warningsFor } from "@/components/QualityWarnings"
 import {
   Drawer,
   DrawerContent,
@@ -74,6 +75,7 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
         <CardCheckBadge verdict={verdict} cardCheck={result.cardCheck} />
       </div>
       <p className="text-sm text-muted-foreground">{why}</p>
+      <QualityWarnings warnings={warningsFor(result.quality, index)} />
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
@@ -122,6 +124,7 @@ export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
             <span data-testid="reading-notation" className="block font-mono text-3xl leading-tight font-semibold tracking-tight">
               {main.chip.notation}
             </span>
+            <QualityFlag warnings={warningsFor(result.quality, last)} />
           </span>
           <CardCheckBadge verdict={verdict} />
           <ChevronUp className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />

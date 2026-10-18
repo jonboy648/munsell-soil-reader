@@ -5,6 +5,7 @@
 import * as munsell from "munsell"
 import { encode, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
+import { paintGlare, paintShadow, type Glare, type Shadow } from "./simulateFaults"
 import type { Corners, Pixels, XY } from "./types"
 
 /** What the camera does to the light before and after the sensor. */
@@ -47,15 +48,23 @@ export const SIM_WIDTH = 960
 export const SIM_HEIGHT = 600
 const CARD = { x: 60, y: 120, patch: 62, gap: 12 }
 const SOIL_BOX = { x: 650, y: 150, w: 240, h: 240 }
-const PITCH = CARD.patch + CARD.gap
 
-const patchCenter = (r: number, c: number): XY => ({
-  x: CARD.x + c * PITCH + CARD.patch / 2,
-  y: CARD.y + r * PITCH + CARD.patch / 2,
-})
+/** The Card's layout at a size: its top left corner stays put, patches and gaps scale. */
+function cardLayout(scale: number) {
+  const patch = CARD.patch * scale
+  const gap = CARD.gap * scale
+  const pitch = patch + gap
+  const center = (r: number, c: number): XY => ({
+    x: CARD.x + c * pitch + patch / 2,
+    y: CARD.y + r * pitch + patch / 2,
+  })
+  return { patch, gap, pitch, center, frame: 16 * scale, corners: [center(0, 0), center(0, 5), center(3, 5), center(3, 0)] as Corners }
+}
 
 /** The Card's corner patch centers in the order the user taps them: TL, TR, BR, BL. */
-export const SIM_CORNERS: Corners = [patchCenter(0, 0), patchCenter(0, 5), patchCenter(3, 5), patchCenter(3, 0)]
+export const SIM_CORNERS: Corners = cardLayout(1).corners
+/** The middle of one patch of the usual-size Card, by row (0 to 3) and column (0 to 5). */
+export const simPatchCenter = (row: number, column: number): XY => cardLayout(1).center(row, column)
 /** The middle of the soil patch. */
 export const SIM_SPOT: XY = { x: SOIL_BOX.x + SOIL_BOX.w / 2, y: SOIL_BOX.y + SOIL_BOX.h / 2 }
 /** The Chip the simulated soil really is. */
@@ -97,19 +106,34 @@ export interface SimScene {
   soil?: string
   /** Noise seed. Default 7. */
   seed?: number
+  /** How big the Card is, 1 being the usual size. Its top left corner stays put. */
+  cardScale?: number
+  /** Reflections painted over the finished Photo. */
+  glare?: Glare[]
+  /** A shadow edge painted over the finished Photo. */
+  shadow?: Shadow
 }
 
-export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7 }: SimScene): SimPhoto {
+export function simulatePhoto({
+  camera,
+  card = true,
+  soil = SIM_SOIL,
+  seed = 7,
+  cardScale = 1,
+  glare = [],
+  shadow,
+}: SimScene): SimPhoto {
   const rand = mulberry32(seed)
+  const layout = cardLayout(cardScale)
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
   const frame = shoot(camera, [0.012, 0.012, 0.012])
   const patches = PATCH_LINEAR.map((lin) => shoot(camera, lin))
   const data = new Uint8ClampedArray(SIM_WIDTH * SIM_HEIGHT * 4)
-  const fx0 = CARD.x - 16
-  const fx1 = CARD.x + 6 * PITCH - CARD.gap + 16
-  const fy0 = CARD.y - 16
-  const fy1 = CARD.y + 4 * PITCH - CARD.gap + 16
+  const fx0 = CARD.x - layout.frame
+  const fx1 = CARD.x + 6 * layout.pitch - layout.gap + layout.frame
+  const fy0 = CARD.y - layout.frame
+  const fy1 = CARD.y + 4 * layout.pitch - layout.gap + layout.frame
   for (let y = 0; y < SIM_HEIGHT; y++) {
     for (let x = 0; x < SIM_WIDTH; x++) {
       let rgb = ground
@@ -119,9 +143,9 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7 }
         noise = 2
         const cx = x - CARD.x
         const cy = y - CARD.y
-        const c = Math.floor(cx / PITCH)
-        const r = Math.floor(cy / PITCH)
-        if (cx >= 0 && cy >= 0 && cx % PITCH < CARD.patch && cy % PITCH < CARD.patch && c < 6 && r < 4) {
+        const c = Math.floor(cx / layout.pitch)
+        const r = Math.floor(cy / layout.pitch)
+        if (cx >= 0 && cy >= 0 && cx % layout.pitch < layout.patch && cy % layout.pitch < layout.patch && c < 6 && r < 4) {
           rgb = patches[r * 6 + c]
         }
       }
@@ -134,11 +158,13 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7 }
       data[i + 3] = 255
     }
   }
-  return { pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data }, corners: SIM_CORNERS, spot: SIM_SPOT }
+  if (shadow) paintShadow(data, SIM_WIDTH, SIM_HEIGHT, shadow)
+  paintGlare(data, SIM_WIDTH, SIM_HEIGHT, glare)
+  return { pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data }, corners: layout.corners, spot: SIM_SPOT }
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard"
+export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "glare"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -179,5 +205,17 @@ export const EXAMPLES: ExamplePhoto[] = [
     name: "No Card in the shot",
     note: "Nothing to correct against, so the Reading is off.",
     scene: { camera: phone(LIGHTS.warm), card: false },
+  },
+  {
+    id: "glare",
+    name: "Glare on the Card and the soil",
+    note: "Bright reflections fall on one Card patch and on the soil. Each is flagged where it is, with what to do.",
+    scene: {
+      camera: phone(LIGHTS.warm),
+      glare: [
+        { at: simPatchCenter(1, 4), radius: 34, strength: 1.5 },
+        { at: { x: SIM_SPOT.x + 25, y: SIM_SPOT.y }, radius: 50, strength: 1.5 },
+      ],
+    },
   },
 ]

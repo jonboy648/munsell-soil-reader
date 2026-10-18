@@ -1,9 +1,10 @@
 // readPhoto: Photo + Card + Spots in, Readings out. The engine's one main call.
 import * as munsell from "munsell"
-import { linearToLab, linearToRgb255, type Vec3 } from "./color"
+import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { patchCenters } from "./colorchecker"
+import { NEUTRAL_PATCHES, PATCH_LINEAR, patchCenters } from "./colorchecker"
 import { cardFitError, fitCardCorrection } from "./correction"
+import { OFF_CARD_DE, checkQuality, type QualityReference } from "./quality"
 import { medianLinear, patchRadius, spotRadius } from "./sampling"
 import type {
   CardCheck,
@@ -65,6 +66,17 @@ function fitCard(pixels: Pixels, corners: Corners) {
   return { correct, check }
 }
 
+/** The ColorChecker's patches as quality references; the grays are the tonal ladder. */
+function cardReferences(corners: Corners): QualityReference[] {
+  const radius = patchRadius(corners)
+  return patchCenters(corners).map((at, i) => ({
+    at,
+    radius,
+    y: luminance(PATCH_LINEAR[i]),
+    neutral: NEUTRAL_PATCHES.includes(i),
+  }))
+}
+
 export function readPhoto({ pixels, card, spots }: ReadPhotoInput): ReadPhotoResult {
   if (card.kind === "page") throw new UnsupportedCardError("Page")
   const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners) : null
@@ -75,5 +87,8 @@ export function readPhoto({ pixels, card, spots }: ReadPhotoInput): ReadPhotoRes
     if (fit) reading.corrected = readColor(fit.correct(lin))
     return reading
   })
-  return { ...(fit ? { cardCheck: fit.check } : {}), quality: [], readings }
+  const onCard = card.kind === "colorchecker" && fit !== null && fit.check.meanDE < OFF_CARD_DE
+  const references = onCard ? cardReferences(card.corners) : []
+  const quality = checkQuality({ pixels, spots, spotRadius: radius, references })
+  return { ...(fit ? { cardCheck: fit.check } : {}), quality, readings }
 }

@@ -17,14 +17,18 @@ const fmt = (n: number) => n.toFixed(1)
 /**
  * The corrected Reading when the Card check is good, and when it is caution (with the raw
  * Reading beside it). Otherwise the raw Reading, flagged: a failed correction must never be
- * shown as the answer. A failure is only blamed on the corner order when nothing else
- * explains it: not a Card quality warning, and not a dirty gray step.
+ * shown as the answer.
  */
 export function shownReading(
   reading: Reading,
   cardCheck: CardCheck | undefined,
-  quality: QualityWarning[] = [],
+  cardWarnings: QualityWarning[] = [],
+  offCard = false,
 ): Shown {
+  // A problem with the Card is flagged, and it explains a caution or a failure better than a
+  // guess, unless the grays say the corners are off the Card: then the warnings were read from
+  // the wrong places, and the corner order is the likelier cause.
+  const flagged = cardWarnings.length > 0 && !offCard
   if (reading.corrected && cardCheck?.verdict === "good") {
     return {
       verdict: "good",
@@ -34,21 +38,29 @@ export function shownReading(
   }
   if (reading.corrected && cardCheck?.verdict === "caution") {
     const dirty = cardCheck.dirtyGrays?.[0]
+    const cause = dirty
+      ? `The ${dirty} gray step looks dirty or tinted, so it was left out of the correction.`
+      : flagged
+        ? `Each Card patch, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, more than usual. The problem flagged below is the likely cause.`
+        : `Each Card patch, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, more than usual. Uneven light across the Card or a dirty gray step can do that.`
     return {
       verdict: "caution",
       main: reading.corrected,
       beside: reading.raw,
-      why: dirty
-        ? `The ${dirty} gray step looks dirty or tinted, so it was left out of the correction. The corrected Reading is shown with the raw one beside it. Wipe the Card or try another.`
-        : `Each Card patch, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, more than usual. Uneven light across the Card or a dirty gray step can do that. The corrected Reading is shown with the raw one beside it; if they differ by a Chip or more, retake in even light.`,
+      why: `${cause} The corrected Reading is shown with the raw one beside it; if they differ by a Chip or more, wipe the Card or retake in even light.`,
+    }
+  }
+  if (reading.corrected && cardCheck && flagged) {
+    return {
+      verdict: "failed",
+      main: reading.raw,
+      why: `Each Card patch, corrected by a fit that left it out, is still off by ${fmt(cardCheck.meanDE)} on average. The problem flagged below is the likely cause. Showing the uncorrected Reading. Fix it and take the Photo again.`,
     }
   }
   if (reading.corrected && cardCheck) {
-    const cardWarnings = quality.filter((w) => w.where === "card")
     const grays = cardCheck.dirtyGrays
-    const cause = cardWarnings.length
-      ? cardWarnings.map((w) => w.advice).join(" ")
-      : grays && grays.length > 1
+    const cause =
+      grays && grays.length > 1
         ? `More than one gray step looks dirty or tinted (${grays.join(", ")}). Wipe the Card or try another.`
         : "The corners were probably tapped out of order, or there is glare or shade on the Card. Tap Start over and begin at the brown patch."
     return {

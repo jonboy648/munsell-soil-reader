@@ -3,12 +3,14 @@
 // docs/correction-comparison.md comes from the cases below.
 import * as munsell from "munsell"
 import { beforeAll, describe, expect, it } from "vitest"
-import { CARD_CHECK_GOOD, deltaE2000, patchCenters, readPhoto } from "./index"
+import { CARD_CHECK_GOOD, deltaE2000, patchSites, readPhoto } from "./index"
 import type { Corners } from "./index"
 import { linearToLab, rgb255ToLinear, type Vec3 } from "./color"
 import { fitMatrix, linearizeThen, pchip, type Fit } from "./correction"
 import { fitRootPolynomial, piecewiseLinear } from "./correctionCandidates.testkit"
 import { LIGHTS, SIM_CORNERS, SIM_SOIL, SIM_SPOT, simulatePhoto, type SimCamera, type SimPhoto } from "./simulate"
+
+const patchCenters = (corners: Corners) => patchSites(corners).map((site) => site.center)
 
 // ---- how far a Reading is from the truth: the same judge as engine.test.ts ----
 const PAGES = ["10R", "2.5YR", "5YR", "7.5YR", "10YR", "2.5Y", "5Y"]

@@ -451,6 +451,44 @@ TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF TH
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## js-aruco2 (MIT)
+
+The frame finder (`src/engine/frame.ts`) reads ArUco markers with
+[js-aruco2](https://github.com/damianofalcioni/js-aruco2) 2.0.0 by Damiano Falcioni, a fork of
+[js-aruco](https://github.com/jcmellado/js-aruco) by Juan Mellado, which is a port of the
+[ArUco](https://www.uco.es/investiga/grupos/ava/portfolio/aruco/) library. It is used unmodified
+as a dependency (see `package.json`). The finder is hidden: nothing in the app imports it, so
+js-aruco2 is not in the built app until the finder is wired in. The two files it uses,
+`aruco.js` and `cv.js`, draw on ArUco (BSD), OpenCV (3-clause BSD) and Stack Blur by Mario
+Klingemann (MIT); the package's `LICENSE.txt`, in `node_modules/js-aruco2` after `npm install`,
+holds those notices. The package also has pose-estimation files (`posit1.js`, `posit2.js`,
+`svd.js`), and its `LICENSE.txt` carries an LGPL-3 notice for AForge.NET, which that pose code
+references. The finder does not use those files and the app does not ship them. The js-aruco2
+license, as shipped:
+
+```text
+Copyright (c) 2020 Damiano Falcioni
+Copyright (c) 2011 Juan Mellado
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ## Other dependencies
 
 These ship in the built app or build it. Each is used unmodified under its own license; the
@@ -464,3 +502,4 @@ license text travels with the package in `node_modules`.
 | Tailwind CSS, `tw-animate-css` | MIT |
 | lucide-react | ISC |
 | Archivo, Public Sans, IBM Plex Mono (via `@fontsource`) | SIL Open Font License 1.1 |
+| vite-plugin-pwa, Workbox (the service worker) | MIT |

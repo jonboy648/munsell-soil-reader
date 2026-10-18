@@ -3,6 +3,7 @@
 import { ChevronUp } from "lucide-react"
 import type { ChipReading, ReadPhotoResult, RgbTriple } from "@/engine"
 import { CardCheckBadge } from "@/components/CardCheckBadge"
+import { QualityFlag, QualityWarnings, cardWarnings, warningsFor } from "@/components/QualityWarnings"
 import {
   Drawer,
   DrawerContent,
@@ -51,7 +52,7 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
 
 function SpotReading({ result, index }: { result: ReadPhotoResult; index: number }) {
   const reading = result.readings[index]
-  const { verdict, main, beside, why } = shownReading(reading, result.cardCheck, result.quality)
+  const { verdict, main, beside, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard)
   const corrected = verdict === "good" || verdict === "caution"
   return (
     <section aria-label={`Spot ${index + 1}`} className="grid gap-3 border-t border-border py-4 first:border-t-0">
@@ -76,6 +77,7 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
         <CardCheckBadge verdict={verdict} cardCheck={result.cardCheck} />
       </div>
       <p className="text-sm text-muted-foreground">{why}</p>
+      <QualityWarnings warnings={warningsFor(result.quality, index)} />
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
@@ -111,7 +113,7 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
 export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
-  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, result.quality)
+  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality), result.offCard)
   return (
     <Drawer>
       <DrawerTrigger asChild>
@@ -125,6 +127,7 @@ export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
             <span data-testid="reading-notation" className="block font-mono text-3xl leading-tight font-semibold tracking-tight">
               {main.chip.notation}
             </span>
+            <QualityFlag warnings={warningsFor(result.quality, last)} />
           </span>
           <CardCheckBadge verdict={verdict} />
           <ChevronUp className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />

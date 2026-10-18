@@ -7,7 +7,8 @@ import {
   mul,
   type Vec3,
 } from "./color"
-import type { Corners, XY } from "./types"
+import { gridMap, gridSites, type Four, type GridPoint, type Site } from "./grid"
+import type { Corners } from "./types"
 
 export const PATCH_NAMES = [
   "dark skin", "light skin", "blue sky", "foliage", "blue flower", "bluish green",
@@ -40,21 +41,47 @@ export const NEUTRAL_PATCHES = [18, 19, 20, 21, 22, 23]
 export const PATCH_COLUMNS = 6
 export const PATCH_ROWS = 4
 
+/** Grid positions of the four patches the user taps: dark skin, bluish green, black, white. */
+export const TAPPED_PATCHES: Four<GridPoint> = [
+  { col: 0, row: 0 },
+  { col: PATCH_COLUMNS - 1, row: 0 },
+  { col: PATCH_COLUMNS - 1, row: PATCH_ROWS - 1 },
+  { col: 0, row: PATCH_ROWS - 1 },
+]
+
+const ALL_PATCHES: GridPoint[] = Array.from({ length: PATCH_ROWS * PATCH_COLUMNS }, (_, i) => ({
+  col: i % PATCH_COLUMNS,
+  row: Math.floor(i / PATCH_COLUMNS),
+}))
+
 /**
- * Patch centers (row by row) from the four corner patch centers the user tapped, in this
- * order: top left (dark skin), top right (bluish green), bottom right (black), bottom left
- * (white). Bilinear between the corners.
+ * Where to read each patch (row by row), from the four corner patch centers the user
+ * tapped, in this order: top left (dark skin), top right (bluish green), bottom right
+ * (black), bottom left (white). A homography, so an angled Card still lands on every patch.
  */
-export function patchCenters([tl, tr, br, bl]: Corners): XY[] {
-  const out: XY[] = []
-  for (let r = 0; r < PATCH_ROWS; r++) {
-    for (let c = 0; c < PATCH_COLUMNS; c++) {
-      const u = c / (PATCH_COLUMNS - 1)
-      const v = r / (PATCH_ROWS - 1)
-      const at = (k: "x" | "y") =>
-        (1 - u) * (1 - v) * tl[k] + u * (1 - v) * tr[k] + u * v * br[k] + (1 - u) * v * bl[k]
-      out.push({ x: at("x"), y: at("y") })
+export const patchSites = (corners: Corners): Site[] =>
+  gridSites(TAPPED_PATCHES, corners, ALL_PATCHES)
+
+/** Share of the diagonal between two patches that the frame read circle takes as its radius. */
+const FRAME_READ_FRACTION = 0.25
+
+/**
+ * Where to read the Card's black frame: the places where four patches meet, 15 of them. Each
+ * circle is a quarter of the way across the diagonal between the patches around it, so it holds
+ * plenty of frame whichever way the Card is turned, and a tap a few pixels off does not move it
+ * off the frame. The radius follows the perspective like the patches' does.
+ */
+export function frameSites(corners: Corners): Site[] {
+  const map = gridMap(TAPPED_PATCHES, corners)
+  const sites: Site[] = []
+  for (let row = 0; row < PATCH_ROWS - 1; row++) {
+    for (let col = 0; col < PATCH_COLUMNS - 1; col++) {
+      const [a, b] = [map({ col, row }), map({ col: col + 1, row: row + 1 })]
+      sites.push({
+        center: map({ col: col + 0.5, row: row + 0.5 }),
+        radius: FRAME_READ_FRACTION * Math.hypot(a.x - b.x, a.y - b.y),
+      })
     }
   }
-  return out
+  return sites
 }

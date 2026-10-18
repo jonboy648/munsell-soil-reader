@@ -191,7 +191,7 @@ describe("what does not fit the form", () => {
     expect(printed(form, "redoxColor")[10]).toBe("")
     expect(form.fields[fieldId(9, "remarks")]).toBe("continued: 2 more layers")
     expect(form.warnings.map((w) => w.kind)).toEqual(["too-many-rows"])
-    expect(soilFields(form)).toHaveLength(11 * PROFILE_COLUMNS.length + 1)
+    expect(Object.keys(form.fields).filter((id) => id.startsWith("soil.profile."))).toHaveLength(11 * PROFILE_COLUMNS.length)
   })
 
   test("the note keeps its place when the last printed row already has remarks", () => {

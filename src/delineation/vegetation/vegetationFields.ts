@@ -11,7 +11,7 @@
 import { regionOf } from "../regions"
 import type { VegColumn } from "../regions/types"
 import { vegetationOf, type Project, type SamplingPoint } from "../model"
-import { printable, wrap } from "../text"
+import { printable, wrap, written } from "../text"
 import { hydrophyticVegetation, VEG_INDICATORS, type HydrophyticVegetation, type VegContext, type VegIndicatorId } from "./hydrophytic"
 import { STATUSES, type Status } from "./status"
 import { STRATA, STRATUM_LABEL, SUGGESTED_PLOT, type Stratum } from "./strata"
@@ -40,9 +40,6 @@ export interface VegWarning {
   kind: "veg-overflow" | "veg-not-identified" | "veg-genus" | "veg-left-out" | "veg-remarks-cut" | "veg-dominant-identity" | "veg-prevalence-invalid" | "text-changed"
   text: string
 }
-
-/** A number as it is written on a form: 20, 2.5, not 20.0. */
-const written = (n: number): string => String(Math.round(n * 100) / 100)
 
 /** How many plants of a stratum the form holds: the Vegetation page and the Continued page. */
 export const strataCapacity = (project: Project, stratum: Stratum): number => regionOf(project.region).vegetation.strata[stratum].rowRules.length * 2

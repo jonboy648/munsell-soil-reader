@@ -47,6 +47,31 @@ export function DecidesSection() {
           regulatory question by itself.
         </p>
       </NotYet>
+
+      <Sub>Vegetation</Sub>
+      <div data-testid="vegetation-notes" className="grid gap-2">
+        <p>
+          Plants are typed by common name, scientific name or abbreviation and looked up on the 2022
+          National Wetland Plant List for the region (with USDA PLANTS names). The list is bundled,
+          so the lookup works with no network. A name is added by itself only when exactly one plant
+          matches; anything else shows the candidates and you pick.
+        </p>
+        <p>
+          The status is the region&apos;s rating. The 2022 list has no NI or NO ratings. The
+          supplement says to use the nearest adjacent region&apos;s rating for a plant the region
+          does not rate, and the app does that: it tries the Midwest, then the Eastern Mountains and
+          Piedmont, then the Atlantic and Gulf Coastal Plain, then the Great Plains. The supplement
+          does not name the order, so the order is an assumption, and it matters only when two
+          neighbours rate the plant differently. A plant on no list is recorded as UPL, as the
+          supplement says to assume, and marked not identified when the app cannot place it in a
+          genus.
+        </p>
+        <p>
+          Not yet: the dominance test and the prevalence index, and the two Northcentral and
+          Northeast subregion exceptions (quaking aspen and red raspberry, which are rated
+          differently in the Northcentral Great Lakes).
+        </p>
+      </div>
     </Section>
   )
 }

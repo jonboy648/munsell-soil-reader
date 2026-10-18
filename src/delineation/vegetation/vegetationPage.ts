@@ -3,9 +3,11 @@
 import type { Form } from "../formFor"
 import type { Project } from "../model"
 import { regionOf } from "../regions"
-import { VEG_COLUMNS } from "../regions/types"
-import type { Placement } from "../soilPage"
+import { VEG_COLUMNS, type Box } from "../regions/types"
+import { tickPlacement, type Placement } from "../soilPage"
 import { fit } from "../text"
+import { VEG_INDICATORS } from "./hydrophytic"
+import { STATUSES } from "./status"
 import { STRATA } from "./strata"
 import { remarkLines, vegFieldId } from "./vegetationFields"
 
@@ -59,6 +61,29 @@ export function vegetationPlacements(project: Project, form: Form): VegetationPl
   lines.slice(0, room).forEach((text, i) => {
     if (text) firstPage.push({ id: `veg.remarks.${i}`, text, x: page.remarks.left, baseline: page.remarks.firstBaseline + i * page.remarks.leading, size: page.fontSize, maxWidth })
   })
+
+  // The worksheets, the indicators' ticks and the answer are on the Vegetation page only.
+  const { worksheets } = page
+  const worksheet = (id: keyof Form["fields"], box: Box) => {
+    const text = field(id)
+    if (text) firstPage.push(onRule(id, text, box.x, box.rule))
+  }
+  worksheet("veg.dominance.a", worksheets.dominance.a)
+  worksheet("veg.dominance.b", worksheets.dominance.b)
+  worksheet("veg.dominance.percent", worksheets.dominance.percent)
+  for (const status of STATUSES) {
+    worksheet(`veg.prevalence.${status}.cover`, worksheets.prevalence.rows[status].cover)
+    worksheet(`veg.prevalence.${status}.product`, worksheets.prevalence.rows[status].product)
+  }
+  worksheet("veg.prevalence.total.a", worksheets.prevalence.totals.a)
+  worksheet("veg.prevalence.total.b", worksheets.prevalence.totals.b)
+  worksheet("veg.prevalence.index", worksheets.prevalence.index)
+  const tick = (id: keyof Form["fields"], box: Box) => {
+    if (field(id)) firstPage.push(tickPlacement(id, box, worksheets.tick.size, worksheets.tick.aboveRule))
+  }
+  for (const id of VEG_INDICATORS) tick(`veg.indicator.${id}`, worksheets.indicators[id])
+  tick("veg.present.yes", worksheets.present.yes)
+  tick("veg.present.no", worksheets.present.no)
 
   const needsContinued = continued.length > 0
   return {

@@ -32,13 +32,14 @@ const jf1 = () => withPlants(JF1_PLANTS_TYPED.map(([name, cover]) => plant(name,
 describe("JF-1's herb stratum on the form", () => {
   const form = formFor(JF1_PROJECT, jf1())
 
-  test("each plant is a row of the herb stratum: scientific name, cover, status; the dominant column is left for the arithmetic", () => {
+  test("each plant is a row of the herb stratum: scientific name, cover, whether it is dominant, status", () => {
     const row = (n: number) => (["name", "cover", "dominant", "status"] as const).map((c) => form.fields[`veg.herb.${n}.${c}`])
-    expect(row(0)).toEqual(["Panicum dichotomiflorum", "50", "", "FACW"])
-    expect(row(1)).toEqual(["Setaria pumila", "10", "", "FAC"])
-    expect(row(2)).toEqual(["Phalaris arundinacea", "3", "", "FACW"])
-    expect(row(6)).toEqual(["Sonchus spp.", "2", "", "FACU"])
-    expect(row(8)).toEqual(["Stiff greenthread", "1", "", "UPL"])
+    // Fall panicgrass is 50 of 85, over the 42.5 line; nothing else reaches 17.
+    expect(row(0)).toEqual(["Panicum dichotomiflorum", "50", "Yes", "FACW"])
+    expect(row(1)).toEqual(["Setaria pumila", "10", "No", "FAC"])
+    expect(row(2)).toEqual(["Phalaris arundinacea", "3", "No", "FACW"])
+    expect(row(6)).toEqual(["Sonchus spp.", "2", "No", "FACU"])
+    expect(row(8)).toEqual(["Stiff greenthread", "1", "No", "UPL"])
     expect(row(9)).toEqual(["", "", "", ""])
   })
 
@@ -187,7 +188,9 @@ describe("the Vegetation PDF", () => {
   })
 
   test("nine plants are one page; more than a stratum's rows are two", async () => {
-    expect(await pageCount(await vegetationPdf(blank, JF1_PROJECT, point, form))).toBe(1)
+    // JF-1's indicators confirmed, so no cover note follows the page (see hydrophytic.test.ts and the cover note tests).
+    const confirmed = withVegetation(point, (v) => ({ ...v, indicators: { rapid: { state: "confirmed" }, dominance: { state: "confirmed" } } }))
+    expect(await pageCount(await vegetationPdf(blank, JF1_PROJECT, confirmed, formFor(JF1_PROJECT, confirmed)))).toBe(1)
     const many = withPlants(Array.from({ length: 14 }, (_, i) => plant("Carex nonexistentus", 2, "herb", `h${i}`)))
     const bytes = await vegetationPdf(blank, JF1_PROJECT, many, formFor(JF1_PROJECT, many))
     expect(await pageCount(bytes)).toBe(2)

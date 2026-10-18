@@ -12,10 +12,11 @@
 // unconfirmed go on the cover note.
 import { regionOf } from "./regions"
 import { PROFILE_COLUMNS, type ProfileColumn, type SoilPage } from "./regions/types"
-import { hydrologyFor } from "./hydrology"
+import { hydrologyFor, suggestWetlandHydrology } from "./hydrology"
 import { printable, truncate, widthOf, wrap, written } from "./text"
 import { topToBottom, type LayerColor, type Project, type SamplingPoint } from "./model"
 import { indicatorLabel, suggest, type Suggestions } from "./rules/suggest"
+import type { HydrophyticVegetation, VegIndicator } from "./vegetation/hydrophytic"
 import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
 export type FieldId =
@@ -75,6 +76,21 @@ export interface HydricSoil {
   cover: CoverNote
 }
 
+/** The cover note's part for the Vegetation page: what is not on the page, and why. */
+export interface VegetationCover {
+  /** Indicators the app found satisfied that the user has not confirmed: they print blank. */
+  unconfirmed: VegIndicator[]
+  /** Indicators the user ticked that the arithmetic does not satisfy (morphological adaptations, problematic vegetation), with their remarks. */
+  ticked: VegIndicator[]
+  /** Why the prevalence index was applied where the supplement's order would not apply it. Empty when it was not. */
+  prevalenceReason: string
+}
+
+/** What the Vegetation page's worksheets and indicators say for one sampling point. */
+export interface VegetationForm extends HydrophyticVegetation {
+  cover: VegetationCover
+}
+
 export interface Form {
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
@@ -84,6 +100,8 @@ export interface Form {
   conclusions: readonly Conclusion[]
   /** The hydric soil indicators of the Soil page: what the layers satisfy, and what the user decided. */
   hydric: HydricSoil
+  /** The Vegetation page's dominance test, prevalence index and hydrophytic vegetation indicators. */
+  vegetation: VegetationForm
   warnings: FormWarning[]
 }
 
@@ -201,7 +219,10 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     warnings.push({ kind: "too-many-rows", text: "A layer has more redox colors than the form has rows. The rest are left off the page." })
   }
 
-  const vegetation = vegetationFields(project, point, name.text)
+  // Whether the sampling point has the hydric soil and wetland hydrology indicators that the prevalence index assumes.
+  const hydricSoil = region.indicators.some((i) => i.id !== "other" && point.indicators?.[i.id]?.state === "confirmed")
+  const hydrologyMet = suggestWetlandHydrology(region, point.hydrology?.ticked ?? []).answer
+  const vegetation = vegetationFields(project, point, name.text, { hydricSoil, hydrology: hydrologyMet })
   const fields = { ...vegetation.fields, "soil.samplingPoint": name.text } as Record<FieldId, string>
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
@@ -247,6 +268,14 @@ export function formFor(project: Project, point: SamplingPoint): Form {
       : [],
     conclusions: typeof present === "boolean" ? [{ id: "hydrology.present", answer: present }] : [],
     hydric,
+    vegetation: {
+      ...vegetation.analysis,
+      cover: {
+        unconfirmed: vegetation.analysis.indicators.filter((i) => i.state === "satisfied" && i.decision === "pending"),
+        ticked: vegetation.analysis.indicators.filter((i) => i.decision === "confirmed" && i.state !== "satisfied"),
+        prevalenceReason: (point.vegetation?.prevalenceReason ?? "").trim(),
+      },
+    },
     warnings,
   }
 }

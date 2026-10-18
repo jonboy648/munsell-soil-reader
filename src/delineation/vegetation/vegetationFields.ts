@@ -3,13 +3,17 @@
 //
 // Rows are counted over the whole stratum, not the page: row 0 is the first plant of the stratum, and
 // the Vegetation page takes as many rows as it has, the Continued page the rest. The Dominant Species?
-// column, the dominance and prevalence worksheets and the indicators are blank here: they are the
-// arithmetic of #34, which fills `veg.<stratum>.<row>.dominant` and adds its own fields. Every value is
-// text the PDF's font can print (../text.ts), as the Soil page's are.
+// column and the worksheets are the arithmetic of the supplement (dominance.ts): `veg.dominance.*` and
+// `veg.prevalence.*`. The ticks of the indicators (`veg.indicator.<id>`) and Yes or No of "Hydrophytic
+// Vegetation Present?" (`veg.present.yes` and `.no`) are printed only when the user has confirmed them
+// (hydrophytic.ts suggests them). Every value is text the PDF's font can print (../text.ts), as the Soil
+// page's are.
 import { regionOf } from "../regions"
 import type { VegColumn } from "../regions/types"
 import { vegetationOf, type Project, type SamplingPoint } from "../model"
 import { printable, wrap } from "../text"
+import { hydrophyticVegetation, VEG_INDICATORS, type HydrophyticVegetation, type VegContext, type VegIndicatorId } from "./hydrophytic"
+import { STATUSES, type Status } from "./status"
 import { STRATA, STRATUM_LABEL, SUGGESTED_PLOT, type Stratum } from "./strata"
 
 export type VegFieldId =
@@ -18,11 +22,22 @@ export type VegFieldId =
   | `veg.${Stratum}.plotSize`
   | `veg.${Stratum}.total`
   | `veg.${Stratum}.${number}.${VegColumn}`
+  | "veg.dominance.a"
+  | "veg.dominance.b"
+  | "veg.dominance.percent"
+  | `veg.prevalence.${Status}.cover`
+  | `veg.prevalence.${Status}.product`
+  | "veg.prevalence.total.a"
+  | "veg.prevalence.total.b"
+  | "veg.prevalence.index"
+  | `veg.indicator.${VegIndicatorId}`
+  | "veg.present.yes"
+  | "veg.present.no"
 
 export const vegFieldId = (stratum: Stratum, row: number, column: VegColumn): VegFieldId => `veg.${stratum}.${row}.${column}`
 
 export interface VegWarning {
-  kind: "veg-overflow" | "veg-not-identified" | "veg-genus" | "veg-left-out" | "veg-remarks-cut" | "text-changed"
+  kind: "veg-overflow" | "veg-not-identified" | "veg-genus" | "veg-left-out" | "veg-remarks-cut" | "veg-dominant-identity" | "veg-prevalence-invalid" | "text-changed"
   text: string
 }
 
@@ -43,13 +58,23 @@ export function remarkLines(project: Project, remarks: string): { lines: string[
   return { lines, room: Math.floor((box.lastBaseline - box.firstBaseline) / box.leading) + 1 }
 }
 
-/** `samplingPoint` is the point's name as the form prints it, which formFor has already made printable. */
+/** A percentage as it is written on a form: 100%, 66.7%. */
+const writtenPercent = (n: number): string => `${Math.round(n * 10) / 10}%`
+
+/**
+ * `samplingPoint` is the point's name as the form prints it, which formFor has already made printable.
+ * `context` says whether the sampling point has hydric soil and wetland hydrology indicators, which decides
+ * whether the prevalence index is applied.
+ */
 export function vegetationFields(
   project: Project,
   point: SamplingPoint,
   samplingPoint: string,
-): { fields: Record<VegFieldId, string>; warnings: VegWarning[] } {
+  context: VegContext,
+): { fields: Record<VegFieldId, string>; warnings: VegWarning[]; analysis: HydrophyticVegetation } {
   const vegetation = vegetationOf(point)
+  const analysis = hydrophyticVegetation(vegetation, context)
+  const dominant = new Set(analysis.dominance.dominants.map((d) => d.id))
   const warnings: VegWarning[] = []
   // Text the user typed, made printable; one warning for the page if any of it had to change.
   let changed = false
@@ -73,7 +98,8 @@ export function vegetationFields(
       const plant = plants[row]
       fields[vegFieldId(stratum, row, "name")] = plant ? clean(plant.name) : ""
       fields[vegFieldId(stratum, row, "cover")] = plant ? written(plant.cover) : ""
-      fields[vegFieldId(stratum, row, "dominant")] = ""
+      // A plant with no status to use was not part of the test: its box is left blank, not marked No.
+      fields[vegFieldId(stratum, row, "dominant")] = plant && plant.status !== null ? (dominant.has(plant.id) ? "Yes" : "No") : ""
       fields[vegFieldId(stratum, row, "status")] = plant ? (plant.status ?? plant.listed) : ""
     }
     if (plants.length > capacity) {
@@ -93,7 +119,39 @@ export function vegetationFields(
       }
     }
   }
+  for (const name of analysis.notIdentified) {
+    warnings.push({ kind: "veg-dominant-identity", text: `${name} is a dominant species but is not identified to species. A dominant must be (supplement p. 26): identify it before relying on the dominance test.` })
+  }
+
+  // The Dominance Test worksheet: A, B and A/B. Blank while there is no dominant to count.
+  const { dominance, prevalence } = analysis
+  fields["veg.dominance.a"] = dominance.b > 0 ? written(dominance.a) : ""
+  fields["veg.dominance.b"] = dominance.b > 0 ? written(dominance.b) : ""
+  fields["veg.dominance.percent"] = dominance.percent !== null ? writtenPercent(dominance.percent) : ""
+  // The Prevalence Index worksheet: every status's total and product once any plant is counted, the column totals, and B/A when the index is valid.
+  const any = prevalence.a > 0
+  for (const status of STATUSES) {
+    const row = prevalence.rows.find((r) => r.status === status)!
+    fields[`veg.prevalence.${status}.cover`] = any ? written(row.cover) : ""
+    fields[`veg.prevalence.${status}.product`] = any ? written(row.product) : ""
+  }
+  fields["veg.prevalence.total.a"] = any ? written(prevalence.a) : ""
+  fields["veg.prevalence.total.b"] = any ? written(prevalence.b) : ""
+  fields["veg.prevalence.index"] = prevalence.index !== null ? prevalence.index.toFixed(2) : ""
+  if (vegetation.plants.length > 0 && !prevalence.valid) {
+    warnings.push({
+      kind: "veg-prevalence-invalid",
+      text: `Only ${writtenPercent(prevalence.identified)} of the vegetation cover is identified and rated. The prevalence index needs 80%, so it is left blank (supplement pp. 27-28).`,
+    })
+  }
+
+  // Ticks and the answer are the user's: nothing is drawn that has not been confirmed.
+  const choices = vegetation.indicators ?? {}
+  for (const id of VEG_INDICATORS) fields[`veg.indicator.${id}`] = choices[id]?.state === "confirmed" ? "X" : ""
+  fields["veg.present.yes"] = vegetation.present === "yes" ? "X" : ""
+  fields["veg.present.no"] = vegetation.present === "no" ? "X" : ""
+
   if (changed) warnings.push({ kind: "text-changed", text: "Some vegetation text has characters the form cannot print; they were replaced." })
-  return { fields, warnings }
+  return { fields, warnings, analysis }
 }
 

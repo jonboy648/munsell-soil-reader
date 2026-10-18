@@ -113,6 +113,38 @@ export const NCNE: Region = {
     },
     samplingPoint: { rule: 53.8, span: [513.2, 567.1] },
     remarks: { left: 40, right: 571, firstBaseline: 668, lastBaseline: 745, leading: 11 },
+    // The worksheets, the indicators' blanks and the Yes and No blanks at the right of page 2, measured the same way.
+    worksheets: {
+      dominance: {
+        a: { x: [497.4, 551.3], rule: 107.4 },
+        b: { x: [497.4, 551.3], rule: 137.88 },
+        percent: { x: [497.4, 551.3], rule: 168.36 },
+      },
+      prevalence: {
+        rows: {
+          OBL: { cover: { x: [434.2, 481.7], rule: 213.84 }, product: { x: [513.2, 559.2], rule: 213.84 } },
+          FACW: { cover: { x: [434.2, 481.7], rule: 229.08 }, product: { x: [513.2, 559.2], rule: 229.08 } },
+          FAC: { cover: { x: [434.2, 481.7], rule: 244.32 }, product: { x: [513.2, 559.2], rule: 244.32 } },
+          FACU: { cover: { x: [434.2, 481.7], rule: 259.56 }, product: { x: [513.2, 559.2], rule: 259.56 } },
+          UPL: { cover: { x: [434.2, 481.7], rule: 274.8 }, product: { x: [513.2, 559.2], rule: 274.8 } },
+        },
+        totals: { a: { x: [434.2, 481.7], rule: 290.04 }, b: { x: [513.2, 559.2], rule: 290.04 } },
+        index: { x: [505.3, 559.2], rule: 305.28 },
+      },
+      // Each indicator's blank is a filled rectangle 15.1 points wide, as on the Soil page.
+      indicators: {
+        rapid: { x: [378, 393.1], rule: 335.52 },
+        dominance: { x: [378, 393.1], rule: 350.76 },
+        prevalence: { x: [378, 393.1], rule: 366 },
+        morphological: { x: [378, 393.1], rule: 381.24 },
+        problematic: { x: [378, 393.1], rule: 411.72 },
+      },
+      present: {
+        yes: { x: [459.5, 481.7], rule: 625.08 },
+        no: { x: [513.2, 535.4], rule: 625.08 },
+      },
+      tick: { size: 9, aboveRule: 1 },
+    },
   },
   // In the order the form prints them: the left column, then the middle, then the right.
   indicators: [...LEFT_COLUMN, ...MIDDLE_COLUMN, ...RIGHT_COLUMN],

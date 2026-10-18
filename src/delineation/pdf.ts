@@ -11,8 +11,24 @@ import { printable, wrap } from "./text"
 /** The cover note's page: letter size, with a margin. */
 const NOTE = { width: 612, height: 792, margin: 54, size: 10, line: 13 }
 
-/** The cover note: the indicators the app suggested that are not ticked, and the ticks that are the user's own. */
-async function addCoverNote(doc: import("pdf-lib").PDFDocument, project: Project, point: SamplingPoint, form: Form) {
+/** One thing a cover note says: a title in bold and the lines under it. */
+export interface NoteItem {
+  title: string
+  lines: string[]
+}
+
+/** A part of a cover note: a heading, a sentence about it, and its items. */
+export interface NoteSection {
+  heading: string
+  intro: string
+  items: NoteItem[]
+}
+
+/**
+ * The cover note that goes after a page of the form: what is not on the page, and why. Pages are added to
+ * `doc` as the text needs them.
+ */
+export async function addCoverNote(doc: import("pdf-lib").PDFDocument, title: string, lead: string, sections: NoteSection[]) {
   const { StandardFonts, rgb } = await import("pdf-lib")
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
@@ -32,22 +48,39 @@ async function addCoverNote(doc: import("pdf-lib").PDFDocument, project: Project
     y -= options.gap ?? 0
   }
 
-  write("Cover note: hydric soil indicators", { bold: true, gap: 2 })
-  write(`${project.name}, sampling point ${point.name}. This page goes with the Soil page of the Wetland Determination Data Form. It lists what is not ticked there.`, { gap: 8 })
-  if (form.hydric.cover.unconfirmed.length > 0) {
-    write("Suggested by the app, not confirmed", { bold: true })
-    write("These are suggestions from the recorded layers. None is ticked on the Soil page, because none has been confirmed.", { gap: 4 })
-    for (const s of form.hydric.cover.unconfirmed) {
-      write(`${s.code} ${s.name}`, { bold: true })
-      for (const line of s.evidence) write(line, { indent: 12 })
-      write(`Rule: ${s.rule}`, { indent: 12 })
-      write(`Source: ${s.citations.map((c) => `${c.document}, ${c.page}`).join("; ")}`, { indent: 12, gap: 6 })
+  write(title, { bold: true, gap: 2 })
+  write(lead, { gap: 8 })
+  for (const section of sections) {
+    write(section.heading, { bold: true })
+    if (section.intro) write(section.intro, { gap: 4 })
+    for (const item of section.items) {
+      write(item.title, { bold: true })
+      item.lines.forEach((line, i) => write(line, { indent: 12, gap: i === item.lines.length - 1 ? 6 : 0 }))
+      if (item.lines.length === 0) y -= 4
     }
   }
-  if (form.hydric.cover.ticked.length > 0) {
-    write("Ticked by the user, not suggested by the app", { bold: true, gap: 0 })
-    for (const t of form.hydric.cover.ticked) write(`${indicatorLabel(t)}${t.remark ? `: ${t.remark}` : ""}`, { indent: 12, gap: 4 })
-  }
+}
+
+/** The Soil page's cover note: the hydric soil indicators the app suggested that are not ticked, and the ticks that are the user's own. */
+function soilNote(form: Form): NoteSection[] {
+  const { unconfirmed, ticked } = form.hydric.cover
+  return [
+    ...(unconfirmed.length > 0
+      ? [
+          {
+            heading: "Suggested by the app, not confirmed",
+            intro: "These are suggestions from the recorded layers. None is ticked on the Soil page, because none has been confirmed.",
+            items: unconfirmed.map((s) => ({
+              title: `${s.code} ${s.name}`,
+              lines: [...s.evidence, `Rule: ${s.rule}`, `Source: ${s.citations.map((c) => `${c.document}, ${c.page}`).join("; ")}`],
+            })),
+          },
+        ]
+      : []),
+    ...(ticked.length > 0
+      ? [{ heading: "Ticked by the user, not suggested by the app", intro: "", items: ticked.map((t) => ({ title: `${indicatorLabel(t)}${t.remark ? `: ${t.remark}` : ""}`, lines: [] })) }]
+      : []),
+  ]
 }
 
 /** `blank` is the official one-page PDF of the page; `placements` are the values to draw on it, and `after` may add pages. */
@@ -77,13 +110,23 @@ const title = (page: string, project: Project, point: SamplingPoint) =>
   `Wetland Determination Data Form, ${page}: ${project.name}, ${point.name}`
 
 /** `blank` is the official one-page PDF of the region's Soil page. A cover note follows it when something is not on it. */
-export const soilPagePdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>
-  drawPage(
+export function soilPagePdf(blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) {
+  const sections = soilNote(form)
+  return drawPage(
     blank,
     soilPlacements(project, form),
     title("Soil", project, point),
-    form.hydric.cover.unconfirmed.length > 0 || form.hydric.cover.ticked.length > 0 ? (doc) => addCoverNote(doc, project, point, form) : undefined,
+    sections.length > 0
+      ? (doc) =>
+          addCoverNote(
+            doc,
+            "Cover note: hydric soil indicators",
+            `${project.name}, sampling point ${point.name}. This page goes with the Soil page of the Wetland Determination Data Form. It lists what is not ticked there.`,
+            sections,
+          )
+      : undefined,
   )
+}
 
 /** `blank` is the official one-page PDF of the region's page 1. */
 export const page1Pdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>

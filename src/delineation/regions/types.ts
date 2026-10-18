@@ -2,6 +2,8 @@
 // form version, where each printed field sits on the official page, and room for the indicators,
 // rules and plant list that later tickets fill. No assets are named here, so the engine that reads
 // it stays pure; the page files are in each region's own assets module.
+import type { VegIndicatorId } from "../vegetation/hydrophytic"
+import type { Status } from "../vegetation/status"
 import type { Stratum } from "../vegetation/strata"
 
 /** The columns of the Soil page's profile description table, left to right. */
@@ -76,6 +78,23 @@ export interface VegetationPage {
   samplingPoint: { rule: number; span: readonly [number, number] }
   /** The Remarks box of the Vegetation page: the text's left end, the right end it wraps at, the baselines of the first and last lines. */
   remarks: { left: number; right: number; firstBaseline: number; lastBaseline: number; leading: number }
+  /** The worksheets, the indicators and the conclusion at the right of the Vegetation page. The Continued page has none. */
+  worksheets: {
+    /** The Dominance Test worksheet: dominants that are OBL, FACW or FAC (A), all dominants (B), and A/B. */
+    dominance: { a: Box; b: Box; percent: Box }
+    /** The Prevalence Index worksheet: each status's total cover and its product with the weight, the column totals, and B/A. */
+    prevalence: {
+      rows: Record<Status, { cover: Box; product: Box }>
+      totals: { a: Box; b: Box }
+      index: Box
+    }
+    /** The blank before each Hydrophytic Vegetation Indicator. */
+    indicators: Record<VegIndicatorId, Box>
+    /** The blanks after "Yes" and "No" of "Hydrophytic Vegetation Present?". */
+    present: { yes: Box; no: Box }
+    /** Where a tick (an X) sits on its blank: its size, and the gap from the line up to its baseline. */
+    tick: { size: number; aboveRule: number }
+  }
 }
 
 /** The blank line printed before an indicator's label on the Soil page, where its tick goes. Points, as above. */

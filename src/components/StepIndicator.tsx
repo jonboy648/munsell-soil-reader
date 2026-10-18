@@ -1,21 +1,22 @@
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Step } from "@/lib/session"
+import type { CardKind, Step } from "@/lib/session"
 
 interface Props {
   step: Step
   cornersTapped: number
   cornerCount: number
   noCard: boolean
+  cardKind: CardKind
   spotCount: number
 }
 
-/** A compact two-step indicator: Card corners, then Spots. */
-export function StepIndicator({ step, cornersTapped, cornerCount, noCard, spotCount }: Props) {
+/** A compact two-step indicator: Card corners (a Page: its Chips), then Spots. */
+export function StepIndicator({ step, cornersTapped, cornerCount, noCard, cardKind, spotCount }: Props) {
   const cardDone = step === "spots"
   const steps = [
     {
-      label: noCard ? "Card skipped" : "Card corners",
+      label: noCard ? "Card skipped" : cardKind === "page" ? "Page Chips" : "Card corners",
       detail: noCard ? "" : `${cornersTapped}/${cornerCount}`,
       active: step === "corners",
       done: cardDone,

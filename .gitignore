@@ -6,3 +6,4 @@ playwright-report/
 __pycache__/
 munsell-prototype.html
 .claude/
+e2e-results.json

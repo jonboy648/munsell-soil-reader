@@ -59,6 +59,9 @@ export const labToXyz = (lab: Vec3, white: Vec3): Vec3 => {
 
 export const linearToLab = (lin: Vec3): Vec3 => xyzToLab(mul(M_RGB_XYZ, lin))
 
+/** Relative luminance (white is 1) of a linear sRGB color. */
+export const luminance = (lin: Vec3): number => mul(M_RGB_XYZ, lin)[1]
+
 /** CIEDE2000 color difference (Sharma, Wu and Dalal 2005; kL = kC = kH = 1). */
 export const deltaE2000 = (lab1: Vec3, lab2: Vec3): number => {
   const [L1, a1, b1] = lab1

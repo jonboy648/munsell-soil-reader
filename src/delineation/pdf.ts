@@ -1,10 +1,11 @@
-// The Soil page as a PDF: the official page with each value drawn at its measured position, in the
-// form's own text size. Runs on the device; nothing is uploaded. The drawing list is the same one the
-// on-screen preview uses.
+// A page of the form as a PDF: the official page with each value drawn at its measured position, in
+// the form's own text size. Runs on the device; nothing is uploaded. The drawing list is the same one
+// the on-screen preview uses.
 import type { Form } from "./formFor"
 import type { Project, SamplingPoint } from "./model"
+import { page1Placements } from "./page1"
 import { indicatorLabel } from "./rules/suggest"
-import { soilPlacements } from "./soilPage"
+import { soilPlacements, type Placement } from "./soilPage"
 import { printable, wrap } from "./text"
 
 /** The cover note's page: letter size, with a margin. */
@@ -33,28 +34,28 @@ async function addCoverNote(doc: import("pdf-lib").PDFDocument, project: Project
 
   write("Cover note: hydric soil indicators", { bold: true, gap: 2 })
   write(`${project.name}, sampling point ${point.name}. This page goes with the Soil page of the Wetland Determination Data Form. It lists what is not ticked there.`, { gap: 8 })
-  if (form.cover.unconfirmed.length > 0) {
+  if (form.hydric.cover.unconfirmed.length > 0) {
     write("Suggested by the app, not confirmed", { bold: true })
     write("These are suggestions from the recorded layers. None is ticked on the Soil page, because none has been confirmed.", { gap: 4 })
-    for (const s of form.cover.unconfirmed) {
+    for (const s of form.hydric.cover.unconfirmed) {
       write(`${s.code} ${s.name}`, { bold: true })
       for (const line of s.evidence) write(line, { indent: 12 })
       write(`Rule: ${s.rule}`, { indent: 12 })
       write(`Source: ${s.citations.map((c) => `${c.document}, ${c.page}`).join("; ")}`, { indent: 12, gap: 6 })
     }
   }
-  if (form.cover.ticked.length > 0) {
+  if (form.hydric.cover.ticked.length > 0) {
     write("Ticked by the user, not suggested by the app", { bold: true, gap: 0 })
-    for (const t of form.cover.ticked) write(`${indicatorLabel(t)}${t.remark ? `: ${t.remark}` : ""}`, { indent: 12, gap: 4 })
+    for (const t of form.hydric.cover.ticked) write(`${indicatorLabel(t)}${t.remark ? `: ${t.remark}` : ""}`, { indent: 12, gap: 4 })
   }
 }
 
-/** `blank` is the official one-page PDF of the region's Soil page. */
-export async function soilPagePdf(
+/** `blank` is the official one-page PDF of the page; `placements` are the values to draw on it, and `after` may add pages. */
+export async function drawPage(
   blank: ArrayBuffer | Uint8Array,
-  project: Project,
-  point: SamplingPoint,
-  form: Form,
+  placements: Placement[],
+  title: string,
+  after?: (doc: import("pdf-lib").PDFDocument) => Promise<void>,
 ): Promise<Uint8Array> {
   // Loaded when a PDF is made, not at start-up: the app does not need it to read a color.
   const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib")
@@ -62,12 +63,28 @@ export async function soilPagePdf(
   const page = doc.getPage(0)
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const { height } = page.getSize()
-  for (const p of soilPlacements(project, form)) {
+  for (const p of placements) {
     page.drawText(p.text, { x: p.x, y: height - p.baseline, size: p.size, font, color: rgb(0, 0, 0) })
   }
-  if (form.cover.unconfirmed.length > 0 || form.cover.ticked.length > 0) await addCoverNote(doc, project, point, form)
-  doc.setTitle(`Wetland Determination Data Form, Soil: ${project.name}, ${point.name}`)
+  await after?.(doc)
+  doc.setTitle(title)
   doc.setProducer("Munsell Soil Reader")
   doc.setCreator("Munsell Soil Reader")
   return doc.save()
 }
+
+const title = (page: string, project: Project, point: SamplingPoint) =>
+  `Wetland Determination Data Form, ${page}: ${project.name}, ${point.name}`
+
+/** `blank` is the official one-page PDF of the region's Soil page. A cover note follows it when something is not on it. */
+export const soilPagePdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>
+  drawPage(
+    blank,
+    soilPlacements(project, form),
+    title("Soil", project, point),
+    form.hydric.cover.unconfirmed.length > 0 || form.hydric.cover.ticked.length > 0 ? (doc) => addCoverNote(doc, project, point, form) : undefined,
+  )
+
+/** `blank` is the official one-page PDF of the region's page 1. */
+export const page1Pdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>
+  drawPage(blank, page1Placements(project, form), title("Page 1", project, point))

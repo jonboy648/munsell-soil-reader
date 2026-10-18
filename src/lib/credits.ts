@@ -108,6 +108,13 @@ export const CREDITS: Credit[] = [
     used: "The official Soil page (September 2024), unchanged, that a sampling point's profile is drawn onto for the PDF and the preview.",
     links: [{ label: "Regulatory Program", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/" }],
   },
+  {
+    name: "Regional Supplement, Northcentral and Northeast Region (ERDC/EL TR-12-1)",
+    license: "US government work, public domain",
+    by: "U.S. Army Corps of Engineers",
+    used: "The definitions of the wetland hydrology indicators, quoted word for word with their pages, and the rule that one primary or two secondary indicators show wetland hydrology.",
+    links: [{ label: "Regional supplements", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/reg_supp/" }],
+  },
 ]
 
 /** The sections of THIRD_PARTY_NOTICES.md, by heading. */

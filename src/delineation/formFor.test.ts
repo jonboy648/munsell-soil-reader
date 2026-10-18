@@ -41,8 +41,8 @@ describe("JF-1 through the form engine", () => {
         expect(form.fields[fieldId(row, column)], `${row} ${column}`).toBe("")
       }
     }
-    expect(form.suggestions.map((s) => s.indicator)).toEqual(["A12"])
-    expect(form.conclusions).toEqual([{ id: "hydricSoilPresent", question: "Hydric Soil Present?", suggested: null, because: "No indicator is confirmed yet." }])
+    expect(form.hydric.suggestions.map((s) => s.indicator)).toEqual(["A12"])
+    expect(form.hydric.conclusion).toEqual({ id: "hydricSoilPresent", question: "Hydric Soil Present?", suggested: null, because: "No indicator is confirmed yet." })
     expect(form.warnings).toEqual([])
   })
 
@@ -245,18 +245,18 @@ describe("the indicators on the form", () => {
   test("a suggestion is not ticked, and goes on the cover note until the user confirms it", () => {
     const form = formFor(JF1_PROJECT, JF1_POINT)
     expect(ticks(form)).toEqual([])
-    expect(form.cover.unconfirmed.map((s) => s.indicator)).toEqual(["A12"])
-    expect(form.cover.unconfirmed[0].rule).toBe(regionOf("NCNE").indicators.find((i) => i.id === "A12")!.quote)
-    expect(form.cover.ticked).toEqual([])
+    expect(form.hydric.cover.unconfirmed.map((s) => s.indicator)).toEqual(["A12"])
+    expect(form.hydric.cover.unconfirmed[0].rule).toBe(regionOf("NCNE").indicators.find((i) => i.id === "A12")!.quote)
+    expect(form.hydric.cover.ticked).toEqual([])
   })
 
   test("a confirmed suggestion is ticked, comes off the cover note, and makes Yes the suggested answer", () => {
     const form = formFor(JF1_PROJECT, withChoices({ A12: { state: "confirmed" } }))
     expect(ticks(form)).toEqual([indicatorFieldId("A12")])
     expect(form.fields[indicatorFieldId("A12")]).toBe("X")
-    expect(form.cover).toEqual({ unconfirmed: [], ticked: [] })
-    expect(form.conclusions[0]).toMatchObject({ suggested: "yes", because: "Yes: A12 Thick Dark Surface is confirmed." })
-    expect(form.conclusions[0].confirmed).toBeUndefined()
+    expect(form.hydric.cover).toEqual({ unconfirmed: [], ticked: [] })
+    expect(form.hydric.conclusion).toMatchObject({ suggested: "yes", because: "Yes: A12 Thick Dark Surface is confirmed." })
+    expect(form.hydric.conclusion.confirmed).toBeUndefined()
     // Suggested is not answered: nothing is printed in Yes or No.
     expect(form.fields["soil.hydric.yes"]).toBe("")
   })
@@ -264,28 +264,34 @@ describe("the indicators on the form", () => {
   test("a rejected suggestion is not ticked and is not on the cover note", () => {
     const form = formFor(JF1_PROJECT, withChoices({ A12: { state: "rejected" } }))
     expect(ticks(form)).toEqual([])
-    expect(form.cover).toEqual({ unconfirmed: [], ticked: [] })
-    expect(form.conclusions[0].suggested).toBeNull()
+    expect(form.hydric.cover).toEqual({ unconfirmed: [], ticked: [] })
+    expect(form.hydric.conclusion.suggested).toBeNull()
   })
 
   test("an indicator the user ticks that the app did not suggest is ticked and goes on the cover note with the remark", () => {
     const form = formFor(JF1_PROJECT, withChoices({ A4: { state: "confirmed", manual: true, remark: "Rotten egg smell at 8 in" } }))
     expect(ticks(form)).toEqual([indicatorFieldId("A4")])
-    expect(form.cover.ticked).toEqual([{ indicator: "A4", code: "A4", name: "Hydrogen Sulfide", remark: "Rotten egg smell at 8 in" }])
-    expect(form.cover.unconfirmed.map((s) => s.indicator)).toEqual(["A12"])
-    expect(form.conclusions[0].suggested).toBe("yes")
+    expect(form.hydric.cover.ticked).toEqual([{ indicator: "A4", code: "A4", name: "Hydrogen Sulfide", remark: "Rotten egg smell at 8 in" }])
+    expect(form.hydric.cover.unconfirmed.map((s) => s.indicator)).toEqual(["A12"])
+    expect(form.hydric.conclusion.suggested).toBe("yes")
+  })
+
+  test("a remark with a character the font cannot print is warned about, because the cover note replaces it", () => {
+    const form = formFor(JF1_PROJECT, withChoices({ A4: { state: "confirmed", manual: true, remark: "Smell at <= 8 in ≤ or so" } }))
+    expect(form.warnings.map((w) => [w.kind, w.text])).toEqual([["text-changed", "The remark on A4 Hydrogen Sulfide has characters the form cannot print; they were replaced on the cover note."]])
+    expect(formFor(JF1_PROJECT, withChoices({ A4: { state: "confirmed", manual: true, remark: "Plain ASCII" } })).warnings).toEqual([])
   })
 
   test("Other is ticked like any other, with its remark", () => {
     const form = formFor(JF1_PROJECT, withChoices({ other: { state: "confirmed", manual: true, remark: "Field-observed" } }))
     expect(form.fields[indicatorFieldId("other")]).toBe("X")
-    expect(form.conclusions[0].because).toBe("Yes: Other (Explain in Remarks) is confirmed.")
+    expect(form.hydric.conclusion.because).toBe("Yes: Other (Explain in Remarks) is confirmed.")
   })
 
   test("Hydric Soil Present prints the user's answer and only that", () => {
     expect(formFor(JF1_PROJECT, withChoices(undefined, "yes")).fields).toMatchObject({ "soil.hydric.yes": "X", "soil.hydric.no": "" })
     expect(formFor(JF1_PROJECT, withChoices(undefined, "no")).fields).toMatchObject({ "soil.hydric.yes": "", "soil.hydric.no": "X" })
-    expect(formFor(JF1_PROJECT, withChoices(undefined, "no")).conclusions[0].confirmed).toBe("no")
+    expect(formFor(JF1_PROJECT, withChoices(undefined, "no")).hydric.conclusion.confirmed).toBe("no")
   })
 
   test("the printed profile does not change with the choices", () => {

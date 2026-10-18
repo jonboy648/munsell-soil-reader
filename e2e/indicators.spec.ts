@@ -13,7 +13,7 @@ const JF1_VALUES = ["JF-1", ...JF1_ROWS.flatMap((row) => row.filter((text) => te
 
 /** Download the Soil page and read it back: its bytes, and how many pages it has. */
 async function download(page: Page, sheet: Locator) {
-  const [file] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download PDF" }).click()])
+  const [file] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download Soil page PDF" }).click()])
   const bytes = new Uint8Array(readFileSync(await file.path()))
   return { bytes, pages: (await PDFDocument.load(bytes)).getPageCount() }
 }
@@ -25,7 +25,7 @@ test("JF-1 suggests A12 with its rule and layers; confirmed, it and Yes are Xs o
   const sheet = await createPoint(page, "JF fixture", "JF-1")
   await recordJf1(sheet)
   const panel = sheet.getByTestId("indicators")
-  const preview = sheet.getByTestId("preview-text")
+  const preview = sheet.getByTestId("soil-preview-text")
 
   // One suggestion, the rule in the document's words, and the layers that satisfy it.
   const suggestion = panel.getByTestId("suggestion")
@@ -99,7 +99,7 @@ test("JF-1 suggests A12 with its rule and layers; confirmed, it and Yes are Xs o
   await again.getByRole("button", { name: "Open point" }).click()
   await expect(again.getByTestId("suggestion")).toHaveAttribute("data-decision", "confirmed")
   await expect(again.getByTestId("hydric-present")).toHaveAttribute("data-answer", "yes")
-  await expect(again.getByTestId("preview-text")).toHaveText([...JF1_VALUES, "X", "X"])
+  await expect(again.getByTestId("soil-preview-text")).toHaveText([...JF1_VALUES, "X", "X"])
 })
 
 test("a rejected suggestion leaves no tick and no cover note; one the user ticks needs a remark and goes on the cover note", async ({ page }) => {
@@ -128,7 +128,7 @@ test("a rejected suggestion leaves no tick and no cover note; one the user ticks
   await tick.getByLabel("Remark").fill("Rotten egg smell at 8 in")
   await tick.getByRole("button", { name: "Tick it" }).click()
   await expect(panel.getByTestId("ticked")).toContainText("A4 Hydrogen Sulfide: Rotten egg smell at 8 in")
-  await expect(sheet.getByTestId("preview-text")).toHaveText([...JF1_VALUES, "X"])
+  await expect(sheet.getByTestId("soil-preview-text")).toHaveText([...JF1_VALUES, "X"])
   await expect(panel.getByTestId("hydric-present")).toContainText("Yes: A4 Hydrogen Sulfide is confirmed.")
 
   // On the PDF: the tick, and a cover note with both the unconfirmed suggestion and the user's own tick.

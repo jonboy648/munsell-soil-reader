@@ -93,7 +93,7 @@ function SuggestionCard({ s, onChoose }: { s: Suggestion; onChoose: Props["onCho
 /** Tick an indicator the app did not suggest, with a reason. */
 function ManualTick({ project, form, onChoose }: Pick<Props, "project" | "form" | "onChoose">) {
   const region = regionOf(project.region)
-  const taken = new Set([...form.suggestions.map((s) => s.indicator), ...form.ticked.map((t) => t.indicator)])
+  const taken = new Set([...form.hydric.suggestions.map((s) => s.indicator), ...form.hydric.ticked.map((t) => t.indicator)])
   const options = region.indicators.filter((i) => !taken.has(i.id))
   const [id, setId] = React.useState("")
   const [remark, setRemark] = React.useState("")
@@ -138,9 +138,9 @@ function ManualTick({ project, form, onChoose }: Pick<Props, "project" | "form" 
       <Button type="submit" variant="outline" className="h-11 text-base">
         Tick it
       </Button>
-      {form.ticked.length > 0 && (
+      {form.hydric.ticked.length > 0 && (
         <ul data-testid="ticked" className="grid gap-2 text-sm">
-          {form.ticked.map((t) => (
+          {form.hydric.ticked.map((t) => (
             <li key={t.indicator} className="flex items-center justify-between gap-2">
               <span className="min-w-0 [overflow-wrap:anywhere]">
                 <b className="font-semibold">{indicatorLabel(t)}</b>
@@ -161,7 +161,7 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
   const region = regionOf(project.region)
   const sub = project.subregion
   const subregion = sub ? `LRR ${sub.lrr}${sub.mlra && sub.mlra !== "other" ? `, MLRA ${sub.mlra}` : ""}` : null
-  const hydric = form.conclusions.find((c) => c.id === "hydricSoilPresent")!
+  const { conclusion } = form.hydric
   return (
     <section aria-label="Hydric soil indicators" data-testid="indicators" className="grid gap-3">
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Hydric soil indicators</h4>
@@ -169,21 +169,21 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
         {subregion ? `Subregion: ${subregion}.` : "The project's subregion is not picked, so indicators limited to some subregions are not suggested."}{" "}
         {region.name} indicators are suggested from the layers recorded. Nothing is ticked on the Soil page until you confirm it.
       </p>
-      {form.suggestions.length === 0 ? (
+      {form.hydric.suggestions.length === 0 ? (
         <p className="text-base" data-testid="no-suggestions">The recorded layers satisfy no indicator the app can decide yet.</p>
       ) : (
         <ul className="grid gap-3">
-          {form.suggestions.map((s) => (
+          {form.hydric.suggestions.map((s) => (
             <SuggestionCard key={s.indicator} s={s} onChoose={onChoose} />
           ))}
         </ul>
       )}
 
-      {form.needs.length > 0 && (
+      {form.hydric.needs.length > 0 && (
         <details data-testid="needs" className="rounded-lg border border-border p-3">
-          <summary className="cursor-pointer text-sm font-semibold">Needs more information ({form.needs.length})</summary>
+          <summary className="cursor-pointer text-sm font-semibold">Needs more information ({form.hydric.needs.length})</summary>
           <ul className="mt-2 grid gap-2 text-sm">
-            {form.needs.map((n) => (
+            {form.hydric.needs.map((n) => (
               <li key={n.indicator} data-indicator={n.indicator}>
                 <b className="font-semibold">{n.code} {n.name}</b>
                 {n.colorsFit && " (the colors and depths fit)"}: needs {n.needs.join(" ")}
@@ -196,10 +196,10 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
       <ManualTick project={project} form={form} onChoose={onChoose} />
 
       <div data-testid="hydric-present" data-answer={point.hydricSoilPresent ?? ""} className="grid gap-2 rounded-lg border-2 border-foreground p-3">
-        <p className="font-heading text-lg font-bold">{hydric.question}</p>
+        <p className="font-heading text-lg font-bold">{conclusion.question}</p>
         <p className="text-sm">
-          {hydric.suggested ? <b className="font-semibold">Suggested: Yes. </b> : null}
-          {hydric.because}
+          {conclusion.suggested ? <b className="font-semibold">Suggested: Yes. </b> : null}
+          {conclusion.because}
         </p>
         <div className="flex gap-2" role="group" aria-label="Your answer">
           <Button

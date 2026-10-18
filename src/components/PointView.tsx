@@ -2,9 +2,10 @@
 import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
+import { HydrologyForm } from "@/components/HydrologyForm"
 import { IndicatorsPanel } from "@/components/IndicatorsPanel"
 import { LayerForm } from "@/components/LayerForm"
-import { SoilPagePreview } from "@/components/SoilPagePreview"
+import { PagePreview } from "@/components/PagePreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
 import { topToBottom, withPoint, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
@@ -125,7 +126,10 @@ export function PointView({ project, point, change, onBack }: Props) {
       <IndicatorsPanel project={project} point={point} form={form} onChoose={onChoose} onHydric={onHydric} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
-      <SoilPagePreview project={project} point={point} form={form} />
+      <PagePreview page="soil" project={project} point={point} form={form} />
+
+      <HydrologyForm key={point.id} project={project} point={point} change={change} />
+      <PagePreview page="page1" project={project} point={point} form={form} />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 // surface (the lists, and readPhoto). Expected values are copied by hand from the source of
 // the list (tomax31/Munsell-Soil-Color-Chart-palette, CC0) and from Jon's physical soil book
 // (Soil-Color Charts, 2009 Revision, 2015 Production), never from the code under test.
+import * as munsell from "munsell"
 import { describe, expect, it } from "vitest"
 import { CHIP_LIST, SOIL_BOOK_CHIPS, readPhoto } from "./index"
 import type { ChipPage } from "./index"
@@ -49,20 +50,23 @@ describe("the CC0 list, as the source has it", () => {
   })
 })
 
-describe("the soil book's Chips: the CC0 list plus the corrections from the physical book", () => {
-  it("has 338 Chips, none twice", () => {
-    expect(SOIL_BOOK_CHIPS).toHaveLength(338)
-    expect(new Set(SOIL_BOOK_CHIPS.map((chip) => chip.notation)).size).toBe(338)
+describe("the Chips the engine knows: the CC0 list plus the corrections from the physical book", () => {
+  it("has 359 Chips, none twice", () => {
+    expect(SOIL_BOOK_CHIPS).toHaveLength(359)
+    expect(new Set(SOIL_BOOK_CHIPS.map((chip) => chip.notation)).size).toBe(359)
   })
 
   it("has the Chips the book prints on each Page", () => {
+    // A Chip printed on two Pages counts on both: the 7 Chips of the WHITE Page's value 8
+    // column are also on their own Pages.
     const perPage = new Map<ChipPage, number>()
-    for (const { page } of SOIL_BOOK_CHIPS) perPage.set(page, (perPage.get(page) ?? 0) + 1)
+    for (const { pages } of SOIL_BOOK_CHIPS) for (const page of pages) perPage.set(page, (perPage.get(page) ?? 0) + 1)
     expect(Object.fromEntries(perPage)).toEqual({
-      // Counted on the photographed Pages.
-      "10YR": 36, "7.5YR": 35, "2.5Y": 31, "5Y": 31, "10Y-5GY": 16, GLEY1: 42, GLEY2: 42,
-      // From the CC0 list only: not yet checked against the book.
-      "10R": 35, "2.5YR": 37, "5YR": 33,
+      // Counted on the photographed Pages and Diagrams.
+      "2.5YR": 37, "5YR": 33, "7.5YR": 35, "10YR": 36, "2.5Y": 31, "5Y": 31,
+      "10Y-5GY": 16, GLEY1: 42, GLEY2: 42, WHITE: 28,
+      // From the CC0 list only. Not checked: Jon's binder tabs start at 2.5YR.
+      "10R": 35,
     })
   })
 
@@ -75,7 +79,7 @@ describe("the soil book's Chips: the CC0 list plus the corrections from the phys
       "10YR 2/1",
       "10YR 2/2",
     ]
-    const listed = SOIL_BOOK_CHIPS.filter((chip) => chip.page === "10YR").map((chip) => chip.notation)
+    const listed = SOIL_BOOK_CHIPS.filter((chip) => chip.pages.includes("10YR")).map((chip) => chip.notation)
     expect([...listed].sort()).toEqual([...printed].sort())
   })
 
@@ -89,7 +93,34 @@ describe("the soil book's Chips: the CC0 list plus the corrections from the phys
       ["N 3/", "very dark gray", 3],
       ["N 2.5/", "black", 2.5],
     ])("adds %s, %s", (notation, name, value) => {
-      expect(bookChip(notation)).toEqual({ notation, name, hue: "N", value, chroma: 0, page: "GLEY1" })
+      const pages = notation === "N 8/" ? ["GLEY1", "WHITE"] : ["GLEY1"] // N 8/ is also on WHITE
+      expect(bookChip(notation)).toEqual({ notation, name, hue: "N", value, chroma: 0, pages })
+    })
+  })
+
+  describe("correction: the WHITE Page, values 9.5, 9, 8.5 and 8", () => {
+    // Rows are hue/chroma; columns are the four values, lightest first.
+    const rows: [row: string, names: string[]][] = [
+      ["N", ["white", "white", "white", "white"]],
+      ["7.5YR /1", ["white", "white", "white", "white"]],
+      ["7.5YR /2", ["pale yellowish pink", "pale yellowish pink", "pinkish white", "pinkish white"]],
+      ["10YR /1", ["white", "white", "white", "white"]],
+      ["10YR /2", ["pale orange yellow", "pale orange yellow", "very pale brown", "very pale brown"]],
+      ["2.5Y /1", ["white", "white", "white", "white"]],
+      ["2.5Y /2", ["very pale yellow", "very pale yellow", "pale yellow", "pale yellow"]],
+    ]
+    const values = ["9.5", "9", "8.5", "8"]
+    const notation = (row: string, value: string) => (row === "N" ? `N ${value}/` : row.replace(" /", ` ${value}/`))
+    const chips = rows.flatMap(([row, names]) => values.map((value, i) => [notation(row, value), names[i]] as const))
+
+    it("has exactly the 28 Chips the WHITE Page prints", () => {
+      const listed = SOIL_BOOK_CHIPS.filter((chip) => chip.pages.includes("WHITE")).map((chip) => chip.notation)
+      expect(chips).toHaveLength(28)
+      expect([...listed].sort()).toEqual(chips.map(([n]) => n).sort())
+    })
+
+    it.each(chips)("names %s %s", (n, name) => {
+      expect(bookChip(n)?.name).toBe(name)
     })
   })
 
@@ -108,7 +139,7 @@ describe("the soil book's Chips: the CC0 list plus the corrections from the phys
 
     it.each(chips)("adds %s, %s", (notation, name) => {
       expect(bookChip(notation)?.name).toBe(name)
-      expect(bookChip(notation)?.page).toBe("10Y-5GY")
+      expect(bookChip(notation)?.pages).toEqual(["10Y-5GY"])
     })
   })
 
@@ -134,25 +165,32 @@ describe("the soil book's Chips: the CC0 list plus the corrections from the phys
       8: "pale green", 7: "pale green", 6: "pale green", 5: "grayish green", 4: "grayish green",
       3: "very dark grayish green", 2.5: "very dark grayish green",
     }
-    const gley1 = SOIL_BOOK_CHIPS.filter((chip) => chip.page === "GLEY1" && chip.hue !== "N")
+    const gley1 = SOIL_BOOK_CHIPS.filter((chip) => chip.pages.includes("GLEY1") && chip.hue !== "N")
     expect(gley1).toHaveLength(35) // 10Y, 5GY, 10GY and 5G at chroma 1, and 5G at chroma 2
     for (const { notation, name, chroma, value } of gley1) {
       expect([notation, name]).toEqual([notation, (chroma === 2 ? greens : grays)[value]])
     }
   })
 
-  it.each<[string, ChipPage]>([
-    ["10YR 4/3", "10YR"],
-    ["10Y 3/1", "GLEY1"],
-    ["10Y 3/2", "10Y-5GY"],
-    ["5GY 4/4", "10Y-5GY"],
-    ["10GY 4/1", "GLEY1"],
-    ["5G 4/2", "GLEY1"],
-    ["N 5/", "GLEY1"],
-    ["10G 4/1", "GLEY2"],
-    ["5PB 8/1", "GLEY2"],
-  ])("prints %s on the %s Page", (notation, page) => {
-    expect(bookChip(notation)?.page).toBe(page)
+  it.each<[string, ChipPage[]]>([
+    ["10YR 4/3", ["10YR"]],
+    ["10Y 3/1", ["GLEY1"]],
+    ["10Y 3/2", ["10Y-5GY"]],
+    ["5GY 4/4", ["10Y-5GY"]],
+    ["10GY 4/1", ["GLEY1"]],
+    ["5G 4/2", ["GLEY1"]],
+    ["N 5/", ["GLEY1"]],
+    ["10G 4/1", ["GLEY2"]],
+    ["5PB 8/1", ["GLEY2"]],
+    // The WHITE Page repeats its value 8 column from other Pages, and adds lighter Chips.
+    ["N 8/", ["GLEY1", "WHITE"]],
+    ["10YR 8/2", ["10YR", "WHITE"]],
+    ["7.5YR 8/3", ["7.5YR"]], // chroma 3 is not on WHITE
+    ["5YR 8/1", ["5YR"]], // 5YR is not on WHITE
+    ["N 9/", ["WHITE"]],
+    ["10YR 9/1", ["WHITE"]],
+  ])("prints %s on the %j Pages", (notation, pages) => {
+    expect(bookChip(notation)?.pages).toEqual(pages)
   })
 })
 
@@ -179,6 +217,9 @@ describe("readPhoto lands on a real Chip from every hue, gley and neutral includ
     ["N 5/", "gray"], // not in the CC0 list
     ["10Y 4/4", "olive"], // the 10Y-5GY Page, not in the CC0 list
     ["5GY 3/4", "dark olive green"],
+    ["10YR 9/1", "white"], // the WHITE Page, not in the CC0 list
+    ["7.5YR 9/2", "pale yellowish pink"],
+    ["2.5Y 8.5/2", "pale yellow"],
   ]
 
   it.each(chips)("a soil at %s reads to %s", (notation, name) => {
@@ -195,7 +236,21 @@ describe("readPhoto lands on a real Chip from every hue, gley and neutral includ
   it("reads a neutral soil to a neutral Chip, which has no chroma", () => {
     const sim = simulatePhoto({ camera: { light: LIGHTS.neutral }, soil: "N 5/" })
     const [reading] = readPhoto({ pixels: sim.pixels, card: { kind: "none" }, spots: [SIM_SPOT] }).readings
-    expect(reading.raw.chip).toMatchObject({ hue: "N", value: 5, chroma: 0, page: "GLEY1" })
+    expect(reading.raw.chip).toMatchObject({ notation: "N 5/", name: "gray", hue: "N", value: 5, chroma: 0 })
+  })
+
+  it.each([
+    ["7.5YR 9.5/2", "pale yellowish pink"],
+    ["10YR 9.5/2", "pale orange yellow"],
+  ])("reads a soil at %s, a Chip outside the sRGB gamut, to that Chip", (notation, name) => {
+    // The Chip's red is brighter than sRGB can show, so its swatch is clamped, but matching
+    // is in Lab and still finds it. munsell.js is the independent check that it is outside.
+    expect(Math.max(...munsell.munsellToLinearRgb(notation))).toBeGreaterThan(1)
+    const sim = simulatePhoto({ camera: { light: LIGHTS.neutral }, soil: notation })
+    const [reading] = readPhoto({ pixels: sim.pixels, card: { kind: "none" }, spots: [SIM_SPOT] }).readings
+    expect(reading.raw.chip.notation).toBe(notation)
+    expect(reading.raw.chip.name).toBe(name)
+    expect(reading.raw.chipRgb[0]).toBe(255)
   })
 
   it("names every candidate in the top 3, not only the nearest", () => {

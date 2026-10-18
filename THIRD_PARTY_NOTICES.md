@@ -398,10 +398,11 @@ English names only (file `munsell_soil_color_chart_palette.gpl`, commit
 `src/engine/chipList.ts`. That palette's RGB values are approximate and are not used: each
 Chip's color is computed from its notation with munsell.js.
 
-The CC0 list lacks the neutral Chips and the 10Y-5GY Page and has some stale names. The
-additions and corrections are in `src/engine/bookCorrections.ts`, checked against a physical
-Munsell Soil-Color Charts, 2009 Revision, 2015 Production, photographed 2026-10-18. The
-10R, 2.5YR and 5YR Pages are not yet checked against the book.
+The CC0 list lacks the neutral Chips, the 10Y-5GY Page and the WHITE Page's lighter Chips,
+and has some stale names. The additions and corrections are in `src/engine/bookCorrections.ts`,
+checked against a physical Munsell Soil-Color Charts, 2009 Revision, 2015 Production,
+photographed 2026-10-18. That checking is not complete: the 10R Chips and the names on the 2.5Y
+and 5Y Pages are not yet checked against the book.
 
 ## ColorChecker reference values
 

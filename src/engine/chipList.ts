@@ -1,4 +1,4 @@
-// The Chips in the Munsell soil book: notation and English color name, in the source's order.
+// The Chips of the CC0 list: notation and English color name, in the source's order.
 //
 // Derived from tomax31/Munsell-Soil-Color-Chart-palette (CC0 1.0, public domain dedication),
 // https://github.com/tomax31/Munsell-Soil-Color-Chart-palette, file
@@ -8,8 +8,9 @@
 // from its notation with munsell.js (see chips.ts). Credited in THIRD_PARTY_NOTICES.md.
 //
 // 315 Chips: the seven hue Pages 10R to 5Y, and the gley Chips (5PB, 10B, 5B, 10BG, 5BG, 10G,
-// 5G, 10GY, 5GY, 10Y). Kept as the source has it. It lacks the neutral Chips and the 10Y-5GY
-// Page and has some stale names; bookCorrections.ts fixes those, and chips.ts merges them.
+// 5G, 10GY, 5GY, 10Y). Kept as the source has it, and not complete: it lacks the neutral Chips,
+// the 10Y-5GY Page and the WHITE Page's lighter Chips, and has some stale names.
+// bookCorrections.ts holds what a physical book showed, and chips.ts merges the two.
 export const CHIP_LIST: readonly (readonly [notation: string, name: string])[] = [
   ["5Y 2.5/1", "black"],
   ["5Y 2.5/2", "black"],

@@ -19,15 +19,27 @@ export interface ChipEntry {
 
 const HUE_PAGES = new Set(["10R", "2.5YR", "5YR", "7.5YR", "10YR", "2.5Y", "5Y"])
 const GLEY2_HUES = new Set(["10G", "5BG", "10BG", "5B", "10B", "5PB"])
+const WHITE_HUES = new Set(["N", "7.5YR", "10YR", "2.5Y"])
 
 /**
- * The Page a Chip is printed on. The hue Pages hold one hue each. 10Y and 5GY have two Pages:
+ * The main Page a Chip is printed on. The hue Pages hold one hue each. 10Y and 5GY have two Pages:
  * chroma 1 is on Gley 1, chromas 2 and 4 on the 10Y-5GY Page. Gley 1 also holds N, 10GY and 5G.
  */
 function pageOf(hue: string, chroma: number): ChipPage {
   if (HUE_PAGES.has(hue)) return hue as ChipPage
   if (GLEY2_HUES.has(hue)) return "GLEY2"
   return (hue === "10Y" || hue === "5GY") && chroma > 1 ? "10Y-5GY" : "GLEY1"
+}
+
+/**
+ * Every Page a Chip is printed on. The WHITE Page holds values 8 to 9.5 of N and of 7.5YR,
+ * 10YR and 2.5Y at chromas 1 and 2. Its value 8 column repeats Chips from other Pages, so
+ * those Chips are on two Pages; the lighter ones are on WHITE alone.
+ */
+function pagesOf(hue: string, value: number, chroma: number): ChipPage[] {
+  const pages: ChipPage[] = value <= 8 ? [pageOf(hue, chroma)] : [] // no other Page is lighter
+  if (WHITE_HUES.has(hue) && value >= 8 && chroma <= 2) pages.push("WHITE")
+  return pages
 }
 
 function buildChips(): ChipEntry[] {
@@ -38,7 +50,7 @@ function buildChips(): ChipEntry[] {
     const [value, chroma] = rest.split("/").map(Number) // 'N 5/' has no chroma: Number('') is 0
     const lin = munsell.munsellToLinearRgb(notation)
     return {
-      chip: { notation, name, hue, value, chroma, page: pageOf(hue, chroma) },
+      chip: { notation, name, hue, value, chroma, pages: pagesOf(hue, value, chroma) },
       lab: linearToLab(lin),
       rgb: linearToRgb255(lin),
     }

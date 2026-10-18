@@ -53,11 +53,15 @@ How a Reading is made: the median of the tapped pixels, a white balance and then
 correction fitted to the 24 Card patches (ColorChecker "after November 2014" reference values),
 a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
 then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 of the corrected
-patches; below 3 is good. The Chips are the 338 in the soil book, with their color names, gley
-and neutral included. They are the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips)
-plus the corrections checked against a physical book (`src/engine/bookCorrections.ts`: the
-neutral Chips, the 10Y-5GY Page and six stale names). Each Chip's color is computed from its
-notation, matching happens in Lab, and only the on-screen swatch is clamped to sRGB.
+patches; below 3 is good. The engine knows 359 Chips with their color names, gley, neutral and
+the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
+what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
+list is only as complete as the checking, which is against one copy (Soil-Color Charts, 2009
+Revision, 2015 Production). Checked, Chips and names: 2.5YR, 5YR, 7.5YR, 10YR, 10Y-5GY, Gley 1,
+Gley 2 and WHITE. Chips checked, names pending: 2.5Y and 5Y. Not checked: 10R, whose Page the
+binder's tabs do not show (they start at 2.5YR). Not known: whether the book has 5R or 7.5R Pages.
+Each Chip's color is computed from its notation, matching happens in Lab, and only the
+on-screen swatch is clamped to sRGB.
 
 ## Tests
 

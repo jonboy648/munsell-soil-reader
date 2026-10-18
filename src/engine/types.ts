@@ -25,7 +25,7 @@ export type Card =
 /** The Pages of the soil book (2009 Revision) that hold the Chips the engine knows. */
 export type ChipPage =
   | "10R" | "2.5YR" | "5YR" | "7.5YR" | "10YR" | "2.5Y" | "5Y"
-  | "10Y-5GY" | "GLEY1" | "GLEY2"
+  | "10Y-5GY" | "GLEY1" | "GLEY2" | "WHITE"
 
 export interface Chip {
   notation: string // '10YR 4/3'; a neutral Chip has no chroma: 'N 5/'
@@ -33,7 +33,7 @@ export interface Chip {
   hue: string // '10YR', '5GY', or 'N' for the neutral Chips
   value: number
   chroma: number // 0 for a neutral Chip
-  page: ChipPage // the Page of the soil book the Chip is printed on
+  pages: readonly ChipPage[] // the Pages of the soil book the Chip is printed on; N 8/ is on two
 }
 
 export type RgbTriple = [number, number, number]

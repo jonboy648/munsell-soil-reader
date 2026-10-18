@@ -78,8 +78,8 @@ export interface Evenness {
 
 export interface QualityInput {
   pixels: Pixels
-  spots: XY[]
-  spotRadius: number
+  /** Each Spot, with the radius it was read at (a Page cuts it down to fit a hole). */
+  spots: { at: XY; radius: number }[]
   /** Empty when there is no Card. */
   references: QualityReference[]
   /**
@@ -224,7 +224,7 @@ const ADVICE = {
   small: "The Card is small in the Photo. Move closer so the Card fills more of the Photo, then take it again.",
 }
 
-export function checkQuality({ pixels, spots, spotRadius, references, spacing, evenness }: QualityInput): QualityResult {
+export function checkQuality({ pixels, spots, references, spacing, evenness }: QualityInput): QualityResult {
   const out: QualityWarning[] = []
   const warn = (kind: QualityWarning["kind"], where: QualityWarning["where"], advice: string) =>
     out.push({ kind, where, advice })
@@ -288,8 +288,8 @@ export function checkQuality({ pixels, spots, spotRadius, references, spacing, e
   // Then each Spot, by its own level. Blown pixels on a Spot that is otherwise well below the
   // top of the range are glare; on a Spot that sits at the top, exposure. A Spot blown through
   // has no level of its own: the Card's white says which, and with no Card it is exposure.
-  spots.forEach((spot, i) => {
-    const s = scan(pixels, spot, spotRadius)
+  spots.forEach(({ at, radius }, i) => {
+    const s = scan(pixels, at, radius)
     if (s.blown >= GLARE_SHARE) {
       const own = s.unblown.length > 0 ? s.unblown[Math.floor(0.25 * (s.unblown.length - 1))] : null
       const glare = own !== null ? own < NEAR_CLIP_LEVEL : useLadder && whiteBlown < CLIP_SHARE

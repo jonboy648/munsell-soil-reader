@@ -71,8 +71,8 @@ comparison (`src/engine/correctionCandidates.testkit.ts`).
 | root-polynomial 2 | 2.59 | 3.26 | 124 of 160 | 83 |
 | curve per channel (PCHIP) + 3x3 | 0.64 | 0.55 | 159 of 160 | 151 |
 | curve per channel (cubic) + 3x3 | 0.69 | 0.62 | 160 of 160 | 154 |
-| **one tone curve + 3x3 (ships)** | 0.69 | 0.61 | 160 of 160 | 158 |
-| one tone curve + root-polynomial 2 | 0.75 | 0.65 | 158 of 160 | 157 |
+| **one tone curve + 3x3 (ships)** | 0.73 | 0.63 | 160 of 160 | 157 |
+| one tone curve + root-polynomial 2 | 0.80 | 0.68 | 158 of 160 | 156 |
 
 By tone curve strength, each cell is mean Reading error ΔE / cases within one Chip (of 40):
 
@@ -81,10 +81,10 @@ By tone curve strength, each cell is mean Reading error ΔE / cases within one C
 | 0 | 0.50 / 40 | 0.46 / 40 | 0.57 / 40 | 0.48 / 40 |
 | 0.3 | 2.40 / 33 | 2.62 / 33 | 0.59 / 40 | 0.55 / 40 |
 | 0.5 | 3.88 / 28 | 4.23 / 27 | 0.59 / 39 | 0.67 / 40 |
-| 0.7 | 5.20 / 24 | 5.74 / 24 | 0.45 / 40 | 0.74 / 40 |
+| 0.7 | 5.20 / 24 | 5.74 / 24 | 0.45 / 40 | 0.81 / 40 |
 
 On a clean simulated camera a curve through every gray is as exact as it gets, and the shared
-curve gives up 0.06 ΔE against it. It buys the robustness below.
+curve gives up 0.08 ΔE against it. It buys the robustness below.
 
 ### The real sensor (132 Photos)
 
@@ -100,12 +100,13 @@ the seven Readings more than a Chip off is in caution; none is in good.
 
 ### Damaged gray steps
 
-Photos with one dirty gray (simulated camera, 624), through the shipped engine:
+Photos with one dirty gray (simulated camera, 624), through the shipped engine and through the
+same engine with a curve per channel (PCHIP) instead of the shared curve:
 
 | | Good | Caution | Failed | Left a gray out | Readings > 1 Chip off, shown as the answer |
 |---|---|---|---|---|---|
-| curve per channel (PCHIP) | 288 | 336 | 0 | 258 | 35 |
-| **one tone curve (ships)** | 450 | 174 | 0 | 126 | 8 (2 good, 6 caution) |
+| curve per channel (PCHIP) | 300 | 324 | 0 | 216 | 45 |
+| **one tone curve (ships)** | 444 | 180 | 0 | 120 | 15 (2 good, 13 caution) |
 
 On a bigger sweep (1716 Photos, 11 soils, no leave-out) the number of Photos whose Reading is
 more than a Chip off and whose Card check is under 3.5 falls with the curve: PCHIP 128,
@@ -113,24 +114,25 @@ least-squares cubic 108, Huber cubic 99, shared curve 77, **shared with Huber 71
 (10YR 2.5/2, 3/2, 5YR 3/4) with a hazy black or N3.5, or a filmed white, are where they read
 wrong: those three grays are 193 of the 221 PCHIP failures.
 
-The leave-out (below) picks out the damaged gray in every Photo where it leaves one out (126 of
-126), and fixes 36 of the Photos that would have read wrong without breaking any. On the real
-sensor with a dirty gray (480): 50 leave one out (17 fixed, 1 broken); Readings more than a Chip
-off and shown as the answer 51, against 125 for the curve per channel. A clean Card leaves a
-gray out in 11 of 220 simulated Photos (all the camera color shift at tone curve 0.7, where the
-black comes out crushed) and in none of the 132 real-sensor Photos.
+The leave-out (below) leaves a gray out in 120 of the 624, and every time it is exactly the
+damaged one; none of those 120 reads wrong. The 15 that read wrong are Photos it did not
+catch: 8 are a filmed white, 4 a hazy N3.5, 3 a hazy black, and 13 of the 15 are caution anyway.
+On the real sensor with a dirty gray (480) it leaves one out in 95, always the damaged one;
+Readings more than a Chip off and shown as the answer are 43, against 113 for the curve per
+channel. A clean Card leaves a gray out in none of the 220 simulated Photos and none of the 132
+real-sensor Photos.
 
 ### Light gradient and other damage
 
 | Photos | Good | Caution | Failed | Card check range |
 |---|---|---|---|---|
-| Clean Card, simulated camera (220) | 209 | 11 | 0 | 0.35 to 1.56 |
+| Clean Card, simulated camera (220) | 220 | 0 | 0 | 0.35 to 1.78 |
 | 10% and 20% gradient across the Card (80) | 72 | 8 | 0 | 0.84 to 2.22 |
 | Clean Card, real sensor (132) | 44 | 88 | 0 | 1.58 to 2.90 |
 | 10% and 20% gradient, real sensor (60) | 20 | 40 | 0 | 1.50 to 3.36 |
-| Damaged ladder, simulated (624) | 450 | 174 | 0 | 0.50 to 2.54 |
-| Damaged ladder, real sensor (480) | 70 | 360 | 50 | 1.58 to 4.12 |
-| Other damage to the Card (324) | 36 | 27 | 261 | 0.49 to 45.8 |
+| Damaged ladder, simulated (624) | 444 | 180 | 0 | 0.50 to 2.93 |
+| Damaged ladder, real sensor (480) | 65 | 355 | 60 | 1.52 to 4.12 |
+| Other damage to the Card (324) | 36 | 27 | 261 | 0.49 to 56.1 |
 
 "Other damage" splits into what spoils the Reading and what does not. 208 of the 324 Photos
 read more than a Chip off; **none of those is good, and one is caution** (a light shadow over a
@@ -140,7 +142,7 @@ the Card drawn 10% large, which pass.
 ## What it says
 
 - **Undoing the tone curve is the big win.** The 3x3's Reading error grows with the tone curve
-  (0.5, 2.4, 3.9, 5.2 ΔE); with the curve inverted it stays under 0.8. On a camera with no tone
+  (0.5, 2.4, 3.9, 5.2 ΔE); with the curve inverted it stays under 0.85. On a camera with no tone
   curve it costs nothing (0.48 against 0.50).
 - **One shared curve over a curve per channel.** It reads a clean simulated camera as well, and a
   real sensor and a dirty Card much better, because no single gray can own a stretch of a curve.
@@ -151,7 +153,7 @@ the Card drawn 10% large, which pass.
   the 160 cases finds no difference (p = 0.97). On the Reading it is worse, not a wash: 3.26
   against 3.00 ΔE, lower in only 36 of 160 cases (p = 7e-10).
 - **Root-polynomial adds nothing once the curve is gone.** One tone curve then root-polynomial 2
-  is worse than one tone curve then 3x3 on both measures (0.75 and 0.65 against 0.69 and 0.61).
+  is worse than one tone curve then 3x3 on both measures (0.80 and 0.68 against 0.73 and 0.63).
 - **Overfitting shows only held out.** In the first round (15 cases, one soil), root-polynomial 3
   scored 1.85 on the patches it was fitted on (3x3: 3.08) and 8.5 held out; degree 4 scored 0.38
   on its own Card and 94.6 held out. That is why the Card check is leave-one-out.
@@ -181,7 +183,7 @@ yellowed white), no dark soils below 3/1 and no real sensor. With those added, d
 to five Chips off at a check of 1.6, and clean Cards from a real sensor scored 2.0 to 3.1 and
 were failed at 2. What the data supports now:
 
-- Clean Photos score up to 1.56 on the simulated camera, 2.22 with a 20% gradient, 2.9 on the
+- Clean Photos score up to 1.78 on the simulated camera, 2.22 with a 20% gradient, 2.9 on the
   real sensor, and 3.36 on the real sensor under a 20% gradient. All of these must not fail:
   the failed limit is above 3.36.
 - Damaged Cards whose Reading is more than a Chip off score 3.32 at the lowest (a light shadow
@@ -199,18 +201,32 @@ should be re-derived from the sweep when #15 has a real Photo.
 ## Leaving a dirty gray out
 
 The grays are the tone ladder, and one dirty gray bends the curve of every channel, but a gray is
-one reference of 24 and the mean hides it. The Page Card's leave-out (#8,
-`src/engine/leftOut.ts`) judges the ladder by the references off it as witnesses: the dirty steps
-are the ones whose removal makes the curve agree with those references, and each must miss the
-fit made without it by at least 4. The ColorChecker uses that ladder rule and nothing else: its
-patches do not wear, and leaving colored patches out as well dropped one from 110 of the 132
-real-sensor Photos and made two Readings worse. A Photo with a gray left out names it, and is
-capped at caution.
+one reference of 24 and the mean hides it. The Page Card's leave-out (#8, `src/engine/leftOut.ts`)
+judges a ladder step by the references beside it, in its value row and the rows above and below:
+a step is dirty when leaving it out makes the curve agree with those row-mates, and it must also
+be a miss to the curve drawn without it. One rule, `dirtyLadderSteps`, serves both Cards. The
+ColorChecker's grays are the ladder, and each other patch sits in the value row of the gray
+nearest it in lightness (`PATCH_VALUE_ROWS`); a Page's /1 column is the ladder and its rows are
+the printed values.
+
+That rule alone misses a dirty step under the shared curve, and this ticket adds one clause. A
+curve that passes through every step is bent by a dirty one, which shows in the row-mates; the
+shared curve gives a far-off step little weight and is not, so removing the step changes nothing
+for its row-mates, and the step shows only in how badly it misses. So a step is also left out when
+the curve drawn without it misses it by 6 or more and fits its row-mates to 1.5 or less. On Jon's
+worn 10YR Page (8/1 and 7/1 smudged) the first test finds nothing to improve; the clause finds
+both.
+
+The ColorChecker uses the ladder rule and nothing else: its patches do not wear, and leaving
+colored patches out as well dropped one from 110 of the 132 real-sensor Photos and made two
+Readings worse. A Page leaves out Chips off the ladder too (up to four), and a row that has to
+lose two of them is a suspect row, which fails the check. A Photo with a gray (or any ladder step)
+left out names it, and is capped at caution; a worn Chip off the ladder is named and not capped.
 
 The ladder's own held-out errors do not find a dirty gray. A gray at either end is predicted by
 extrapolation and misses whether it is dirty or not (a clean Card reaches 4 to 6 at its ends),
 and the worst of the six was the damaged one in only 638 of 1716 Photos. Judging the ladder by
-the witnesses off it did: 126 of 126.
+the references beside it did: 120 of 120.
 
 ## Limits
 

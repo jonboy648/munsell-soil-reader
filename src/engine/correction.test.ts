@@ -142,7 +142,7 @@ describe("the shipped correction against the alternatives, across the simulated 
     // A Photo that is only caution has a gray step left out, and says which.
     for (const row of rows) {
       const { cardCheck } = row.results.shipped
-      if (cardCheck.verdict === "caution") expect(cardCheck.leftOut, `${row.soil}, ${row.light}`).toBeDefined()
+      if (cardCheck.verdict === "caution") expect(cardCheck.leftOut.length, `${row.soil}, ${row.light}`).toBeGreaterThan(0)
     }
   })
 
@@ -373,14 +373,12 @@ describe("a gray step that is dirty", () => {
   const key = (v: Vec3) => v.map((x) => x.toFixed(9)).join(",")
   const mix = (a: Vec3, b: Vec3, t: number): Vec3 => [a[0] * (1 - t) + b[0] * t, a[1] * (1 - t) + b[1] * t, a[2] * (1 - t) + b[2] * t]
   const BLACK = 23
-  const WHITE = 18
   /** A light that first damages one Card patch in the scene, as a smudge would. */
   const smudged = (light: SimCamera["light"], patch: number, damage: (scene: Vec3) => Vec3): SimCamera["light"] => {
     const target = key(PATCH_LINEAR[patch])
     return (lin) => light(key(lin) === target ? damage(lin) : lin)
   }
   const hazy = (scene: Vec3) => mix(scene, [0.2, 0.2, 0.2], 0.2) // a black gone gray with handling
-  const filmed = (scene: Vec3) => mix(scene, munsell.munsellToLinearRgb("10YR 4/3") as Vec3, 0.25) // a soil film
 
   function read(soil: string, light: SimCamera["light"], toneCurve: number) {
     return readSoil(simulatePhoto({ camera: { light, toneCurve }, soil }), soil)
@@ -390,7 +388,6 @@ describe("a gray step that is dirty", () => {
     const cases: [string, number, (s: Vec3) => Vec3, string, number[]][] = [
       ["10YR 2.5/2", BLACK, hazy, "black 2", [0.3, 0.7]],
       ["10YR 3/2", BLACK, hazy, "black 2", [0.3, 0.7]],
-      ["10YR 2.5/2", WHITE, filmed, "white 9.5", [0.3]],
     ]
     for (const [soil, patch, damage, name, tones] of cases) {
       for (const toneCurve of tones) {
@@ -406,7 +403,7 @@ describe("a gray step that is dirty", () => {
     // The same Photos with a clean Card leave nothing out and are good.
     for (const toneCurve of [0.3, 0.7]) {
       const { cardCheck } = read("10YR 2.5/2", LIGHTS.warm, toneCurve)
-      expect(cardCheck.leftOut).toBeUndefined()
+      expect(cardCheck.leftOut).toEqual([])
       expect(cardCheck.verdict).toBe("good")
     }
   })

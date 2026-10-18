@@ -178,11 +178,11 @@ describe("readPhoto with no Card", () => {
   })
 })
 
-describe("readPhoto with a Page", () => {
-  it("says plainly that Pages are not supported yet", () => {
+describe("readPhoto with a Page that is not one hue", () => {
+  it("says plainly that it is not supported yet (the hue Pages are tested in page.test.ts)", () => {
     const sim = simulatePhoto({ camera: phone(LIGHTS.warm) })
     const read = () =>
-      readPhoto({ pixels: sim.pixels, card: { kind: "page", hue: "10YR", corners: SIM_CORNERS }, spots: [SIM_SPOT] })
+      readPhoto({ pixels: sim.pixels, card: { kind: "page", hue: "GLEY1", taps: SIM_CORNERS }, spots: [SIM_SPOT] })
     expect(read).toThrow(UnsupportedCardError)
     expect(read).toThrow(/not supported yet/)
   })

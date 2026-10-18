@@ -1,10 +1,12 @@
 // The X-Rite ColorChecker Classic 24: reference colors and patch geometry.
 import {
   BRADFORD_D50_TO_D65,
+  M_RGB_XYZ,
   M_XYZ_RGB,
   WHITE_D50,
   labToXyz,
   mul,
+  xyzToLab,
   type Vec3,
 } from "./color"
 import { gridMap, gridSites, type Four, type GridPoint, type Site } from "./grid"
@@ -37,6 +39,19 @@ export const PATCH_LINEAR: Vec3[] = PATCH_LAB_D50.map((lab) =>
 
 /** The six gray patches along the bottom row, used for white balance. */
 export const NEUTRAL_PATCHES = [18, 19, 20, 21, 22, 23]
+
+/**
+ * The value row of each patch, for judging the grays by the patches of about their own lightness
+ * (see leftOut.ts). The six grays are rows 0 to 5, dark to light; every other patch is in the row
+ * of the gray nearest it in L*.
+ */
+export const PATCH_VALUE_ROWS: number[] = (() => {
+  const lightness = PATCH_LINEAR.map((lin) => xyzToLab(mul(M_RGB_XYZ, lin))[0])
+  const grays = [...NEUTRAL_PATCHES].sort((a, b) => lightness[a] - lightness[b])
+  return PATCH_LINEAR.map((_, i) =>
+    grays.reduce((best, g, row) => (Math.abs(lightness[g] - lightness[i]) < Math.abs(lightness[grays[best]] - lightness[i]) ? row : best), 0),
+  )
+})()
 
 export const PATCH_COLUMNS = 6
 export const PATCH_ROWS = 4

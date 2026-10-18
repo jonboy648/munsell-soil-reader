@@ -2,18 +2,41 @@
 import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, luminance, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { checkCard, dirtyGrays } from "./cardCheck"
-import { NEUTRAL_PATCHES, PATCH_COLUMNS, PATCH_LINEAR, PATCH_NAMES, PATCH_ROWS, frameSites, patchSites } from "./colorchecker"
-import { fitCorrection, type Fit, type Reference } from "./correction"
+import { checkCard } from "./cardCheck"
+import {
+  NEUTRAL_PATCHES,
+  PATCH_COLUMNS,
+  PATCH_LINEAR,
+  PATCH_NAMES,
+  PATCH_ROWS,
+  PATCH_VALUE_ROWS,
+  frameSites,
+  patchSites,
+} from "./colorchecker"
+import { fitCorrection, type Correction, type Fit, type Reference } from "./correction"
+import { dirtyLadderSteps, leftOut } from "./leftOut"
+import {
+  isPageHue,
+  pageModel,
+  pagePaperSites,
+  pageSites,
+  pageSpacing,
+  pageSpotRadius,
+  suggestedPage,
+  type PageHue,
+} from "./page"
 import { checkQuality, type Evenness, type QualityReference } from "./quality"
 import { medianLinear, spotRadius } from "./sampling"
 import type {
+  CardCheck,
+  ChipPage,
   ChipReading,
   Corners,
   Pixels,
   ReadPhotoInput,
   ReadPhotoResult,
   Reading,
+  XY,
 } from "./types"
 
 export class UnsupportedCardError extends Error {
@@ -21,6 +44,12 @@ export class UnsupportedCardError extends Error {
     super(`A ${kind} Card is not supported yet.`)
     this.name = "UnsupportedCardError"
   }
+}
+
+/** A Page that is not one hue (Gley, 10Y-5GY, WHITE), or one whose layout is unchecked (10R), is not a Card yet. */
+function pageHueOf(page: ChipPage): PageHue {
+  if (!isPageHue(page)) throw new UnsupportedCardError(`${page} Page`)
+  return page
 }
 
 /** Munsell notation of a color, one decimal, or a note when the inversion gives no answer. */
@@ -54,14 +83,42 @@ function readColor(lin: Vec3): ChipReading {
   }
 }
 
-function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
+/** A Card's correction and its Card check, and how wide to read a Spot when the Card knows better than the Photo. */
+interface CardFit {
+  correct: Correction
+  check: CardCheck
+  spotRadius?: (spot: XY, radius: number) => number
+}
+
+function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
   const references: Reference[] = patchSites(corners).map(({ center, radius }, i) => ({
     measured: medianLinear(pixels, center, radius),
     truth: PATCH_LINEAR[i],
     ladder: NEUTRAL_PATCHES.includes(i),
     name: PATCH_NAMES[i],
   }))
-  return checkCard(references, fit, dirtyGrays(references, fit))
+  // A ColorChecker's patches do not wear, so only its grays are judged: a dirty one is left out.
+  return checkCard(references, fit, dirtyLadderSteps(references, PATCH_VALUE_ROWS, fit))
+}
+
+/**
+ * The same fit and Card check on a Page's Chips, with the ones that disagree with the rest left
+ * out first: a few smudged Chips must not drag the correction. The Card check names them. If two
+ * or more Chips off the ladder in one value row had to go, the fit is not to be trusted, however
+ * well the rest fit: that row's ladder step is probably dirty, or its Chips are beyond the ladder.
+ */
+function fitPage(pixels: Pixels, hue: PageHue, taps: Corners, fit: Fit): CardFit {
+  const { chips, values } = pageModel(hue)
+  const sites = pageSites(hue, taps)
+  const references: Reference[] = chips.map(({ linear, col }, i) => ({
+    measured: medianLinear(pixels, sites[i].center, sites[i].radius),
+    truth: linear,
+    ladder: col === 0, // the /1 column runs from the lightest row to the darkest
+    name: chips[i].chip.notation,
+  }))
+  const { indices, suspectRow } = leftOut(references, chips.map((c) => c.row), fit)
+  const checked = checkCard(references, fit, indices, suspectRow === undefined ? undefined : values[suspectRow])
+  return { ...checked, spotRadius: pageSpotRadius(hue, taps) }
 }
 
 /**
@@ -71,6 +128,13 @@ function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
  */
 const FRAME_UNEVEN_STOPS = 0.3
 const FRAME_OFF_CARD_STOPS = 3
+/**
+ * A Page's white paper is as even as the frame, but the Page is big in the Photo, so the light
+ * falls off across it: on Jon's four real Pages the paper's plane fit reads 0.11, 0.16, 0.27 and
+ * 0.33 stops, over the frame's 0.3. Provisional, until real Photos are run (#15).
+ */
+const PAGE_UNEVEN_STOPS = 0.45
+const PAGE_OFF_CARD_STOPS = 3
 
 /**
  * What the quality checks need from a ColorChecker: its patches as references (the grays are
@@ -94,22 +158,60 @@ function cardQuality(corners: Corners): { references: QualityReference[]; spacin
   return { references, spacing, evenness: { samples, limitStops: FRAME_UNEVEN_STOPS, offCardStops: FRAME_OFF_CARD_STOPS } }
 }
 
+/**
+ * The same for a Page: its Chips as references (the /1 column is the tonal ladder), the bare
+ * paper over the whole Page as the evenness samples, and the column pitch as the spacing.
+ */
+function pageQuality(hue: PageHue, taps: Corners): { references: QualityReference[]; spacing: number; evenness: Evenness } {
+  const { chips } = pageModel(hue)
+  const references = pageSites(hue, taps).map(({ center, radius }, i) => ({
+    at: center,
+    radius,
+    y: luminance(chips[i].linear),
+    ladder: chips[i].col === 0,
+  }))
+  const samples = pagePaperSites(hue, taps).map(({ center, radius }) => ({ at: center, radius, y: 1 }))
+  return {
+    references,
+    spacing: pageSpacing(hue, taps),
+    evenness: { samples, limitStops: PAGE_UNEVEN_STOPS, offCardStops: PAGE_OFF_CARD_STOPS },
+  }
+}
+
 export function readPhoto({
   pixels,
   card,
   spots,
   correction = fitCorrection,
 }: ReadPhotoInput): ReadPhotoResult {
-  if (card.kind === "page") throw new UnsupportedCardError("Page")
-  const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners, correction) : null
+  const hue = card.kind === "page" ? pageHueOf(card.hue) : null
+  const fit: CardFit | null =
+    card.kind === "colorchecker"
+      ? fitCard(pixels, card.corners, correction)
+      : card.kind === "page"
+        ? fitPage(pixels, hue!, card.taps, correction)
+        : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {
-    const lin = medianLinear(pixels, spot, radius)
-    const reading: Reading = { spot, raw: readColor(lin) }
+    const read = fit?.spotRadius?.(spot, radius) ?? radius
+    const lin = medianLinear(pixels, spot, read)
+    const reading: Reading = { spot, radius: read, raw: readColor(lin) }
     if (fit) reading.corrected = readColor(fit.correct(lin))
+    // The correction is strongest near the Page's own hue: point to the Page the soil belongs on.
+    const better = hue && reading.corrected ? suggestedPage(hue, reading.corrected.chip) : undefined
+    if (better) reading.betterPage = better
     return reading
   })
-  const cardParts = card.kind === "colorchecker" ? cardQuality(card.corners) : { references: [] }
-  const { warnings: quality, offCard } = checkQuality({ pixels, spots, spotRadius: radius, ...cardParts })
+  const cardParts =
+    card.kind === "colorchecker"
+      ? cardQuality(card.corners)
+      : card.kind === "page"
+        ? pageQuality(hue!, card.taps)
+        : { references: [] }
+  const { warnings: quality, offCard } = checkQuality({
+    pixels,
+    spots: readings.map((r) => ({ at: r.spot, radius: r.radius })),
+    ...cardParts,
+  })
   return { ...(fit ? { cardCheck: fit.check } : {}), ...(offCard ? { offCard } : {}), quality, readings }
 }

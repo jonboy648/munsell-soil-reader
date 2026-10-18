@@ -5,3 +5,4 @@ playwright-report/
 *.tsbuildinfo
 __pycache__/
 munsell-prototype.html
+.claude/

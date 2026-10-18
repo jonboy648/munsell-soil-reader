@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test"
 
-const PORT = 4173
+// E2E_PORT lets parallel worktrees run the browser tests at the same time.
+const PORT = Number(process.env.E2E_PORT ?? 4173)
 
 // Seam 2: the built page. The tests run against the production build (vite build, then
 // vite preview), in Chromium at a phone-sized viewport with touch.

@@ -14,6 +14,8 @@ export interface Location {
 
 export interface SavedReading {
   id: string
+  /** Milliseconds since 1970: when this Reading was saved, which can be long after its Sample was made. */
+  savedAt: number
   /** Exactly what the engine returned for the Spot, raw and corrected. */
   reading: Reading
   cardCheck?: CardCheck
@@ -82,6 +84,16 @@ export function depthText(s: Pick<Sample, "depthTop" | "depthBottom">): string {
 
 export type SampleFields = Pick<Sample, "name" | "depthTop" | "depthBottom" | "condition" | "notes">
 
+/**
+ * Only the Sample fields the user changed between the form they started from and the form they
+ * saved, so that saving cannot overwrite a field another tab changed meanwhile.
+ */
+export function changedFields(start: SampleDraft, draft: SampleDraft): Partial<SampleFields> {
+  const before = fieldsOf(start)
+  const after = fieldsOf(draft)
+  return Object.fromEntries(Object.entries(after).filter(([key, value]) => before[key as keyof SampleFields] !== value))
+}
+
 /** The Sample's own fields from a form that passed `problemWith`. */
 export const fieldsOf = (d: SampleDraft): SampleFields => ({
   name: d.name.trim(),
@@ -95,6 +107,7 @@ export const fieldsOf = (d: SampleDraft): SampleFields => ({
 export function savedReadings(result: ReadPhotoResult, card: Card, which: number[]): SavedReading[] {
   return which.map((i) => ({
     id: crypto.randomUUID(),
+    savedAt: Date.now(),
     reading: result.readings[i],
     cardCheck: result.cardCheck,
     quality: result.quality.filter((w) => w.where === "card" || w.where === i),

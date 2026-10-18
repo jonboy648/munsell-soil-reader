@@ -107,7 +107,7 @@ export const deleteSample = (id: string): Promise<void> =>
 export const addReadings = (id: string, readings: SavedReading[]) =>
   modify(id, (sample) => ({ ...sample, readings: [...sample.readings, ...readings] }))
 
-export const updateFields = (id: string, fields: SampleFields) => modify(id, (sample) => ({ ...sample, ...fields }))
+export const updateFields = (id: string, fields: Partial<SampleFields>) => modify(id, (sample) => ({ ...sample, ...fields }))
 
 export const removeReading = (id: string, readingId: string) =>
   modify(id, (sample) => ({ ...sample, readings: sample.readings.filter((r) => r.id !== readingId) }))

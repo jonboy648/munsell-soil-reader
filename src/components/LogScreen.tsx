@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button"
 import { SampleForm } from "@/components/SampleForm"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
+  changedFields,
   depthText,
   draftOf,
-  fieldsOf,
   problemWith,
   type Sample,
   type SampleDraft,
@@ -22,7 +22,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   samples: Sample[]
   /** Each rejects when the Log could not be written. */
-  onEdit: (id: string, fields: SampleFields) => Promise<unknown>
+  onEdit: (id: string, fields: Partial<SampleFields>) => Promise<unknown>
   onRemoveReading: (id: string, readingId: string) => Promise<unknown>
   onRemoveLocation: (id: string) => Promise<unknown>
   onDelete: (id: string) => Promise<unknown>
@@ -56,7 +56,7 @@ function Confirm({
       aria-label={`Confirm: ${lower} ${what}`}
       className="grid gap-2 rounded-md border-2 border-foreground p-3"
     >
-      <p className="text-sm font-medium">
+      <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
         {verb} {what}? This cannot be undone.
       </p>
       <div className="flex gap-2">
@@ -138,7 +138,8 @@ type SampleCardProps = Pick<Props, "onEdit" | "onRemoveReading" | "onRemoveLocat
 }
 
 function SampleCard({ sample, onEdit, onRemoveReading, onRemoveLocation, onDelete }: SampleCardProps) {
-  const [draft, setDraft] = React.useState<SampleDraft | null>(null) // set while editing
+  // Set while editing: the form as it started and as it is now, so that saving sends only what changed.
+  const [edit, setEdit] = React.useState<{ start: SampleDraft; draft: SampleDraft } | null>(null)
   const [confirming, setConfirming] = React.useState<string | null>(null) // "sample", "location" or a Reading's id
   const [problem, setProblem] = React.useState<string | null>(null)
 
@@ -152,12 +153,13 @@ function SampleCard({ sample, onEdit, onRemoveReading, onRemoveLocation, onDelet
     }
   }
   const saveEdit = () => {
-    if (!draft) return
-    const invalid = problemWith(draft)
+    if (!edit) return
+    const invalid = problemWith(edit.draft)
     if (invalid) return setProblem(invalid)
+    const changed = changedFields(edit.start, edit.draft)
     void attempt(async () => {
-      await onEdit(sample.id, fieldsOf(draft))
-      setDraft(null)
+      if (Object.keys(changed).length > 0) await onEdit(sample.id, changed)
+      setEdit(null)
     })
   }
 
@@ -166,17 +168,21 @@ function SampleCard({ sample, onEdit, onRemoveReading, onRemoveLocation, onDelet
     <section
       aria-label={`Sample ${sample.name}`}
       data-testid="log-sample"
-      className="grid gap-2 rounded-lg border border-border bg-card p-4"
+      className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-lg border border-border bg-card p-4"
     >
-      {draft ? (
+      {edit ? (
         <div className="grid gap-4">
-          <SampleForm idPrefix={`edit-${sample.id}`} draft={draft} onChange={setDraft} />
+          <SampleForm
+            idPrefix={`edit-${sample.id}`}
+            draft={edit.draft}
+            onChange={(draft) => setEdit({ ...edit, draft })}
+          />
           <div className="flex gap-2">
             <Button
               variant="outline"
               className="h-11 flex-1 text-base"
               onClick={() => {
-                setDraft(null)
+                setEdit(null)
                 setProblem(null)
               }}
             >
@@ -189,7 +195,7 @@ function SampleCard({ sample, onEdit, onRemoveReading, onRemoveLocation, onDelet
         </div>
       ) : (
         <>
-          <h3 className="font-heading text-lg font-bold">{sample.name}</h3>
+          <h3 className="min-w-0 font-heading text-lg font-bold [overflow-wrap:anywhere]">{sample.name}</h3>
           <p className="text-sm text-muted-foreground">{meta}</p>
           {sample.location && (
             <div className="grid gap-2">
@@ -211,9 +217,11 @@ function SampleCard({ sample, onEdit, onRemoveReading, onRemoveLocation, onDelet
               )}
             </div>
           )}
-          {sample.notes && <p className="text-sm whitespace-pre-wrap">{sample.notes}</p>}
+          {sample.notes && (
+            <p className="min-w-0 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{sample.notes}</p>
+          )}
           <div className="flex gap-2">
-            <Button variant="outline" className="h-11 flex-1 text-base" onClick={() => setDraft(draftOf(sample))}>
+            <Button variant="outline" className="h-11 flex-1 text-base" onClick={() => setEdit({ start: draftOf(sample), draft: draftOf(sample) })}>
               Edit Sample
             </Button>
             {confirming !== "sample" && (
@@ -268,7 +276,7 @@ export function LogScreen({ open, onOpenChange, samples, ...changes }: Props) {
             Screen), so export a CSV after each trip.
           </SheetDescription>
         </SheetHeader>
-        <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 pb-4">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] content-start gap-4 overflow-y-auto px-4 pb-4">
           <Button
             size="lg"
             className="h-12 text-base"
@@ -277,6 +285,10 @@ export function LogScreen({ open, onOpenChange, samples, ...changes }: Props) {
           >
             Export CSV
           </Button>
+          <p className="text-sm text-muted-foreground">
+            Excel shows a leading ' on text it could mistake for a formula, number or date, such as
+            001 or 1 A. The export puts it there on purpose; it is not damage.
+          </p>
           {samples.length === 0 ? (
             <p className="text-base">Nothing saved yet. Read a Spot, then tap Save to Log.</p>
           ) : (

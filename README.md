@@ -53,7 +53,10 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
 - The Log: Samples and their Readings are saved on the device in IndexedDB (`src/lib/log.ts`,
   `logStore.ts`) and exported as CSV (`logCsv.ts`); the screens are `LogPanel`, `SaveToLogSheet` and
   `LogScreen`. Photos are never stored. Location is off unless the user switches it on in the Save
-  form.
+  form. The CSV starts with a UTF-8 byte-order mark so Excel reads it as UTF-8. In Excel, a Sample
+  name or note that it could mistake for a formula, number, time, date or TRUE/FALSE (`=1+1`, `001`,
+  `1 A`, `Mar 5`) is shown with a leading apostrophe: the export adds it on purpose, so that
+  Excel keeps the text as typed. It is not corruption.
 - `e2e/`: the browser tests.
 - Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
   writes the web app manifest and a service worker that precaches every built file (code,

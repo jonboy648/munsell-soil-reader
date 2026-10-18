@@ -44,6 +44,14 @@ function SaveForm({
   const [problem, setProblem] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
   const existing = samples.find((s) => s.id === choice)
+  // A save outlives the form when it is cancelled. Its late answer must not touch a newer sheet.
+  const open = React.useRef(true)
+  React.useEffect(() => {
+    open.current = true
+    return () => {
+      open.current = false
+    }
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,6 +61,7 @@ function SaveForm({
     setSaving(true)
     try {
       const refused = await onSave(existing ? { sampleId: existing.id } : { fields: fieldsOf(draft) }, withLocation)
+      if (!open.current) return
       if (refused) {
         setProblem(refused)
         setChoice(NEW)
@@ -61,6 +70,7 @@ function SaveForm({
         onDone()
       }
     } catch {
+      if (!open.current) return
       setProblem("The Log could not be written on this device. Try again.")
       setSaving(false)
     }

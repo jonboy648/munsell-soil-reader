@@ -27,20 +27,44 @@ interface Props {
   spots: XY[]
 }
 
+/** A save that is waiting on the location or on the write. */
+interface Attempt {
+  spots: XY[]
+  cancelled: boolean
+  /** The write has started, so it is too late to cancel: the Reading will be saved. */
+  writing: boolean
+}
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 export function LogPanel({ result, card, spots }: Props) {
   const [samples, setSamples] = React.useState<Sample[]>([]) // oldest first
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
-  // Spots already saved to the Log. A new Photo, Start over and No Card all make new Spot
-  // objects, so nothing here needs clearing: a Spot is saved only if this very Spot was.
-  const [saved, setSaved] = React.useState<XY[]>([])
-  // What was just saved, good only while the Spots are the ones it was saved from.
-  const [status, setStatus] = React.useState<{ text: string; spots: XY[] } | null>(null)
+  // A Spot counts as saved while the Reading written for it is still in the Log (deleting the
+  // Reading, or its Sample, in the Log or in another tab makes the Spot new again; Photos are
+  // not stored, so that Reading would otherwise be lost). Spots of a new Photo, and after Start
+  // over or No Card, are new objects, so nothing here needs clearing.
+  const [placed, setPlaced] = React.useState<{ spot: XY; readingId: string }[]>([])
+  // Spots a save is working on right now, so that nothing can save them a second time meanwhile.
+  const [inFlight, setInFlight] = React.useState<XY[]>([])
+  const saving = React.useRef<Attempt | null>(null)
+  // What was just saved, shown only while the Spots are the ones it was saved from and the
+  // Readings are still in the Log.
+  const [status, setStatus] = React.useState<{ text: string; spots: XY[]; readingIds: string[] } | null>(null)
   const [problem, setProblem] = React.useState<string | null>(null)
 
-  useBackClosesSheet(saveOpen, setSaveOpen)
+  // Closing the Save sheet while it is still saving (Cancel, Back, Esc, the corner X) means
+  // cancel: the save is dropped before it writes, and its Spots are free again at once.
+  const setSaveSheet = React.useCallback((open: boolean) => {
+    const attempt = saving.current
+    if (!open && attempt && !attempt.writing) {
+      attempt.cancelled = true
+      setInFlight((all) => all.filter((spot) => !attempt.spots.includes(spot)))
+    }
+    setSaveOpen(open)
+  }, [])
+  useBackClosesSheet(saveOpen, setSaveSheet)
   useBackClosesSheet(logOpen, setLogOpen)
 
   const refresh = React.useCallback(async () => {
@@ -62,37 +86,56 @@ export function LogPanel({ result, card, spots }: Props) {
     await refresh()
   }
 
-  const newSpots = spots.map((_, i) => i).filter((i) => !saved.includes(spots[i]))
+  const inLog = React.useMemo(() => new Set(samples.flatMap((s) => s.readings.map((r) => r.id))), [samples])
+  const isSaved = (spot: XY) =>
+    inFlight.includes(spot) || placed.some((p) => p.spot === spot && inLog.has(p.readingId))
+  const newSpots = spots.map((_, i) => i).filter((i) => !isSaved(spots[i]))
   const savedCount = spots.length - newSpots.length
+  // The sheet counts the Spots it is saving as new until the save is done.
+  const sheetNew = newSpots.length + spots.filter((spot) => inFlight.includes(spot)).length
 
   const save = async (target: SaveTarget, withLocation: boolean): Promise<string | void> => {
     if (!result || !card) return
+    const chosen = newSpots.map((i) => spots[i])
     const readings = savedReadings(result, card, newSpots)
-    let name: string
-    let missingLocation = false
-    if ("sampleId" in target) {
-      const updated = await addReadings(target.sampleId, readings)
-      if (!updated) {
-        await refresh()
-        return "That Sample was deleted in another window. Save to a new Sample instead."
+    const attempt: Attempt = { spots: chosen, cancelled: false, writing: false }
+    saving.current = attempt
+    setInFlight((all) => [...all, ...chosen]) // before the first await
+    try {
+      let name: string
+      let missingLocation = false
+      if ("sampleId" in target) {
+        if (attempt.cancelled) return
+        attempt.writing = true
+        const updated = await addReadings(target.sampleId, readings)
+        if (!updated) {
+          await refresh()
+          return "That Sample was deleted in another window. Save to a new Sample instead."
+        }
+        name = updated.name
+      } else {
+        // The only place the location is asked for, and only when the user has switched it on.
+        const location = withLocation ? await currentLocation() : null
+        if (attempt.cancelled) return
+        attempt.writing = true
+        missingLocation = withLocation && location === null
+        name = target.fields.name
+        await addSample({ id: crypto.randomUUID(), ...target.fields, location, createdAt: Date.now(), readings })
       }
-      name = updated.name
-    } else {
-      // The only place the location is asked for, and only when the user has switched it on.
-      const location = withLocation ? await currentLocation() : null
-      missingLocation = withLocation && location === null
-      name = target.fields.name
-      await addSample({ id: crypto.randomUUID(), ...target.fields, location, createdAt: Date.now(), readings })
+      askToKeepLog()
+      await refresh()
+      setPlaced((all) => [...all, ...chosen.map((spot, k) => ({ spot, readingId: readings[k].id }))])
+      setStatus({
+        text:
+          `Saved ${plural(readings.length, "Reading")} to ${name}.` +
+          (missingLocation ? " The location was not available, so this Sample has none." : ""),
+        spots,
+        readingIds: readings.map((r) => r.id),
+      })
+    } finally {
+      if (saving.current === attempt) saving.current = null
+      setInFlight((all) => all.filter((spot) => !chosen.includes(spot)))
     }
-    askToKeepLog()
-    setSaved((all) => [...all, ...newSpots.map((i) => spots[i])])
-    setStatus({
-      text:
-        `Saved ${plural(readings.length, "Reading")} to ${name}.` +
-        (missingLocation ? " The location was not available, so this Sample has none." : ""),
-      spots,
-    })
-    await refresh()
   }
 
   const readingCount = samples.reduce((n, s) => n + s.readings.length, 0)
@@ -106,7 +149,7 @@ export function LogPanel({ result, card, spots }: Props) {
           : `All ${spots.length} Readings from this Photo are already saved.`
         : `${plural(newSpots.length, "new Reading")} to save${savedCount > 0 ? `; ${savedCount} already saved` : ""}.`
   return (
-    <section aria-label="Log" className="grid gap-2">
+    <section aria-label="Log" className="grid grid-cols-[minmax(0,1fr)] gap-2">
       <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Log</h2>
       <div className="flex gap-2">
         <Button size="lg" className="h-12 flex-1 text-base" disabled={!canSave} onClick={() => setSaveOpen(true)}>
@@ -124,8 +167,8 @@ export function LogPanel({ result, card, spots }: Props) {
           ? "Nothing in the Log yet."
           : `${plural(samples.length, "Sample")}, ${plural(readingCount, "Reading")} in the Log on this device.`}
       </p>
-      {status?.spots === spots && (
-        <p role="status" className="text-sm font-medium">
+      {status?.spots === spots && status.readingIds.some((id) => inLog.has(id)) && (
+        <p role="status" className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
           {status.text}
         </p>
       )}
@@ -136,9 +179,9 @@ export function LogPanel({ result, card, spots }: Props) {
       )}
       <SaveToLogSheet
         open={saveOpen}
-        onOpenChange={setSaveOpen}
-        newCount={newSpots.length}
-        savedCount={savedCount}
+        onOpenChange={setSaveSheet}
+        newCount={sheetNew}
+        savedCount={spots.length - sheetNew}
         samples={samples}
         onSave={save}
       />

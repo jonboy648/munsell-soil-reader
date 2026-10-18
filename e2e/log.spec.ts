@@ -11,7 +11,7 @@ const GROUND: XY = { x: 300, y: 560 }
 
 const CSV_HEADER =
   "Sample,Depth top (cm),Depth bottom (cm),Condition,Notes,Latitude,Longitude,Location accuracy (m)," +
-  "Saved,UTC offset,Spot x,Spot y,Chip,Chip name,Exact,Top 3,Card,Page hue,Card check,Card check mean DE,Warnings"
+  "Sample created,Saved,UTC offset,Spot x,Spot y,Chip,Chip name,Exact,Top 3,Card,Page hue,Card check,Card check mean DE,Warnings"
 const COLUMNS = CSV_HEADER.split(",")
 
 /** Tap a place on the Photo, given in Photo pixels. */
@@ -135,10 +135,14 @@ async function spyOnGeolocation(page: Page) {
   await page.addInitScript(() => {
     const spy = window as unknown as { geoCalls: number }
     spy.geoCalls = 0
-    const geo = navigator.geolocation as unknown as Record<string, (...args: unknown[]) => unknown>
+    // On the prototype, which lives as long as the page: WebKit drops properties set on `navigator.geolocation`.
+    const geo = Object.getPrototypeOf(navigator.geolocation) as Record<string, (...args: unknown[]) => unknown>
     for (const method of ["getCurrentPosition", "watchPosition"]) {
-      const original = geo[method].bind(geo)
-      geo[method] = (...args) => (spy.geoCalls++, original(...args))
+      const original = geo[method]
+      geo[method] = function (this: unknown, ...args: unknown[]) {
+        spy.geoCalls++
+        return original.apply(this, args)
+      }
     }
   })
 }
@@ -169,6 +173,7 @@ test("a saved Reading is still in the Log after a reload, and the Log says it li
   await expect(log).toContainText("The Log lives only on this device")
   await expect(log).toContainText("Your browser can also erase it on its own")
   await expect(log).toContainText("export a CSV after each trip")
+  await expect(log).toContainText("Excel shows a leading '")
   const sample = log.getByRole("region", { name: "Sample A1" })
   await expect(sample).toContainText("0-15 cm · moist")
   await expect(sample).toContainText("dark topsoil")
@@ -203,6 +208,7 @@ test("the CSV has the header and one row per Reading, with the Sample repeated a
     expect(r["Notes"]).toBe(notes)
     expect(r["Latitude"]).toBe("")
     expect(r["Longitude"]).toBe("")
+    expect(r["Sample created"]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
     expect(r["Saved"]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
     expect(r["UTC offset"]).toMatch(/^UTC[+-]\d{2}:\d{2}$/)
     expect(r["Card"]).toBe("colorchecker")
@@ -220,7 +226,7 @@ test("text Excel would run as a formula or turn into a number or date is marked 
   await readSpots(page, SIM_SPOT)
   await saveToNewSample(page, { name: "001", condition: "moist", notes: "- slight effervescence" })
   await tapPhoto(page, GROUND)
-  await saveToNewSample(page, { name: "3/4", condition: "dry", notes: '=HYPERLINK("http://example.com")' })
+  await saveToNewSample(page, { name: "1 A", condition: "dry", notes: '=HYPERLINK("http://example.com")' })
   await tapPhoto(page, { x: 600, y: 520 })
   await saveToNewSample(page, { name: "A1", condition: "dry", notes: "@home, 5 m from the road" })
 
@@ -229,7 +235,7 @@ test("text Excel would run as a formula or turn into a number or date is marked 
   const rows = csvRows(text)
   expect(rows.map((r) => [r["Sample"], r["Notes"]])).toEqual([
     ["'001", "'- slight effervescence"],
-    ["'3/4", `'=HYPERLINK("http://example.com")`],
+    ["'1 A", `'=HYPERLINK("http://example.com")`],
     ["A1", "'@home, 5 m from the road"],
   ])
 })
@@ -237,18 +243,30 @@ test("text Excel would run as a formula or turn into a number or date is marked 
 test.describe("in the evening in Chicago", () => {
   test.use({ timezoneId: "America/Chicago" })
 
-  test("the CSV dates and the file name use local time, with the offset in its own column", async ({ page }) => {
+  test("the CSV dates and the file name use local time, each Reading with its own save time", async ({ page }) => {
     // 19:30 on 18 October in Chicago is already 19 October in UTC.
     await page.clock.setFixedTime(new Date("2026-10-19T00:30:00Z"))
     await readSpots(page, SIM_SPOT)
     await saveToNewSample(page, { name: "A1", condition: "moist" })
+
+    // Two days later a Reading is added to the same Sample.
+    await page.clock.setFixedTime(new Date("2026-10-20T14:05:00Z"))
+    await tapPhoto(page, GROUND)
+    await saveToExistingSample(page, "A1, moist")
+
+    // And the Log is exported at 20:15 on the 20th, which is the 21st in UTC.
+    await page.clock.setFixedTime(new Date("2026-10-21T01:15:00Z"))
     await openLog(page)
     const { filename, text } = await exportCsv(page)
 
-    expect(filename).toBe("soil-log-2026-10-18.csv")
-    const [row] = csvRows(text)
-    expect(row["Saved"]).toBe("2026-10-18 19:30")
-    expect(row["UTC offset"]).toBe("UTC-05:00")
+    expect(filename).toBe("soil-log-2026-10-20.csv")
+    const [first, second] = csvRows(text)
+    expect(first["Sample created"]).toBe("2026-10-18 19:30")
+    expect(first["Saved"]).toBe("2026-10-18 19:30")
+    expect(second["Sample created"]).toBe("2026-10-18 19:30")
+    expect(second["Saved"]).toBe("2026-10-20 09:05")
+    expect(first["UTC offset"]).toBe("UTC-05:00")
+    expect(second["UTC offset"]).toBe("UTC-05:00")
   })
 })
 
@@ -470,12 +488,13 @@ test("the Log closes from a button in the thumb zone and with Back, never leavin
 })
 
 test("closing a sheet any other way takes its history entry off, so Back then leaves the app", async ({ page }) => {
+  await page.goto("/?before") // somewhere to go back to
   await readSpots(page, SIM_SPOT)
   await (await openLog(page)).getByRole("button", { name: "Close Log", exact: true }).click()
   await expect(logScreen(page)).toHaveCount(0)
   await historySettled(page)
   await page.goBack()
-  await expect.poll(() => page.url()).toBe("about:blank")
+  await expect.poll(() => page.url()).toContain("?before")
 })
 
 test("a save in one tab shows up in another without a reload", async ({ page, context }) => {
@@ -525,7 +544,8 @@ test("an edit from a tab that has gone stale leaves the other tab's Readings alo
   await expect(log.getByRole("region", { name: "Sample A1 (north pit)" })).toBeVisible()
 })
 
-test("the Log keeps working after the browser drops its connection to the database", async ({ page, context }) => {
+test("the Log keeps working after the browser drops its connection to the database", async ({ page, context, browserName }) => {
+  test.skip(browserName !== "chromium", "forcing a connection closed needs the Chrome DevTools Protocol")
   await readSpots(page, SIM_SPOT)
   await saveToNewSample(page, { name: "A1", condition: "moist" })
 
@@ -542,15 +562,21 @@ test("the Log keeps working after the browser drops its connection to the databa
 })
 
 test("the browser is asked once, after the first save, to keep the Log", async ({ page }) => {
-  await page.addInitScript(() => {
-    const spy = window as unknown as { persistCalls: number }
-    spy.persistCalls = 0
-    const original = navigator.storage.persist.bind(navigator.storage)
-    navigator.storage.persist = () => (spy.persistCalls++, original())
-  })
   const calls = () => page.evaluate(() => (window as unknown as { persistCalls: number }).persistCalls)
 
   await readSpots(page, SIM_SPOT)
+  // Set up once the page is loaded: WebKit has no storage.persist while init scripts run.
+  await page.evaluate(() => {
+    const spy = window as unknown as { persistCalls: number }
+    spy.persistCalls = 0
+    // On the prototype, which lives as long as the page: WebKit drops properties set on `navigator.storage`.
+    const manager = Object.getPrototypeOf(navigator.storage)
+    const original = manager.persist
+    manager.persist = function (this: StorageManager) {
+      spy.persistCalls++
+      return original.call(this)
+    }
+  })
   await (await openLog(page)).getByRole("button", { name: "Close Log", exact: true }).click()
   expect(await calls()).toBe(0)
 
@@ -560,4 +586,150 @@ test("the browser is asked once, after the first save, to keep the Log", async (
   await saveToExistingSample(page, "A1, moist")
   await expect(page.getByTestId("log-summary")).toContainText("1 Sample, 2 Readings")
   expect(await calls()).toBe(1)
+})
+
+test("the Log keeps working after its database is deleted under it, as clearing site data does", async ({ page }) => {
+  await readSpots(page, SIM_SPOT)
+  await saveToNewSample(page, { name: "A1", condition: "moist" })
+
+  // The app has to let go of its connection for the deletion to go through.
+  const outcome = await page.evaluate(
+    () =>
+      new Promise<string>((resolve) => {
+        const request = indexedDB.deleteDatabase("munsell-soil-reader")
+        request.onsuccess = () => resolve("deleted")
+        request.onblocked = () => resolve("blocked")
+        setTimeout(() => resolve("still waiting"), 5000)
+      }),
+  )
+  expect(outcome).toBe("deleted")
+
+  await tapPhoto(page, GROUND)
+  await saveToNewSample(page, { name: "B2", condition: "dry" })
+  await expect(page.getByRole("status")).toHaveText("Saved 1 Reading to B2.")
+  await page.reload()
+  await expect(page.getByTestId("log-summary")).toContainText("1 Sample, 1 Reading")
+})
+
+/** A geolocation that answers after `ms`, so a test can act while a save is waiting for it. */
+async function slowLocation(page: Page, ms: number) {
+  await page.addInitScript((delay) => {
+    const slow = {
+      getCurrentPosition: (ok: (position: unknown) => void) => {
+        setTimeout(() => ok({ coords: { latitude: 41.5, longitude: -93.6, accuracy: 5 }, timestamp: Date.now() }), delay)
+      },
+      watchPosition: () => 0,
+      clearWatch: () => {},
+    }
+    Object.defineProperty(navigator, "geolocation", { value: slow, configurable: true })
+  }, ms)
+}
+
+for (const dismiss of ["Cancel", "Back"] as const) {
+  test(`${dismiss} while a save waits for the location saves nothing, and saving again makes one Sample`, async ({ page }) => {
+    test.slow() // two saves and a deliberate wait, on engines that are slow to click through
+    await slowLocation(page, 2000)
+    await readSpots(page, SIM_SPOT)
+    await page.getByRole("button", { name: "Save to Log" }).click()
+    const sheet = saveSheet(page)
+    await sheet.getByLabel("Sample name or number").fill("Slow")
+    await sheet.getByRole("radio", { name: "moist" }).click()
+    await sheet.getByRole("switch", { name: "Save my location with this Sample" }).click()
+    await saveButton(sheet).click()
+    await expect(sheet.getByRole("button", { name: "Saving..." })).toBeVisible()
+
+    if (dismiss === "Cancel") await sheet.getByRole("button", { name: "Cancel" }).click()
+    else await page.goBack()
+    await expect(sheet).toHaveCount(0)
+
+    // The Spot is free again at once: save it again, this time without the location.
+    await expect(page.getByTestId("log-pending")).toHaveText("1 new Reading to save.")
+    await historySettled(page)
+    await page.getByRole("button", { name: "Save to Log" }).click()
+    await sheet.getByRole("switch", { name: "Save my location with this Sample" }).click()
+    await sheet.getByLabel("Sample name or number").fill("Quick")
+    await sheet.getByRole("radio", { name: "dry" }).click()
+
+    // The first save's location arrives about now. It must neither close this sheet nor write.
+    await page.waitForTimeout(2500)
+    await expect(sheet).toBeVisible()
+    await saveButton(sheet).click()
+    await expect(page.getByRole("status")).toHaveText("Saved 1 Reading to Quick.")
+    await expect(page.getByTestId("log-summary")).toContainText("1 Sample, 1 Reading")
+    const log = await openLog(page)
+    await expect(log.getByTestId("log-sample")).toHaveCount(1)
+    await expect(log.getByRole("region", { name: "Sample Quick" })).toBeVisible()
+  })
+}
+
+test("a Spot whose Reading was deleted from the Log can be saved again", async ({ page }) => {
+  const pending = page.getByTestId("log-pending")
+  await readSpots(page, SIM_SPOT)
+  await saveToNewSample(page, { name: "A1", condition: "moist" })
+  await expect(pending).toHaveText("The Reading from this Photo is already saved.")
+
+  // Photos are not stored, so a Reading deleted from the Log is gone unless it can be saved again.
+  const log = await openLog(page)
+  await log.getByRole("button", { name: "Delete Reading" }).click()
+  await log.getByRole("button", { name: "Yes, delete" }).click()
+  await expect(log.getByTestId("log-reading")).toHaveCount(0)
+  await log.getByRole("button", { name: "Close Log", exact: true }).click()
+
+  await expect(pending).toHaveText("1 new Reading to save.")
+  await expect(page.getByRole("status")).toHaveCount(0)
+  await saveToExistingSample(page, "A1, moist")
+  await expect(page.getByTestId("log-summary")).toContainText("1 Sample, 1 Reading")
+})
+
+test("editing a Sample sends only what was changed, so another tab's edit to another field survives", async ({ page, context }) => {
+  // This tab never hears about changes, so its form goes stale on purpose.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "BroadcastChannel", { value: undefined })
+  })
+  await readSpots(page, SIM_SPOT)
+  await saveToNewSample(page, { name: "A1", condition: "moist", notes: "first" })
+  const log = await openLog(page)
+  await log.getByRole("button", { name: "Edit Sample" }).click()
+
+  // Meanwhile the other tab changes the notes.
+  const other = await context.newPage()
+  await other.goto("/")
+  const otherLog = await openLog(other)
+  await otherLog.getByRole("button", { name: "Edit Sample" }).click()
+  await otherLog.getByLabel("Notes").fill("second")
+  await otherLog.getByRole("button", { name: "Save changes" }).click()
+  await expect(otherLog.getByRole("region", { name: "Sample A1" })).toContainText("second")
+  await other.close()
+
+  // This tab changes only the name. Its form still says "first" for the notes.
+  await log.getByLabel("Sample name or number").fill("A1 (north pit)")
+  await log.getByRole("button", { name: "Save changes" }).click()
+  const sample = log.getByRole("region", { name: "Sample A1 (north pit)" })
+  await expect(sample).toContainText("second")
+  await expect(sample).not.toContainText("first")
+})
+
+test.describe("on a 360 px wide phone", () => {
+  test.use({ viewport: { width: 360, height: 740 } })
+
+  test("long unbroken text never makes the page or the Log scroll sideways", async ({ page }) => {
+    const sideways = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    const longName = `ID${"9".repeat(70)}`
+    await readSpots(page, SIM_SPOT)
+    await saveToNewSample(page, { name: longName, condition: "moist", notes: `https://example.com/${"a".repeat(120)}` })
+    await expect(page.getByRole("status")).toContainText(longName)
+    expect(await sideways()).toBe(0)
+
+    // The Log's own scrolling area, and the dialog around it, are no wider than the screen.
+    const log = await openLog(page)
+    const overflow = () =>
+      log.evaluate((dialog) => {
+        const scroller = dialog.querySelector(".overflow-y-auto") as HTMLElement
+        return [dialog.scrollWidth - dialog.clientWidth, scroller.scrollWidth - scroller.clientWidth]
+      })
+    expect(await overflow()).toEqual([0, 0])
+    await log.getByRole("button", { name: "Delete Sample" }).click()
+    await expect(log.getByRole("group", { name: /Confirm: delete Sample/ })).toBeVisible()
+    expect(await overflow()).toEqual([0, 0])
+  })
 })

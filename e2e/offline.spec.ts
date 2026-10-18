@@ -507,22 +507,29 @@ test.describe("on a 320 x 568 phone", () => {
   })
 })
 
+/** How long to wait for a browser's service worker install, which varies a lot between runners. */
+const INSTALL_MS = 20_000
+
 test("a first install that fails is tried again when the app comes back to the front", async ({ page, site }) => {
   // The first visit on a weak signal: one precached file answers 503, so the install fails and
   // the browser drops the registration.
   site.failPrecache(true)
   await page.goto(site.url)
   // Wait for the install to really have failed, not just for there to be no registration yet.
-  await expect.poll(() => site.precacheFailures()).toBeGreaterThan(0)
+  // The install is the browser's own work and takes longer on a busy runner (WebKit on macOS once
+  // took more than the default 5 s to ask for the file), so these waits are generous.
+  await expect.poll(() => site.precacheFailures(), { timeout: INSTALL_MS }).toBeGreaterThan(0)
   await expect
-    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()) === undefined))
+    .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration()) === undefined), {
+      timeout: INSTALL_MS,
+    })
     .toBe(true)
   await expect(page.getByTestId("offline-notice")).toHaveCount(0)
 
   // Signal comes back; no reload.
   site.failPrecache(false)
   await lookForUpdate(page)
-  await expect(page.getByTestId("offline-notice")).toContainText("Ready to work offline")
+  await expect(page.getByTestId("offline-notice")).toContainText("Ready to work offline", { timeout: INSTALL_MS })
 })
 
 test("an update reaches a window no worker controls while another window holds it waiting", async ({

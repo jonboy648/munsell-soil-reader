@@ -58,6 +58,13 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   build, with its own license text) to `licenses.json`, which the service worker caches too. It is a page of the same single HTML
   file (`#method`), so it works offline with the rest.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
+- The Log: Samples and their Readings are saved on the device in IndexedDB (`src/lib/log.ts`,
+  `logStore.ts`) and exported as CSV (`logCsv.ts`); the screens are `LogPanel`, `SaveToLogSheet` and
+  `LogScreen`. Photos are never stored. Location is off unless the user switches it on in the Save
+  form. The CSV starts with a UTF-8 byte-order mark so Excel reads it as UTF-8. In Excel, a Sample
+  name or note that it could mistake for a formula, number, time, date or TRUE/FALSE (`=1+1`, `001`,
+  `1 A`, `Mar 5`) is shown with a leading apostrophe: the export adds it on purpose, so that
+  Excel keeps the text as typed. It is not corruption.
 - `e2e/`: the browser tests.
 - Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
   writes the web app manifest and a service worker that precaches every built file (code,
@@ -145,6 +152,7 @@ Two seams, and nothing else:
   tilt, then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
 - **Browser** (`e2e/*.spec.ts`): the production build at a phone viewport. It picks an example,
   taps corners and Spots by coordinates and reads the text on screen.
+  `e2e/log.spec.ts` covers the Log: save, reload, edit, delete, and the downloaded CSV.
   `e2e/offline.spec.ts` covers install and offline: the manifest, Chromium's installability
   check, a Reading with the network off, and the notices for the first install and for each kind
   of new deploy (served through a small proxy that publishes new versions of the app). The

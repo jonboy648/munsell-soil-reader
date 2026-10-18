@@ -17,6 +17,8 @@ export type Correction = (lin: Vec3) => Vec3
 export interface Reference {
   measured: Vec3
   truth: Vec3
+  /** What to call it when telling the user about it: "neutral 5", or a Chip's notation. */
+  name?: string
   /**
    * Part of the tone ladder: a gray, or close to one, whose true color is known in each
    * channel. The ladder is what each channel's curve is drawn through, so it needs at least
@@ -139,18 +141,17 @@ export const fitCorrection: Fit = linearizeThen(pchip)
 const colorDifference = (a: Vec3, b: Vec3): number => deltaE2000(linearToLab(a), linearToLab(b))
 
 /**
- * The Card check: how well the correction predicts references it was not fitted to. Each
- * reference in turn is left out, the correction is fitted on the rest, and the left-out
- * reference is corrected and compared with its true color. The mean CIEDE2000 over all of
- * them is the result. Judged on the references it was fitted to, a more flexible fit would
- * look better just by memorising the Card.
+ * How well the correction predicts each reference it was not fitted to. Each reference in
+ * turn is left out, the correction is fitted on the rest, and the left-out reference is
+ * corrected and compared with its true color (CIEDE2000). Judged on the references it was
+ * fitted to, a more flexible fit would look better just by memorising the Card. The result
+ * is in the order of `references`, so a caller can see which one is off.
  *
  * To leave a dirty reference out of the check altogether, drop it from `references` first.
  */
-export function heldOutError(references: Reference[], fit: Fit): number {
-  const total = references.reduce((sum, held, i) => {
+export function heldOutErrors(references: Reference[], fit: Fit): number[] {
+  return references.map((held, i) => {
     const rest = references.filter((_, j) => j !== i)
-    return sum + colorDifference(fit(rest)(held.measured), held.truth)
-  }, 0)
-  return total / references.length
+    return colorDifference(fit(rest)(held.measured), held.truth)
+  })
 }

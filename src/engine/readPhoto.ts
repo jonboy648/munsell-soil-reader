@@ -2,11 +2,11 @@
 import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { NEUTRAL_PATCHES, PATCH_LINEAR, patchCenters } from "./colorchecker"
-import { fitCorrection, heldOutError, type Fit, type Reference } from "./correction"
+import { checkCard } from "./cardCheck"
+import { NEUTRAL_PATCHES, PATCH_LINEAR, PATCH_NAMES, patchCenters } from "./colorchecker"
+import { fitCorrection, type Fit, type Reference } from "./correction"
 import { medianLinear, patchRadius, spotRadius } from "./sampling"
 import type {
-  CardCheck,
   ChipReading,
   Corners,
   Pixels,
@@ -14,9 +14,6 @@ import type {
   ReadPhotoResult,
   Reading,
 } from "./types"
-
-/** The Card check is good when the mean held-out CIEDE2000 of the Card is below this. */
-export const CARD_CHECK_GOOD = 2
 
 export class UnsupportedCardError extends Error {
   constructor(kind: string) {
@@ -62,10 +59,9 @@ function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
     measured: medianLinear(pixels, p, radius),
     truth: PATCH_LINEAR[i],
     ladder: NEUTRAL_PATCHES.includes(i),
+    name: PATCH_NAMES[i],
   }))
-  const meanDE = heldOutError(references, fit)
-  const check: CardCheck = { meanDE, ok: meanDE < CARD_CHECK_GOOD }
-  return { correct: fit(references), check }
+  return checkCard(references, fit)
 }
 
 export function readPhoto({

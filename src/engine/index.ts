@@ -1,5 +1,6 @@
 // The reading engine's public surface. Pure TypeScript: no DOM, no React.
-export { readPhoto, CARD_CHECK_GOOD, UnsupportedCardError } from "./readPhoto"
+export { readPhoto, UnsupportedCardError } from "./readPhoto"
+export { CARD_CHECK_GOOD, CARD_CHECK_CAUTION } from "./cardCheck"
 export { deltaE2000 } from "./color"
 export { patchCenters } from "./colorchecker"
 export { patchRadius, spotRadius } from "./sampling"

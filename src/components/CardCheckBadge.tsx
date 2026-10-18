@@ -1,12 +1,13 @@
-import { Check, CircleDashed, TriangleAlert } from "lucide-react"
+import { Check, CircleAlert, CircleDashed, TriangleAlert } from "lucide-react"
 import type { CardCheck } from "@/engine"
 import { cn } from "@/lib/utils"
 import type { Verdict } from "@/lib/verdict"
 
-// Gray only, so the states differ by icon, words and border: filled = good, heavy outline =
-// failed, dashed = not corrected. None of them depends on seeing a color.
+// Gray only, so the states differ by icon, words and border: filled = good, plain outline =
+// caution, heavy outline = failed, dashed = not corrected. None of them depends on seeing a color.
 const STYLE: Record<Verdict, string> = {
   good: "border-transparent bg-foreground text-background",
+  caution: "border border-foreground bg-background text-foreground",
   failed: "border-2 border-foreground bg-background font-bold text-foreground",
   uncorrected: "border border-dashed border-foreground/70 text-foreground",
 }
@@ -22,10 +23,11 @@ export function CardCheckBadge({
 }) {
   const text = {
     good: "Card check good",
+    caution: "Card check caution",
     failed: "Card check failed",
     uncorrected: "Not corrected",
   }[verdict]
-  const Icon = { good: Check, failed: TriangleAlert, uncorrected: CircleDashed }[verdict]
+  const Icon = { good: Check, caution: CircleAlert, failed: TriangleAlert, uncorrected: CircleDashed }[verdict]
   return (
     <span
       data-testid="card-check"

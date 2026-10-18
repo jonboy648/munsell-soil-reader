@@ -60,9 +60,15 @@ export type QualityWarning = {
   advice: string
 }
 
+export type CardVerdict = "good" | "caution" | "failed"
+
 export interface CardCheck {
   meanDE: number // mean CIEDE2000 between each Card reference and its true color, corrected by a fit made without it
-  ok: boolean // good when meanDE is below CARD_CHECK_GOOD
+  /** Good: below CARD_CHECK_GOOD, no dirty gray step. Caution: below CARD_CHECK_CAUTION, or a gray step was left out. Failed: above, or more than one gray step looked dirty. */
+  verdict: CardVerdict
+  ok: boolean // verdict is good
+  /** Gray steps that looked dirty or tinted, worst first. The first was left out of the correction; with a second the check failed. */
+  dirtyGrays?: string[]
 }
 
 export interface ReadPhotoInput {

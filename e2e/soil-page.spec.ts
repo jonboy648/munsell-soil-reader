@@ -69,13 +69,13 @@ test("JF-1 is typed in, previewed and exported as a PDF whose text reads back as
   await expect(sheet.getByTestId("form-warnings")).toHaveCount(0)
 
   // The preview draws the values in row order.
-  const preview = sheet.getByTestId("preview-text")
+  const preview = sheet.getByTestId("soil-preview-text")
   await expect(preview).toHaveText(JF1_VALUES)
 
   // The PDF holds the same values, in the same order and at the same places.
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    sheet.getByRole("button", { name: "Download PDF" }).click(),
+    sheet.getByRole("button", { name: "Download Soil page PDF" }).click(),
   ])
   expect(download.suggestedFilename()).toBe("soil-page-JF-fixture-JF-1.pdf")
   const drawn = (await pdfText(new Uint8Array(readFileSync(await download.path())))).slice(-JF1_VALUES.length)
@@ -94,7 +94,7 @@ test("a layer with no matrix color is warned about, and the page still comes out
   const sheet = await createPoint(page, "Pond", "SP-1")
   await addLayer(sheet, { top: "0", bottom: "6" })
   await expect(sheet.getByTestId("form-warnings")).toContainText("Layer 1 (0-6 in) has no matrix color")
-  await expect(sheet.getByTestId("preview-text")).toHaveText(["SP-1", "0-6"])
+  await expect(sheet.getByTestId("soil-preview-text")).toHaveText(["SP-1", "0-6"])
 })
 
 test("layer problems are said in plain words, and a typed color is read as the book prints it", async ({ page }) => {
@@ -192,7 +192,7 @@ test("a Reading is assigned to a layer as its matrix color from the readings pan
   await again.getByRole("button", { name: "Open project" }).click()
   await again.getByRole("button", { name: "Open point" }).click()
   await expect(again.getByTestId("layer")).toContainText("Matrix 10YR 4/3, 90%")
-  await expect(again.getByTestId("preview-text")).toHaveText(["SP-1", "0-6", "10YR 4/3", "90"])
+  await expect(again.getByTestId("soil-preview-text")).toHaveText(["SP-1", "0-6", "10YR 4/3", "90"])
   await expect(again.getByTestId("form-warnings")).toHaveCount(0)
   void SIM_HEIGHT
 })
@@ -301,12 +301,12 @@ test("remarks too wide for their column wrap onto the rows below, and symbols th
   await expect(sheet.getByTestId("form-warnings")).toContainText("Layer 1: the remarks have characters the form cannot print")
 
   const spelled = "pH <= 5 -> dark organic surface with many fine roots, small stones and some clay"
-  const lines = await sheet.locator('[data-testid="preview-text"][data-field$=".remarks"]').allTextContents()
+  const lines = await sheet.locator('[data-testid="soil-preview-text"][data-field$=".remarks"]').allTextContents()
   expect(lines.length).toBeGreaterThan(1)
   expect(lines.join(" ")).toBe(spelled)
 
   // The PDF is made (the font has no such symbols) and no line of it crosses the table's right rule.
-  const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download PDF" }).click()])
+  const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download Soil page PDF" }).click()])
   const drawn = await pdfText(new Uint8Array(readFileSync(await download.path())))
   // The remarks are the last text drawn: the name and the row's depth, color and percent come before them.
   const remarkLines = drawn.slice(-lines.length)

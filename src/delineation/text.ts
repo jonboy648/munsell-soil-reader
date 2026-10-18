@@ -3,6 +3,9 @@
 // the form engine, the preview and the PDF all agree on what fits.
 import { HELVETICA_WIDTHS } from "./helveticaWidths"
 
+/** A number as it is written on a form: 20, 2.5, not 20.0. */
+export const written = (n: number): string => String(Math.round(n * 100) / 100)
+
 /** The width of the text in points at this text size. Characters Helvetica cannot print count as nothing. */
 export function widthOf(text: string, size: number): number {
   let thousandths = 0

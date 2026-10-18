@@ -105,15 +105,15 @@ describe("a pair of Sampling points", () => {
     const paired: Project = { ...project, points: [{ ...jf1, pair: { with: "jf-2", role: "wetland" } }, jf2] }
     expect(pairOf(paired, paired.points[0])).toMatchObject({ role: "wetland", other: { name: "JF-2" } })
     expect(pairOf(paired, paired.points[1])).toMatchObject({ role: "upland", other: { name: "JF-1" } })
-    expect(formFor(paired, paired.points[0]).fields["page1.remarks"]).toBe("Wetland point, paired with the upland point JF-2.")
-    expect(formFor(paired, paired.points[1]).fields["page1.remarks"]).toBe("Upland point, paired with the wetland point JF-1.")
+    expect(formFor(paired, paired.points[0]).fields["page1.summaryRemarks"]).toBe("Wetland point, paired with the upland point JF-2.")
+    expect(formFor(paired, paired.points[1]).fields["page1.summaryRemarks"]).toBe("Upland point, paired with the wetland point JF-1.")
   })
 
   test("says nothing when there is no pair, or when the other half is gone", () => {
-    expect(formFor(project, jf1).fields["page1.remarks"]).toBe("")
+    expect(formFor(project, jf1).fields["page1.summaryRemarks"]).toBe("")
     const orphan: Project = { ...project, points: [{ ...jf1, pair: { with: "deleted", role: "upland" } }] }
     expect(pairOf(orphan, orphan.points[0])).toBeNull()
-    expect(formFor(orphan, orphan.points[0]).fields["page1.remarks"]).toBe("")
+    expect(formFor(orphan, orphan.points[0]).fields["page1.summaryRemarks"]).toBe("")
   })
 })
 
@@ -165,9 +165,9 @@ describe("where page 1 is drawn", () => {
 
   test("a paired point's note starts the Summary remarks, inside the box", () => {
     const paired: Project = { ...project, points: [{ ...jf1, pair: { with: "jf-2", role: "wetland" } }, jf2] }
-    const note = page1Placements(paired, formFor(paired, paired.points[0])).find((p) => p.id === "page1.remarks")
+    const note = page1Placements(paired, formFor(paired, paired.points[0])).find((p) => p.id === "page1.summaryRemarks")
     expect(note?.text).toBe("Wetland point, paired with the upland point JF-2.")
-    expect(note?.x).toBe(page1.remarks.left)
-    expect(note?.baseline).toBe(page1.remarks.baseline)
+    expect(note?.x).toBe(page1.summaryRemarks.left)
+    expect(note?.baseline).toBe(page1.summaryRemarks.baseline)
   })
 })

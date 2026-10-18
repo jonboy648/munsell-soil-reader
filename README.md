@@ -67,14 +67,17 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   Excel keeps the text as typed. It is not corruption.
 - `src/delineation/`: the wetland form. A Project holds a header (the lines at the top of page 1, entered
   once and printed on every point's form) and Sampling points, which hold their own lines (name, lat,
-  long, datum, the wetland or upland pair) and Layers (inches). `formFor(project, point)` is the pure
-  form engine: every printed field of page 1's header and the Soil page's profile table, suggestions,
-  conclusions and warnings. The region package (`regions/ncne/`) is data: the official ENG Form 6116-8
-  pages, as PDFs and images, and where each field sits on them, measured from the PDF. A point's PDF is
-  its page 1, Soil page and Privacy Act page, each the official page with the values drawn on it
-  (pdf-lib, on the device); the project PDF is those for every point in order, with each official page
-  embedded once. The on-screen previews draw the same lists of placed values. Text is made printable
-  and fitted to its line in `text.ts`, with a warning when it is cut.
+  long, datum, the wetland or upland pair), Layers (inches) and Hydrology. `formFor(project, point)` is
+  the pure form engine: every printed field of page 1's header and Hydrology section and the Soil page's
+  profile table, suggestions, conclusions and warnings. The region package (`regions/ncne/`) is data:
+  the official ENG Form 6116-8 pages, as PDFs and images, and where each field sits on them, measured
+  from the PDF. A point's PDF is its page 1, Soil page and Privacy Act page, each the official page
+  with the values drawn on it (pdf-lib, on the device); the project PDF is those for every point in
+  order, with each official page embedded once. The on-screen previews draw the same lists of placed
+  values. Text is made printable and fitted to its line in `text.ts`, with a warning when it is cut.
+  Page 1's Hydrology section (the 29 indicators with the supplement's definitions and pages,
+  `regions/ncne/hydrology-rules.md`, the one-primary-or-two-secondary rule, depths and notes) is drawn
+  on the same page the same way.
 - `e2e/`: the browser tests.
 - Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
   against a ColorChecker and exports the batch file the frame card reads. It is a separate

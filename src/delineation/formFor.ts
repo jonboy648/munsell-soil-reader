@@ -1,7 +1,7 @@
 // The form engine: the values of every printed field of a form, for one sampling point. Pure: no
 // UI, no files. The on-screen preview and the PDF both draw from what this returns.
 //
-// Filled so far: the header of page 1 (`page1.<line>`, and `page1.remarks` for the note of a pair), the
+// Filled so far: the header of page 1 (`page1.<line>`, and `page1.summaryRemarks` for the note of a pair), the
 // Soil page's Sampling Point box (`soil.samplingPoint`) and its profile description table. The table's
 // fields are named `soil.profile.<row>.<column>`, rows from 0, and every one is in `fields`, blank when
 // unknown. Every value is already text the PDF's font can print.
@@ -16,14 +16,25 @@ import {
   type ProfileColumn,
   type SoilPage,
 } from "./regions/types"
-import { fit, printable, truncate, widthOf, wrap } from "./text"
+import { hydrologyFor } from "./hydrology"
+import { fit, printable, truncate, widthOf, wrap, written } from "./text"
 import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
 
-type Page1Id = `page1.${Page1Field}` | "page1.remarks"
-export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint" | Page1Id
+type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
+export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint" | Page1Id | `page1.hydrology.${string}`
 
 export interface FormWarning {
-  kind: "no-matrix" | "bad-depth" | "overlap" | "gap" | "too-many-rows" | "remarks-cut" | "text-changed" | "field-cut"
+  kind:
+    | "no-matrix"
+    | "bad-depth"
+    | "overlap"
+    | "gap"
+    | "too-many-rows"
+    | "remarks-cut"
+    | "text-changed"
+    | "field-cut"
+    | "hydrology-observation"
+    | "hydrology-answer"
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
   text: string
@@ -32,11 +43,25 @@ export interface FormWarning {
 export interface Form {
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
-  /** Indicators the data satisfies, for the user to confirm. None yet. */
-  suggestions: readonly never[]
-  /** The yes or no conclusions of the form. None yet. */
-  conclusions: readonly never[]
+  /** What the recorded data suggests, with the rule it used, for the user to confirm. */
+  suggestions: readonly Suggestion[]
+  /** The answers the user has confirmed. */
+  conclusions: readonly Conclusion[]
   warnings: FormWarning[]
+}
+
+/** A suggested answer, shown with the rule behind it. It is not printed until the user confirms it. */
+export interface Suggestion {
+  id: "hydrology.present"
+  answer: boolean
+  text: string
+  citation: string
+}
+
+/** A yes or no answer the user confirmed. */
+export interface Conclusion {
+  id: "hydrology.present"
+  answer: boolean
 }
 
 export const fieldId = (row: number, column: ProfileColumn): FieldId => `soil.profile.${row}.${column}`
@@ -87,15 +112,12 @@ function page1Fields(project: Project, point: SamplingPoint, warnings: FormWarni
   const pair = pairOf(project, point)
   if (pair) {
     const [mine, theirs] = pair.role === "wetland" ? ["Wetland", "upland"] : ["Upland", "wetland"]
-    out["page1.remarks"] = printable(`${mine} point, paired with the ${theirs} point ${pair.other.name}.`).text
+    out["page1.summaryRemarks"] = printable(`${mine} point, paired with the ${theirs} point ${pair.other.name}.`).text
   } else {
-    out["page1.remarks"] = ""
+    out["page1.summaryRemarks"] = ""
   }
   return out
 }
-
-/** A number as it is written on a form: 20, 2.5, not 20.0. */
-const written = (n: number): string => String(Math.round(n * 100) / 100)
 
 type Row = Partial<Record<ProfileColumn, string>>
 
@@ -191,5 +213,17 @@ export function formFor(project: Project, point: SamplingPoint): Form {
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }
-  return { fields, suggestions: [], conclusions: [], warnings }
+
+  const hydrology = hydrologyFor(regionOf(project.region), point.hydrology)
+  Object.assign(fields, hydrology.fields)
+  warnings.push(...hydrology.warnings)
+  const present = point.hydrology?.present
+  return {
+    fields,
+    suggestions: hydrology.suggestion
+      ? [{ id: "hydrology.present", answer: hydrology.suggestion.answer, text: hydrology.suggestion.text, citation: hydrology.suggestion.citation }]
+      : [],
+    conclusions: typeof present === "boolean" ? [{ id: "hydrology.present", answer: present }] : [],
+    warnings,
+  }
 }

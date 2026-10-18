@@ -74,7 +74,7 @@ async function setDetails(sheet: Locator, details: { lat: string; long: string; 
 const textOf = async (download: Download, pageNumber: number) =>
   (await pdfText(new Uint8Array(readFileSync(await download.path())), pageNumber)).map((d) => d.text)
 
-const page1Text = (sheet: Locator) => sheet.getByTestId("page1-preview").getByTestId("preview-text")
+const page1Text = (sheet: Locator) => sheet.getByTestId("page1-preview-text")
 
 test("the header is filled once, two points are added, and the project's PDF reads back both forms", async ({ page }) => {
   await page.goto("/")
@@ -147,7 +147,7 @@ test("the header and the pair are still there after a reload, and a point's own 
   await openPoint(sheet, "SP-2")
   await expect(sheet.getByTestId("point-details")).toContainText("Wetland point, paired with the upland point SP-1.")
 
-  const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download PDF" }).click()])
+  const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download form PDF" }).click()])
   expect(download.suggestedFilename()).toBe("wetland-form-Pond-SP-2.pdf")
   const pages = await Promise.all([1, 2, 3].map((n) => textOf(download, n)))
   expect(pages[0]).toContain("SP-2")

@@ -1,19 +1,16 @@
 // One sampling point: its own header lines and pair, its Layers from the surface down, the form's
-// warnings, page 1 and the Soil page, and the PDF of its form.
+// warnings, the Soil page and page 1, and the PDF of its whole form.
 import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
 import { FormExport, slug } from "@/components/FormExport"
+import { HydrologyForm } from "@/components/HydrologyForm"
 import { LayerForm } from "@/components/LayerForm"
 import { PagePreview } from "@/components/PagePreview"
 import { PointDetails, type PointDetailsChange } from "@/components/PointDetails"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
 import { pairOf, topToBottom, withPoint, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
-import { page1Placements } from "@/delineation/page1"
-import { regionOf } from "@/delineation/regions"
-import { pageAssets } from "@/delineation/regions/assets"
-import { soilPlacements } from "@/delineation/soilPage"
 
 interface Props {
   project: Project
@@ -83,10 +80,6 @@ export function PointView({ project, point, change, onBack }: Props) {
   const [editingDetails, setEditingDetails] = React.useState(false)
   const form = React.useMemo(() => formFor(project, point), [project, point])
   const layers = topToBottom(point.layers)
-  const { page1, soil } = regionOf(project.region)
-  const assets = pageAssets[project.region]
-  const page1Drawn = React.useMemo(() => page1Placements(project, form), [project, form])
-  const soilDrawn = React.useMemo(() => soilPlacements(project, form), [project, form])
 
   // The pair is kept on this point; a pair another point recorded with this one is replaced by it.
   const saveDetails = async ({ lat, long, datum, pair }: PointDetailsChange) => {
@@ -159,14 +152,18 @@ export function PointView({ project, point, change, onBack }: Props) {
         )
       )}
 
-      <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Page 1, ENG Form 6116-8</h4>
-      <PagePreview size={page1.size} image={assets.page1.image} placements={page1Drawn} label={`Page 1 for ${point.name}`} testId="page1-preview" />
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
-      <PagePreview size={soil.size} image={assets.soil.image} placements={soilDrawn} label={`Soil page for ${point.name}`} testId="soil-preview" />
+      <PagePreview page="soil" project={project} point={point} form={form} />
+
+      <HydrologyForm key={point.id} project={project} point={point} change={change} />
+      <PagePreview page="page1" project={project} point={point} form={form} />
+
+      <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">This sampling point's form</h4>
+      <p className="text-sm text-muted-foreground">Page 1, the Soil page and the Privacy Act page in one file.</p>
       <FormExport
         project={project}
         points={[point]}
-        label="Download PDF"
+        label="Download form PDF"
         filename={`wetland-form-${slug(project.name)}-${slug(point.name)}`}
         title={`${project.name}, ${point.name}`}
       />

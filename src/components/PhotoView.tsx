@@ -2,6 +2,8 @@
 // what the user has marked (Card corners, the patch positions, Spots) over the Photo.
 import * as React from "react"
 import { patchCenters, patchRadius, spotRadius, type Corners, type XY } from "@/engine"
+import { Magnifier } from "@/components/Magnifier"
+import { usePlacement } from "@/lib/placement"
 import { CORNER_COUNT } from "@/lib/session"
 
 interface Props {
@@ -65,6 +67,7 @@ function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots
 export function PhotoView({ pixels, corners, spots, onTap }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
+  const { placing, handlers } = usePlacement(onTap)
 
   React.useEffect(() => {
     const canvas = canvasRef.current
@@ -87,25 +90,21 @@ export function PhotoView({ pixels, corners, spots, onTap }: Props) {
     )
   }
 
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = e.currentTarget
-    const rect = canvas.getBoundingClientRect()
-    onTap({
-      x: (e.clientX - rect.left) * (canvas.width / rect.width),
-      y: (e.clientY - rect.top) * (canvas.height / rect.height),
-    })
-  }
-
+  // touch-none: a press on the Photo places a point; it never scrolls the page.
   return (
-    <canvas
-      ref={canvasRef}
-      width={pixels.width}
-      height={pixels.height}
-      onClick={handleClick}
-      role="img"
-      aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
-      data-testid="photo"
-      className="block h-auto w-full cursor-crosshair bg-muted"
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={pixels.width}
+        height={pixels.height}
+        {...handlers}
+        onContextMenu={(e) => e.preventDefault()}
+        role="img"
+        aria-label="Photo. Tap to mark the Card corners, then the Spots on the soil."
+        data-testid="photo"
+        className="block h-auto w-full cursor-crosshair touch-none bg-muted select-none"
+      />
+      {placing && <Magnifier placing={placing} />}
+    </>
   )
 }

@@ -1,6 +1,7 @@
 // The Card: which one it is, which corner or Chip to tap next, drawn as the Card itself, or what
 // is already marked.
 import { PAGE_CHROMAS, PAGE_HUES, pageModel, type PageHue } from "@/engine"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group-1"
 import { cn } from "@/lib/utils"
 import { FramePanel } from "@/components/FramePanel"
 import { CORNER_COUNT, type CardKind, type FrameSession } from "@/lib/session"
@@ -40,7 +41,7 @@ interface Props {
   onConfirmOutline?: () => void
 }
 
-/** Two or more choices side by side, one pressed. Gray, so the choice never tints the Photo. */
+/** Two or more choices side by side, one chosen. Gray, so the choice never tints the Photo. */
 function Choice<T extends string>({
   label,
   options,
@@ -55,24 +56,23 @@ function Choice<T extends string>({
   testId: string
 }) {
   return (
-    <div role="group" aria-label={label} data-testid={testId} className="flex flex-wrap gap-1.5">
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="lg"
+      aria-label={label}
+      data-testid={testId}
+      value={value ?? ""}
+      // Pressing the chosen one again would clear it; a choice stays chosen.
+      onValueChange={(picked) => picked && onPick(picked as T)}
+      className="w-fit max-w-full flex-wrap shadow-none"
+    >
       {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onPick(option.value)}
-          className={cn(
-            "min-h-10 rounded-md border px-3 text-sm font-medium",
-            value === option.value
-              ? "border-foreground bg-foreground text-background"
-              : "border-border bg-card text-foreground",
-          )}
-        >
+        <ToggleGroupItem key={option.value} value={option.value} className="text-sm">
           {option.text}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }
 

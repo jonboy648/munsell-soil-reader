@@ -14,6 +14,9 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
+    // No service worker, so its notices (and its caching) never get into another spec. The one
+    // that is about the service worker, e2e/offline.spec.ts, turns it back on.
+    serviceWorkers: "block",
   },
   projects: [{ name: "chromium-phone", use: { ...devices["Pixel 7"] } }],
   webServer: {

@@ -1,8 +1,11 @@
 // Seam 1: the frame finder, hidden until a frame exists. Every test builds a simulated Photo
 // with the printed frame around the Card, calls findCard, and checks what a caller would see:
 // the Card's corners or nothing, and what readPhoto makes of them.
-import { build } from "vite"
-import { describe, expect, it } from "vitest"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { build, type BuildEnvironmentOptions } from "vite"
+import { afterAll, describe, expect, it } from "vitest"
 import { CARD_CHECK_GOOD, readPhoto } from "./index"
 import type { Corners, Pixels, XY } from "./index"
 import { findCard } from "./frame"
@@ -196,10 +199,24 @@ describe("a Photo without the whole frame", () => {
 })
 
 describe("the app bundle", () => {
-  it("does not contain the frame finder, so it stays hidden until it is wired in", async () => {
-    const result = await build({ logLevel: "silent", mode: "production", build: { write: false } })
+  // The build's code stays in memory, but the PWA plugin writes its service worker to the output
+  // directory whatever `write` says, so that directory is a disposable one, not dist/.
+  const scratch = mkdtempSync(join(tmpdir(), "frame-test-"))
+  afterAll(() => rmSync(scratch, { recursive: true, force: true }))
+
+  /** The JavaScript a production build of the project makes, with `options` on top. */
+  async function chunksOf(options: BuildEnvironmentOptions = {}) {
+    const result = await build({
+      logLevel: "silent",
+      mode: "production",
+      build: { write: false, outDir: scratch, ...options },
+    })
     const outputs = Array.isArray(result) ? result.flatMap((r) => r.output) : "output" in result ? result.output : []
-    const chunks = outputs.flatMap((output) => (output.type === "chunk" ? [output] : []))
+    return outputs.flatMap((output) => (output.type === "chunk" ? [output] : []))
+  }
+
+  it("does not contain the frame finder, so it stays hidden until it is wired in", async () => {
+    const chunks = await chunksOf()
     // The build really is the app: the engine is in it, so an empty result cannot pass.
     expect(chunks.flatMap((chunk) => chunk.moduleIds).some((id) => /[\\/]engine[\\/]readPhoto\.ts$/.test(id))).toBe(true)
     for (const chunk of chunks) {
@@ -212,15 +229,9 @@ describe("the app bundle", () => {
   it("could take the frame finder when it is wired in: bundled on its own, it finds the same Card", async () => {
     // js-aruco2 is a plain script that fails in a production build unless vite.config.ts runs it
     // as CommonJS, so the finder is built here the way the app would build it and then run.
-    const result = await build({
-      logLevel: "silent",
-      mode: "production",
-      build: { write: false, lib: { entry: "src/engine/frame.ts", formats: ["es"], fileName: "frame" } },
-    })
-    const outputs = Array.isArray(result) ? result.flatMap((r) => r.output) : "output" in result ? result.output : []
-    const chunk = outputs.find((output) => output.type === "chunk")
-    expect(chunk?.type).toBe("chunk")
-    const bundled = await import(/* @vite-ignore */ `data:text/javascript,${encodeURIComponent(chunk!.type === "chunk" ? chunk!.code : "")}`)
+    const [chunk] = await chunksOf({ lib: { entry: "src/engine/frame.ts", formats: ["es"], fileName: "frame" } })
+    expect(chunk).toBeDefined()
+    const bundled = await import(/* @vite-ignore */ `data:text/javascript,${encodeURIComponent(chunk.code)}`)
     const sim = framed({ yaw: 40, pitch: 0 })
     expect(bundled.findCard(sim.pixels)).toEqual(findCard(sim.pixels))
     expect(bundled.findCard(simulatePhoto({ camera }).pixels)).toBeNull()

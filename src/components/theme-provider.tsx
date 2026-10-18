@@ -15,9 +15,16 @@ function readStoredTheme(): Theme {
   return "system"
 }
 
+// The browser bar color: the --background gray of each theme, as the manifest and index.html have it.
+const BAR_COLOR = { light: "#ebebeb", dark: "#1f1f1f" }
+
 function applyTheme(theme: Theme) {
   const dark = theme === "dark" || (theme === "system" && window.matchMedia(DARK_QUERY).matches)
   document.documentElement.classList.toggle("dark", dark)
+  // index.html sets a light and a dark theme-color for the OS setting; the in-app choice wins.
+  for (const meta of document.querySelectorAll("meta[name=theme-color]")) {
+    meta.setAttribute("content", dark ? BAR_COLOR.dark : BAR_COLOR.light)
+  }
 }
 
 const ThemeContext = React.createContext<{

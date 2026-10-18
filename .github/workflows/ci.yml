@@ -65,9 +65,11 @@ jobs:
       - name: Browser tests (Playwright)
         if: matrix.engine == 'webkit'
         run: |
-          for i in 1 2 3; do
+          # Temporary: slow the runner down with three busy loops, to see how a slow runner fails.
+          for n in 1 2 3; do (while :; do :; done) & done
+          for i in 1 2; do
             echo "=== LOOP $i"
-            npx playwright test --project=webkit --retries=0 || true
+            npx playwright test e2e/method.spec.ts e2e/offline.spec.ts --project=webkit --retries=0 || true
           done
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.

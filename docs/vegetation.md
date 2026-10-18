@@ -86,8 +86,10 @@ scientific name, cover, the Dominant Species? column (blank: #34 fills it), stat
 its plot size (the supplement's suggestion, 30 ft radius for trees, 15 ft for sapling/shrub, 5 ft for herbs,
 30 ft for woody vines, unless the user writes another) and its total cover, which the Continued page repeats
 as the official automated data sheet does. The Remarks box takes the vegetation remarks, wrapped to the box.
-Values are drawn in Helvetica 8 point, as the soil page's are; text the font cannot print is changed to a
-question mark, and a phone keyboard's curly quotes and dashes to plain ones.
+Values are drawn in Helvetica 8 point, as the soil page's are, with the same text helpers (`text.ts`): a
+value too wide for its column is drawn smaller, down to 5 point, then cut with "...". Text the font cannot
+print is spelled out (`<=`), loses its marks (`cafe`) or becomes a question mark, with a warning. Remarks
+that are longer than the Remarks box are cut at its last line, with a warning.
 
 Where each value sits was measured from the official PDF's own drawing (`regions/ncne/index.ts`).
 `vegetationLayout.test.ts` checks every rule a value sits on against the PDF, so a mistyped number shows up.

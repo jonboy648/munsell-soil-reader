@@ -121,7 +121,7 @@ export function PointView({ project, point, change, onBack }: Props) {
       <HydrologyForm key={point.id} project={project} point={point} change={change} />
       <PagePreview page="page1" project={project} point={point} form={form} />
 
-      <VegetationEntry key={point.id} project={project} point={point} onChange={changeVegetation} />
+      <VegetationEntry key={`vegetation-${point.id}`} project={project} point={point} onChange={changeVegetation} />
       <VegetationPreview project={project} point={point} form={form} />
     </div>
   )

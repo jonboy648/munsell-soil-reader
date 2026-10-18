@@ -56,7 +56,7 @@ test("two secondary indicators are ticked, the rule suggests yes, the user confi
 
   // Confirm the suggestion: now Yes is printed.
   await sheet.getByRole("button", { name: "Confirm Yes" }).click()
-  await expect(sheet.getByRole("status")).toContainText("Confirmed: Yes, printed on the form.")
+  await expect(hydrology.getByRole("status")).toContainText("Confirmed: Yes, printed on the form.")
   await expect(printed).toHaveText(["X", "X", "X", "14", "X", "Monitoring well MW-3 read 14 in. on 12 Oct.", "Seasonally flooded depression."])
 
   // The PDF holds the same values at the same places as the preview.

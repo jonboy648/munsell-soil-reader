@@ -73,8 +73,8 @@ function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
  * it is the corners rather than the light. The frame is one black surface, so in even light
  * every part of it is equally bright whatever the camera's tone curve does.
  */
-const FRAME_UNEVEN_STOPS = 0.3
-const FRAME_OFF_CARD_STOPS = 3
+export const FRAME_UNEVEN_STOPS = 0.3
+export const FRAME_OFF_CARD_STOPS = 3
 
 /**
  * What the quality checks need from a ColorChecker: its patches as references (the grays are

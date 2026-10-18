@@ -5,13 +5,16 @@ import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
 import { InstallHint } from "@/components/InstallHint"
+import { MethodPage } from "@/components/method/MethodPage"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
 import { SpotsPanel } from "@/components/SpotsPanel"
 import { StepIndicator } from "@/components/StepIndicator"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { buttonVariants } from "@/components/ui/button"
 import { UpdateNotice } from "@/components/UpdateNotice"
 import { examplePhoto, filePhoto } from "@/lib/photo"
+import { hrefOf, usePage } from "@/lib/route"
 import {
   CORNER_COUNT,
   canUndo,
@@ -22,6 +25,7 @@ import {
 } from "@/lib/session"
 
 export function App() {
+  const page = usePage()
   const [session, dispatch] = React.useReducer(sessionReducer, initialSession)
   const [problem, setProblem] = React.useState<string | null>(null)
   const step = stepOf(session)
@@ -53,6 +57,8 @@ export function App() {
       setProblem("That file didn't open as a Photo. Try a JPEG or PNG.")
     }
   }
+
+  if (page === "method") return <MethodPage />
 
   return (
     <div className="mx-auto flex min-h-svh max-w-xl flex-col">
@@ -102,8 +108,15 @@ export function App() {
         </div>
 
         {/* At the bottom of the page, where a thumb reaches it. */}
-        <footer className="px-2">
+        <footer className="grid justify-items-start px-2">
           <InstallHint />
+          <a
+            href={hrefOf("method")}
+            data-testid="method-link"
+            className={buttonVariants({ variant: "ghost", size: "lg", className: "h-11" })}
+          >
+            Accuracy, method and credits
+          </a>
           <ThemeToggle />
         </footer>
       </main>

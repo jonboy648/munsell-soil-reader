@@ -17,6 +17,9 @@ ColorChecker Photo (#15) has been run.**
 - **Page: a PCHIP curve per channel, then a 3x3 held near diagonal.** Its ladder is the /1 chroma
   column, which is slightly tinted with the truth known per channel, so the channels do not share a
   curve. Jon's real Pages favour a curve per channel.
+- **The frame** (#57) has printed grays whose colors a batch measures, so they are not neutral: it
+  takes a curve per channel, as a Page does, and its tests need it (a camera color shift scores 2.37
+  with the shared curve, under 2 without).
 - **Measurement mode** (#60) reads printed swatches to a CIEDE2000 of about 1 against a ColorChecker,
   and keeps the exact per-channel curves (`fitChannelCurves`): on a clean simulated camera they are
   up to 1 closer than the shared curve on the lightest and darkest swatches.

@@ -13,7 +13,9 @@ import {
   frameSites,
   patchSites,
 } from "./colorchecker"
-import { fitCorrection, fitPageCorrection, type Correction, type Fit, type Reference } from "./correction"
+import { fitChannelCurves, fitCorrection, fitPageCorrection, type Correction, type Fit, type Reference } from "./correction"
+import { UnmeasuredBatchError, batchProblem, type Batch } from "./batch"
+import { frameQuality, frameReferences, insideWindow } from "./frameCard"
 import { dirtyLadderSteps, leftOut } from "./leftOut"
 import {
   isPageHue,
@@ -100,6 +102,17 @@ export function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
   }))
   // A ColorChecker's patches do not wear, so only its grays are judged: a dirty one is left out.
   return checkCard(references, fit, dirtyLadderSteps(references, PATCH_VALUE_ROWS, fit))
+}
+
+/**
+ * The frame: its patches, read where the outline puts them, against the colors its batch measured.
+ * Its grays are printed and measured per batch, not neutral, so a curve per channel (not one shared).
+ */
+function fitFrame(pixels: Pixels, outline: Corners, batch: Batch, fit: Fit): CardFit {
+  const problem = batchProblem(batch)
+  if (problem) throw new UnmeasuredBatchError(problem)
+  // The frame's patches are judged as they are: none is left out.
+  return checkCard(frameReferences(pixels, outline, batch), fit, [])
 }
 
 /**
@@ -191,7 +204,9 @@ export function readPhoto({
       ? fitCard(pixels, card.corners, correction ?? fitCorrection)
       : card.kind === "page"
         ? fitPage(pixels, hue!, card.taps, correction ?? fitPageCorrection)
-        : null
+        : card.kind === "frame"
+          ? fitFrame(pixels, card.outline, card.batch, correction ?? fitChannelCurves)
+          : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {
     const read = fit?.spotRadius?.(spot, radius) ?? radius
@@ -201,6 +216,7 @@ export function readPhoto({
     // The correction is strongest near the Page's own hue: point to the Page the soil belongs on.
     const better = hue && reading.corrected ? suggestedPage(hue, reading.corrected.chip) : undefined
     if (better) reading.betterPage = better
+    if (card.kind === "frame" && !insideWindow(card.outline, spot)) reading.outsideWindow = true
     return reading
   })
   const cardParts =
@@ -208,7 +224,9 @@ export function readPhoto({
       ? cardQuality(card.corners)
       : card.kind === "page"
         ? pageQuality(hue!, card.taps)
-        : { references: [] }
+        : card.kind === "frame"
+          ? frameQuality(card.outline, card.batch)
+          : { references: [] }
   const { warnings: quality, offCard } = checkQuality({
     pixels,
     spots: readings.map((r) => ({ at: r.spot, radius: r.radius })),

@@ -1,7 +1,18 @@
 // The Photo: shows it full width and turns taps into Photo coordinates. It also draws
 // what the user has marked (Card corners, the patch or Chip positions, Spots) over the Photo.
 import * as React from "react"
-import { pageModel, pageSites, patchSites, spotRadius, type Corners, type PageHue, type Site, type XY } from "@/engine"
+import {
+  framePatchSites,
+  frameWindow,
+  pageModel,
+  pageSites,
+  patchSites,
+  spotRadius,
+  type Corners,
+  type PageHue,
+  type Site,
+  type XY,
+} from "@/engine"
 import { Magnifier } from "@/components/Magnifier"
 import { usePlacement } from "@/lib/placement"
 import { CORNER_COUNT, type CardKind } from "@/lib/session"
@@ -19,6 +30,8 @@ interface Props {
   hue: PageHue | null
   /** A Page: the Chips the Card check left out, as notation. */
   leftOut?: string[]
+  /** The frame's outline, once found; its patches are drawn when it is confirmed. */
+  frame?: { outline: Corners | null; confirmed: boolean }
   onTap: (point: XY) => void
 }
 
@@ -29,6 +42,17 @@ function ring(ctx: CanvasRenderingContext2D, p: XY, radius: number, px: number) 
     ctx.lineWidth = width
     ctx.beginPath()
     ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI)
+    ctx.stroke()
+  }
+}
+
+function polygon(ctx: CanvasRenderingContext2D, points: XY[], px: number) {
+  for (const [style, width] of [["#000", 3.5 * px], ["#fff", 1.75 * px]] as const) {
+    ctx.strokeStyle = style
+    ctx.lineWidth = width
+    ctx.beginPath()
+    points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)))
+    ctx.closePath()
     ctx.stroke()
   }
 }
@@ -86,6 +110,7 @@ function draw(
   cardKind: CardKind,
   hue: PageHue | null,
   leftOut: string[],
+  frame: Props["frame"],
 ) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
@@ -101,6 +126,16 @@ function draw(
       if (skipped.includes(i)) leftOutMark(ctx, center, radius, px * 0.6)
     })
   }
+  if (frame?.outline) {
+    // The frame: its outline and window, and once it is confirmed every patch where the engine reads it.
+    polygon(ctx, frame.outline, px)
+    polygon(ctx, frameWindow(frame.outline), px * 0.6)
+    if (frame.confirmed) for (const { site } of framePatchSites(frame.outline)) ring(ctx, site.center, site.radius, px * 0.6)
+    frame.outline.forEach((c, i) => {
+      ring(ctx, c, 8 * px, px)
+      label(ctx, c, String(i + 1), px)
+    })
+  }
   corners.forEach((c, i) => {
     ring(ctx, c, 8 * px, px)
     label(ctx, c, String(i + 1), px)
@@ -113,7 +148,7 @@ function draw(
 
 const NONE: string[] = []
 
-export function PhotoView({ pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut = NONE, onTap }: Props) {
+export function PhotoView({ pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut = NONE, frame, onTap }: Props) {
   const [canvas, setCanvas] = React.useState<HTMLCanvasElement | null>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
   const { placing, handlers } = usePlacement(canvas, onTap)
@@ -126,8 +161,8 @@ export function PhotoView({ pixels, corners, spots, spotRadii, spotLabels, cardK
   }, [canvas])
 
   React.useEffect(() => {
-    if (canvas && pixels) draw(canvas, pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut)
-  }, [canvas, pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut, shownWidth])
+    if (canvas && pixels) draw(canvas, pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut, frame)
+  }, [canvas, pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut, frame, shownWidth])
 
   if (!pixels) {
     return (

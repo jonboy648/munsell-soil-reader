@@ -1,5 +1,5 @@
 // The Cards the app can read against, and the trade between them (ADR 0001, ADR 0003). How a Page
-// is used is in PageCard.tsx; the printed frame is a marked stub until it ships.
+// is used is in PageCard.tsx; the printed frame is a marked stub until a batch is measured.
 import { NotYet, Section, Sub } from "./parts"
 import { PageCard } from "./PageCard"
 
@@ -37,8 +37,11 @@ export function CardsSection() {
       <Sub>The printed frame</Sub>
       <NotYet testId="frame-stub">
         <p>
-          A printed frame with measured color patches and a marker in each corner is planned, so the
-          app can find the Card without taps and no book is needed. It is not in this version.
+          A printed frame with 18 measured color patches, a window for the soil and a marker in each
+          corner is a Card of its own: the app finds it from its markers, without taps, and no book
+          is needed. The app can already read against one, but no frame has been printed and measured
+          yet. Each print batch's patch colors are measured once, so until the first batch is measured
+          the app refuses a frame as a Card and says so.
         </p>
       </NotYet>
     </Section>

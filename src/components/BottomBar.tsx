@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils"
 interface Props {
   onFile: (file: File) => void
   onUndo: () => void
-  onNoCard: () => void
+  /** Absent where skipping the Card makes no sense (measurement mode). */
+  onNoCard?: () => void
   onRestart: () => void
   canUndo: boolean
   hasPhoto: boolean
@@ -57,7 +58,7 @@ export function BottomBar({ onFile, onUndo, onNoCard, onRestart, canUndo, hasPho
       <BarButton icon={Camera} label="Take Photo" primary onClick={() => takeRef.current?.click()} />
       <BarButton icon={ImageIcon} label="Choose" onClick={() => chooseRef.current?.click()} />
       <BarButton icon={Undo2} label="Undo" onClick={onUndo} disabled={!canUndo} />
-      <BarButton icon={ScanLine} label="No Card" onClick={onNoCard} disabled={!hasPhoto || noCard} />
+      {onNoCard && <BarButton icon={ScanLine} label="No Card" onClick={onNoCard} disabled={!hasPhoto || noCard} />}
       <BarButton icon={RotateCcw} label="Start over" onClick={onRestart} disabled={!hasPhoto} />
     </div>
   )

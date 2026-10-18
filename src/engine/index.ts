@@ -21,6 +21,8 @@ export {
 export { deltaE2000 } from "./color"
 export { BatchFormatError, UnmeasuredBatchError, batchCodeOf, batchProblem, parseBatch } from "./batch"
 export { frameWindow, framePatchSites } from "./frameCard"
+export { BATCH_COLUMNS, BATCH_METHOD_CAMERA, FRAME_SLOTS, SWATCH_IDS, formatBatchCsv, parseBatchCsv, swatchSlot } from "./batchFile"
+export { batchRows, measureShot, summarizeShots, swatchRadius } from "./measure"
 export { DIRTY_FACTOR, DIRTY_FLOOR, MAX_LADDER_LEFT_OUT, MAX_LEFT_OUT } from "./leftOut"
 export { patchSites } from "./colorchecker"
 export { gridMap, gridSites } from "./grid"
@@ -28,8 +30,10 @@ export { PAGE_CHROMAS, PAGE_HUES, isPageHue, pageModel, pagePaperSites, pageSite
 export { spotRadius } from "./sampling"
 export { CHIP_LIST } from "./chipList"
 export { SOIL_BOOK_CHIPS } from "./chips"
-export type { Batch, BatchPatch } from "./batch"
+export type { Batch } from "./batch"
+export type { BatchRow } from "./batchFile"
 export type { Four, GridMap, GridPoint, Site } from "./grid"
+export type { MeasureSummary, ShotMeasurement, SwatchSummary, SwatchTap } from "./measure"
 export type { PageChip, PageHue, PageModel } from "./page"
 export type {
   Card,

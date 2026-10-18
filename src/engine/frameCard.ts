@@ -81,7 +81,7 @@ export function insideWindow(outline: Corners, spot: XY): boolean {
 }
 
 function truthOf(batch: Batch, id: string) {
-  const patch = batch.patches.find((p) => p.id === id)
+  const patch = batch.patches.find((p) => p.patch === id)
   if (!patch) throw new Error(`Batch ${batch.code} has no measurement for patch ${id}.`)
   return labD50ToLinear(patch.lab)
 }

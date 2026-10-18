@@ -92,7 +92,8 @@ function fitReferences(references: Reference[], fit: Fit): CardFit {
   return { correct: fit(references), check }
 }
 
-function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
+/** Fits the correction to a ColorChecker in the Photo and runs the Card check on it. */
+export function fitCard(pixels: Pixels, corners: Corners, fit: Fit): CardFit {
   return fitReferences(
     patchSites(corners).map(({ center, radius }, i) => ({
       measured: medianLinear(pixels, center, radius),

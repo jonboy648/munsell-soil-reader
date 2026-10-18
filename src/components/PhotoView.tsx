@@ -23,6 +23,8 @@ interface Props {
   spots: XY[]
   /** The radius each Spot was read with, once the engine has read it. */
   spotRadii?: number[]
+  /** What each Spot is called on the Photo; their numbers when absent. */
+  spotLabels?: string[]
   cardKind: CardKind
   /** The Page's hue, once chosen. */
   hue: PageHue | null
@@ -104,6 +106,7 @@ function draw(
   corners: XY[],
   spots: XY[],
   spotRadii: number[] | undefined,
+  spotLabels: string[] | undefined,
   cardKind: CardKind,
   hue: PageHue | null,
   leftOut: string[],
@@ -139,13 +142,13 @@ function draw(
   })
   spots.forEach((s, i) => {
     ring(ctx, s, spotRadii?.[i] ?? spotRadius(pixels), px)
-    label(ctx, s, String(i + 1), px)
+    label(ctx, s, spotLabels?.[i] ?? String(i + 1), px)
   })
 }
 
 const NONE: string[] = []
 
-export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, leftOut = NONE, frame, onTap }: Props) {
+export function PhotoView({ pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut = NONE, frame, onTap }: Props) {
   const [canvas, setCanvas] = React.useState<HTMLCanvasElement | null>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
   const { placing, handlers } = usePlacement(canvas, onTap)
@@ -158,8 +161,8 @@ export function PhotoView({ pixels, corners, spots, spotRadii, cardKind, hue, le
   }, [canvas])
 
   React.useEffect(() => {
-    if (canvas && pixels) draw(canvas, pixels, corners, spots, spotRadii, cardKind, hue, leftOut, frame)
-  }, [canvas, pixels, corners, spots, spotRadii, cardKind, hue, leftOut, frame, shownWidth])
+    if (canvas && pixels) draw(canvas, pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut, frame)
+  }, [canvas, pixels, corners, spots, spotRadii, spotLabels, cardKind, hue, leftOut, frame, shownWidth])
 
   if (!pixels) {
     return (

@@ -31,12 +31,13 @@ interface Props {
   cardKind: CardKind
   /** The Page's hue, once chosen. */
   hue: PageHue | null
-  onCardKind: (kind: CardKind) => void
-  onHue: (hue: PageHue) => void
-  /** The frame as the Card: where the finder and the batch are. */
-  frame: FrameSession
-  onBatchCode: (code: string) => void
-  onConfirmOutline: () => void
+  /** Absent where the Card is fixed (measurement mode), which hides the choice of Card. */
+  onCardKind?: (kind: CardKind) => void
+  onHue?: (hue: PageHue) => void
+  /** The frame as the Card: where the finder and the batch are. Absent where the frame is not offered. */
+  frame?: FrameSession
+  onBatchCode?: (code: string) => void
+  onConfirmOutline?: () => void
 }
 
 /** Two or more choices side by side, one pressed. Gray, so the choice never tints the Photo. */
@@ -170,7 +171,7 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue, fr
       </p>
     )
   }
-  const picker = (
+  const picker = onCardKind && onHue && (
     <div className="grid gap-2">
       <Choice
         label="Card"
@@ -194,7 +195,7 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue, fr
       )}
     </div>
   )
-  if (cardKind === "frame") {
+  if (cardKind === "frame" && frame && onBatchCode && onConfirmOutline) {
     return (
       <div className="grid gap-3">
         {picker}

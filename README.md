@@ -66,6 +66,10 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   `1 A`, `Mar 5`) is shown with a leading apostrophe: the export adds it on purpose, so that
   Excel keeps the text as typed. It is not corruption.
 - `e2e/`: the browser tests.
+- Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
+  against a ColorChecker and exports the batch file the frame card reads. It is a separate
+  chunk the reader never loads. How it measures, the file format and how accurate it is:
+  [docs/measurement-mode.md](docs/measurement-mode.md).
 - Install and offline: [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) (MIT, Workbox)
   writes the web app manifest and a service worker that precaches every built file (code,
   styles, the bundled fonts, icons and any data files by type), so the app opens with no
@@ -164,7 +168,8 @@ Two seams, and nothing else:
 
 - **Engine** (`src/engine/*.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
   a Card and soil of a known Chip under a chosen light, exposure, color shift, tone curve and
-  tilt, then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
+  tilt, then calls `readPhoto`. The same simulated camera makes the example Photos in the app,
+  and, with a swatch card in the scene, the measurement mode's (`measure.test.ts`).
 - **Browser** (`e2e/*.spec.ts`): the production build at a phone viewport. It picks an example,
   taps corners and Spots by coordinates and reads the text on screen.
   `e2e/log.spec.ts` covers the Log: save, reload, edit, delete, and the downloaded CSV.

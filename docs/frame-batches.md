@@ -39,7 +39,7 @@ S03,47.9,7.9,16.4,,,,,X-Rite i1 Pro 3,2026-11-04
 A patch with no row is not measured. A file is usable when all 18 patches (six grays and twelve
 soil colors) have a row. With fewer, the frame is refused, and the message names the patches
 still to measure. A file that cannot be read is refused with the line and the reason
-(`src/engine/batch.ts` has the rules).
+(`src/engine/batchFile.ts`, shared with the measurement mode that writes these files, has the rules for the columns; `src/engine/batch.ts` adds the frame's: its patch IDs, none twice, all 18 present).
 
 The layout the patch IDs belong to is `src/engine/frameLayout.json`, agent-fab's prototype 1
 (`layout.json`). A batch is made for one design, so a new layout means new batch files.

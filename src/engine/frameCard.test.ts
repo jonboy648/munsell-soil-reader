@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 import { CARD_CHECK_GOOD, readPhoto } from "./index"
 import type { Batch, Corners, XY } from "./index"
 import { BatchFormatError, UnmeasuredBatchError, batchProblem, parseBatch } from "./batch"
+import { BATCH_COLUMNS, formatBatchCsv } from "./batchFile"
 import {
   FRAME_DISTANCE,
   LIGHTS,
@@ -42,7 +43,7 @@ const withinOneChip = (a: string, b: string) => stepsApart(a, b) <= 1
 const phone = (light: SimCamera["light"], toneCurve = PHONE_TONE_CURVE): SimCamera => ({ light, toneCurve })
 const WARM: SimScene = { camera: phone(LIGHTS.warm), frame: {} }
 /** The first line of a batch file. */
-const HEADER = "patch,L,a,b,sd_L,sd_a,sd_b,n,method,date"
+const HEADER = BATCH_COLUMNS.join(",")
 
 /** Read a simulated frame Photo with the outline where the markers really are. */
 function read(sim: SimPhoto, extra: { spots?: XY[]; batch?: Batch; outline?: Corners } = {}) {
@@ -55,15 +56,8 @@ function read(sim: SimPhoto, extra: { spots?: XY[]; batch?: Batch; outline?: Cor
 const corrected = (sim: SimPhoto, extra?: Parameters<typeof read>[1]) => read(sim, extra).readings[0].corrected!.chip.notation
 
 /** The batch as the CSV file the measurement mode exports, with the rows of `leave` left out. */
-function csvOf(batch: Batch, options: { leave?: string[] } = {}): string {
-  const rows = batch.patches
-    .filter((p) => !options.leave?.includes(p.id))
-    .map((p) => {
-      const [L, a, b] = p.lab
-      return `${p.id},${L},${a},${b},${(p.sd ?? ["", "", ""]).join(",")},${p.n ?? ""},"${p.method}",${p.date}`
-    })
-  return [HEADER, ...rows].join("\n")
-}
+const csvOf = (batch: Batch, options: { leave?: string[] } = {}): string =>
+  formatBatchCsv(batch.patches.filter((p) => !options.leave?.includes(p.patch)))
 
 describe("readPhoto with the frame card", () => {
   describe.each([
@@ -181,7 +175,7 @@ describe("readPhoto with the frame card", () => {
     expect(attempt).toThrow(UnmeasuredBatchError)
     expect(attempt).toThrow("This frame's batch (NEW-LOT) has not been measured yet, so the colors of its patches are not known and it can't be used as a Card.")
     // Partly measured is refused too, and says which patches are missing.
-    const partly: Batch = { code: "NEW-LOT", patches: sim.frame!.batch.patches.filter((p) => !["G3", "S02"].includes(p.id)) }
+    const partly: Batch = { code: "NEW-LOT", patches: sim.frame!.batch.patches.filter((p) => !["G3", "S02"].includes(p.patch)) }
     expect(() => read(sim, { batch: partly })).toThrow("only partly measured (not yet: G3, S02)")
   })
 })
@@ -239,17 +233,19 @@ describe("warnings on the frame card", () => {
 describe("a batch file", () => {
   const batch = simFrameBatch()
 
-  it("is read back as the batch it was made from", () => {
+  it("is read back as the batch the measurement mode's exporter wrote", () => {
     const parsed = parseBatch("sim-1", csvOf(batch))
     expect(parsed.code).toBe("SIM-1")
-    expect(parsed.patches).toEqual(batch.patches)
+    // The exporter writes two decimals of Lab, so a color comes back to within half a hundredth.
+    expect(parsed.patches.map((p) => ({ ...p, lab: undefined }))).toEqual(batch.patches.map((p) => ({ ...p, lab: undefined })))
+    parsed.patches.forEach((p, i) => p.lab.forEach((v, k) => expect(v).toBeCloseTo(batch.patches[i].lab[k], 2)))
     expect(batchProblem(parsed)).toBeNull()
   })
 
   it("is the same batch whatever the line endings, the case of the header and a byte-order mark", () => {
     const header = "Patch,l,A,B,SD_L,sd_A,Sd_b,N,Method,Date"
-    const windows = "﻿" + csvOf(batch).replace(HEADER, header).replace(/\n/g, "\r\n") + "\r\n\r\n"
-    expect(parseBatch("SIM-1", windows).patches).toEqual(batch.patches)
+    const windows = "\uFEFF" + csvOf(batch).replace(HEADER, header).replace(/\n/g, "\r\n") + "\r\n\r\n"
+    expect(parseBatch("SIM-1", windows)).toEqual(parseBatch("SIM-1", csvOf(batch)))
   })
 
   it("reads a Card the same as the batch it came from", () => {
@@ -268,32 +264,18 @@ describe("a batch file", () => {
 
   it("takes an instrument's reading, which has no spread and no count", () => {
     const parsed = parseBatch("SIM-1", HEADER + "\nG1,94.8,-0.4,1.9,,,,,X-Rite i1 Pro 3,2026-11-02")
-    expect(parsed.patches).toEqual([{ id: "G1", lab: [94.8, -0.4, 1.9], method: "X-Rite i1 Pro 3", date: "2026-11-02" }])
+    expect(parsed.patches).toEqual([{ patch: "G1", lab: [94.8, -0.4, 1.9], method: "X-Rite i1 Pro 3", date: "2026-11-02" }])
   })
 
-  it("reads a method with a comma or a quote in it", () => {
-    const row = '\nG1,94.8,-0.4,1.9,0.2,0.1,0.1,3,"camera, ""ColorChecker""",2026-11-02'
-    expect(parseBatch("SIM-1", HEADER + row).patches[0].method).toBe('camera, "ColorChecker"')
-  })
-
+  // What a file may hold is batchFile.ts's to say (its own tests); these are the frame's: whose patches.
   it.each([
-    ["is empty", "", "line 1: it is empty"],
-    ["has the wrong columns", "patch,L,a,b\nG1,50,0,0", `line 1: the first line must be ${HEADER}`],
-    ["has the old single sd column", "patch,L,a,b,sd,n,method,date", "line 1: the first line must be"],
-    ["names a patch the frame does not have", HEADER + "\nX9,50,0,0,,,,3,m,2026-01-01", 'line 2: "X9" is not a patch on this frame'],
-    ["names a reserved patch", HEADER + "\nR1,50,0,0,,,,3,m,2026-01-01", 'line 2: "R1" is not a patch on this frame'],
-    ["lists a patch twice", HEADER + "\nG1,50,0,0,,,,3,m,2026-01-01\nG1,50,0,0,,,,3,m,2026-01-01", "line 3: patch G1 is listed twice"],
-    ["has a row with too few columns", HEADER + "\nG1,50,0,0", "line 2: expected 10 columns, found 4"],
-    ["has a color that is not a number", HEADER + "\nG1,fifty,0,0,,,,3,m,2026-01-01", "line 2: L, a and b of G1 must be numbers"],
-    ["has a color with a part missing", HEADER + "\nG1,50,,0,,,,3,m,2026-01-01", "line 2: L, a and b of G1 must be numbers"],
-    ["has a lightness past 100", HEADER + "\nG1,101,0,0,,,,3,m,2026-01-01", "line 2: the color of G1 is not a CIELAB color"],
-    ["has only some of the spread", HEADER + "\nG1,50,0,0,0.2,,0.1,3,m,2026-01-01", "line 2: sd_L, sd_a and sd_b of G1 must be numbers"],
-    ["has a negative spread", HEADER + "\nG1,50,0,0,0.2,-0.1,0.1,3,m,2026-01-01", "line 2: sd_L, sd_a and sd_b of G1 must be numbers"],
-    ["counts no shots", HEADER + "\nG1,50,0,0,0.2,0.1,0.1,0,m,2026-01-01", "line 2: n of G1 must be a whole number"],
-    ["counts a part of a shot", HEADER + "\nG1,50,0,0,0.2,0.1,0.1,2.5,m,2026-01-01", "line 2: n of G1 must be a whole number"],
-    ["has no method", HEADER + "\nG1,50,0,0,,,,3,,2026-01-01", "line 2: say how G1 was measured"],
-    ["has a date that is not a date", HEADER + "\nG1,50,0,0,,,,3,m,Jan 1", "line 2: the date of G1 must be YYYY-MM-DD"],
-  ])("is refused, with the line and the reason, when it %s", (_name, csv, message) => {
+    ["is empty", "", "Line 1: the first line must be the header"],
+    ["has the old single sd column", "patch,L,a,b,sd,n,method,date", "Line 1: the first line must be the header"],
+    ["has a color out of range", HEADER + "\nG1,101,0,0,,,,3,m,2026-01-01", "Line 2, L: 101 is outside 0 to 100"],
+    ["names a patch the frame does not have", HEADER + "\nX9,50,0,0,,,,3,m,2026-01-01", 'Batch file SIM-1: "X9" is not a patch on this frame'],
+    ["names a reserved patch", HEADER + "\nR1,50,0,0,,,,3,m,2026-01-01", 'Batch file SIM-1: "R1" is not a patch on this frame'],
+    ["lists a patch twice", HEADER + "\nG1,50,0,0,,,,3,m,2026-01-01\nG1,51,0,0,,,,3,m,2026-01-01", "Batch file SIM-1: patch G1 is listed twice"],
+  ])("is refused, with the reason, when it %s", (_name, csv, message) => {
     expect(() => parseBatch("SIM-1", csv)).toThrow(BatchFormatError)
     expect(() => parseBatch("SIM-1", csv)).toThrow(message)
   })

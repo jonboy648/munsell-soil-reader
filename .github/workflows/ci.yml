@@ -46,16 +46,11 @@ jobs:
         include:
           - { engine: chromium, os: ubuntu-latest }
           - { engine: firefox, os: ubuntu-latest }
-          - { engine: webkit, os: macos-latest }
-          - { engine: webkit, os: macos-latest, copy: 2 }
-          - { engine: webkit, os: macos-latest, copy: 3 }
-          - { engine: webkit, os: macos-latest, copy: 4 }
-          - { engine: webkit, os: macos-latest, copy: 5 }
-          - { engine: webkit, os: macos-latest, copy: 6 }
-          - { engine: webkit, os: macos-latest, copy: 7 }
-          - { engine: webkit, os: macos-latest, copy: 8 }
-          - { engine: webkit, os: macos-latest, copy: 9 }
-          - { engine: webkit, os: macos-latest, copy: 10 }
+          - { engine: webkit, os: macos-latest, hog: 0 }
+          - { engine: webkit, os: macos-latest, hog: 3000, copy: 2 }
+          - { engine: webkit, os: macos-latest, hog: 4500, copy: 3 }
+          - { engine: webkit, os: macos-latest, hog: 5500, copy: 4 }
+          - { engine: webkit, os: macos-latest, hog: 6500, copy: 5 }
     steps:
       - uses: actions/checkout@v7
 
@@ -74,11 +69,15 @@ jobs:
       - name: Browser tests (Playwright)
         if: matrix.engine == 'webkit'
         run: |
-          # Temporary: whole suite, three passes, with a memory log every 5 seconds.
-          (while :; do echo "MEM $(date +%T) $(vm_stat | awk '/Pages free|Pages active|Pages wired|Pages occupied by compressor|Pageouts/ {printf "%s%s ", $2, $3}') $(ps -axo rss,comm | awk '/WebKit|webkit/ {s+=$1} END {printf "webkitMB=%d", s/1024}')"; sleep 5; done) &
-          for i in 1 2; do
-            echo "=== LOOP $i"
-            npx playwright test --project=webkit --retries=0 || true
+          # Temporary: hold ${{ matrix.hog }} MB of memory while the service worker specs run.
+          if [ "${{ matrix.hog }}" != "0" ]; then
+            python3 -c "import time; x = bytearray(${{ matrix.hog }} * 1024 * 1024); [x.__setitem__(i, 1) for i in range(0, len(x), 4096)]; time.sleep(3000)" &
+            sleep 5
+          fi
+          (while :; do echo "MEM $(date +%T) $(vm_stat | awk '/Pages free|Pages occupied by compressor|Pageouts/ {printf "%s%s ", $2, $3}')"; sleep 10; done) &
+          for i in 1 2 3; do
+            echo "=== LOOP $i hog=${{ matrix.hog }}"
+            npx playwright test e2e/method.spec.ts e2e/offline.spec.ts --project=webkit --retries=0 || true
           done
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.

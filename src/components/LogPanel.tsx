@@ -37,15 +37,17 @@ interface Attempt {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
+// The Reading written for each saved Spot. A Spot counts as saved while that Reading is still in
+// the Log (deleting the Reading, or its Sample, in the Log or in another tab makes the Spot new
+// again; Photos are not stored, so that Reading would otherwise be lost). Kept outside the
+// component because the Method page unmounts the reader, and keyed by the Spot object: a new
+// Photo, Start over and No Card all make new Spot objects, so nothing ever needs clearing.
+const readingOfSpot = new WeakMap<XY, string>()
+
 export function LogPanel({ result, card, spots }: Props) {
   const [samples, setSamples] = React.useState<Sample[]>([]) // oldest first
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
-  // A Spot counts as saved while the Reading written for it is still in the Log (deleting the
-  // Reading, or its Sample, in the Log or in another tab makes the Spot new again; Photos are
-  // not stored, so that Reading would otherwise be lost). Spots of a new Photo, and after Start
-  // over or No Card, are new objects, so nothing here needs clearing.
-  const [placed, setPlaced] = React.useState<{ spot: XY; readingId: string }[]>([])
   // Spots a save is working on right now, so that nothing can save them a second time meanwhile.
   const [inFlight, setInFlight] = React.useState<XY[]>([])
   const saving = React.useRef<Attempt | null>(null)
@@ -87,8 +89,10 @@ export function LogPanel({ result, card, spots }: Props) {
   }
 
   const inLog = React.useMemo(() => new Set(samples.flatMap((s) => s.readings.map((r) => r.id))), [samples])
-  const isSaved = (spot: XY) =>
-    inFlight.includes(spot) || placed.some((p) => p.spot === spot && inLog.has(p.readingId))
+  const isSaved = (spot: XY) => {
+    const readingId = readingOfSpot.get(spot)
+    return inFlight.includes(spot) || (readingId !== undefined && inLog.has(readingId))
+  }
   const newSpots = spots.map((_, i) => i).filter((i) => !isSaved(spots[i]))
   const savedCount = spots.length - newSpots.length
   // The sheet counts the Spots it is saving as new until the save is done.
@@ -123,8 +127,8 @@ export function LogPanel({ result, card, spots }: Props) {
         await addSample({ id: crypto.randomUUID(), ...target.fields, location, createdAt: Date.now(), readings })
       }
       askToKeepLog()
+      chosen.forEach((spot, k) => readingOfSpot.set(spot, readings[k].id))
       await refresh()
-      setPlaced((all) => [...all, ...chosen.map((spot, k) => ({ spot, readingId: readings[k].id }))])
       setStatus({
         text:
           `Saved ${plural(readings.length, "Reading")} to ${name}.` +

@@ -679,6 +679,21 @@ for (const dismiss of ["Cancel", "Back"] as const) {
   })
 }
 
+test("a saved Spot is still saved after a visit to the Method page", async ({ page }) => {
+  const pending = page.getByTestId("log-pending")
+  await readSpots(page, SIM_SPOT)
+  await saveToNewSample(page, { name: "A1", condition: "moist" })
+  await expect(pending).toHaveText("The Reading from this Photo is already saved.")
+
+  // The Method page takes the reader's place on screen, and Back brings it back.
+  await page.getByTestId("method-link").click()
+  await expect(page).toHaveURL(/#method$/)
+  await page.goBack()
+  await expect(page.getByTestId("photo")).toBeVisible()
+  await expect(pending).toHaveText("The Reading from this Photo is already saved.")
+  await expect(page.getByRole("button", { name: "Save to Log" })).toBeDisabled()
+})
+
 test("a Spot whose Reading was deleted from the Log can be saved again", async ({ page }) => {
   const pending = page.getByTestId("log-pending")
   await readSpots(page, SIM_SPOT)

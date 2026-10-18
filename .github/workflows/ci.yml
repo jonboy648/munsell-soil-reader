@@ -52,6 +52,10 @@ jobs:
           - { engine: webkit, os: macos-latest, copy: 4 }
           - { engine: webkit, os: macos-latest, copy: 5 }
           - { engine: webkit, os: macos-latest, copy: 6 }
+          - { engine: webkit, os: macos-latest, copy: 7 }
+          - { engine: webkit, os: macos-latest, copy: 8 }
+          - { engine: webkit, os: macos-latest, copy: 9 }
+          - { engine: webkit, os: macos-latest, copy: 10 }
     steps:
       - uses: actions/checkout@v7
 

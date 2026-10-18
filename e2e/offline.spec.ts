@@ -106,6 +106,7 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
 // playwright.config.ts blocks service workers, so the other specs never see their notices; this
 // spec is the one about them.
 test.use({ serviceWorkers: "allow" })
+test.setTimeout(120_000)
 
 /** Open the app and wait for the first install to finish; the page is not controlled yet. */
 async function openFirstVisit(page: Page, url = "/") {
@@ -137,16 +138,50 @@ function watch(page: Page) {
       )
       seen.push(`${stamp()} ${label} ${outcome}`)
       if (outcome === "TIMEOUT") {
-        const regs = await page.evaluate(async () =>
-          (await navigator.serviceWorker.getRegistrations()).map((r) => ({
-            scope: r.scope,
-            installing: r.installing?.state,
-            waiting: r.waiting?.state,
-            active: r.active?.state,
-          })),
-        )
-        console.log(`SWDIAG ${label} ${JSON.stringify({ regs, seen: seen.slice(-40) })}`)
-        throw new Error(`SWDIAG ${label}: serviceWorker.ready did not resolve in 12 s`)
+        const regsOf = () =>
+          page.evaluate(async () =>
+            (await navigator.serviceWorker.getRegistrations()).map((r) => ({
+              scope: r.scope,
+              installing: r.installing?.state,
+              waiting: r.waiting?.state,
+              active: r.active?.state,
+            })),
+          )
+        const hasWorker = async () => (await regsOf()).some((r) => r.installing || r.waiting || r.active)
+        const waitFor = async (ms: number) => {
+          const end = Date.now() + ms
+          while (Date.now() < end) {
+            if (await hasWorker()) return true
+            await page.waitForTimeout(500)
+          }
+          return false
+        }
+        const stages: string[] = [`${stamp()} regs ${JSON.stringify(await regsOf())}`]
+        let recovered = "none"
+        if (await waitFor(18_000)) recovered = "self"
+        stages.push(`${stamp()} after waiting: ${recovered}`)
+        if (recovered === "none") {
+          await page.evaluate(async () => {
+            await Promise.race([
+              (await navigator.serviceWorker.getRegistration())?.update(),
+              new Promise((r) => setTimeout(r, 3000)),
+            ])
+          }).catch((e) => stages.push(`update threw ${String(e).slice(0, 80)}`))
+          if (await waitFor(8_000)) recovered = "update"
+          stages.push(`${stamp()} after update(): ${recovered}`)
+        }
+        if (recovered === "none") {
+          await page.evaluate(() => Promise.race([navigator.serviceWorker.register("/sw.js"), new Promise((r) => setTimeout(r, 3000))])).catch((e) => stages.push(`register threw ${String(e).slice(0, 80)}`))
+          if (await waitFor(8_000)) recovered = "register"
+          stages.push(`${stamp()} after register(): ${recovered}`)
+        }
+        if (recovered === "none") {
+          await page.reload().catch(() => {})
+          if (await waitFor(8_000)) recovered = "reload"
+          stages.push(`${stamp()} after reload: ${recovered}`)
+        }
+        console.log(`SWDIAG ${label} recovered=${recovered} ${JSON.stringify({ stages, seen: seen.slice(-12) })}`)
+        throw new Error(`SWDIAG ${label}: serviceWorker.ready did not resolve in 12 s (recovered: ${recovered})`)
       }
       if ((Date.now() - t0) / 1000 > 3) console.log(`SWSLOW ${label} ${stamp()}`)
     },

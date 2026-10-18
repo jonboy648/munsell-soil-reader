@@ -58,6 +58,13 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   build, with its own license text) to `licenses.json`, which the service worker caches too. It is a page of the same single HTML
   file (`#method`), so it works offline with the rest.
 - `src/lib/`: the session reducer (taps and undo), loading a Photo, and which Reading to show.
+- The Log: Samples and their Readings are saved on the device in IndexedDB (`src/lib/log.ts`,
+  `logStore.ts`) and exported as CSV (`logCsv.ts`); the screens are `LogPanel`, `SaveToLogSheet` and
+  `LogScreen`. Photos are never stored. Location is off unless the user switches it on in the Save
+  form. The CSV starts with a UTF-8 byte-order mark so Excel reads it as UTF-8. In Excel, a Sample
+  name or note that it could mistake for a formula, number, time, date or TRUE/FALSE (`=1+1`, `001`,
+  `1 A`, `Mar 5`) is shown with a leading apostrophe: the export adds it on purpose, so that
+  Excel keeps the text as typed. It is not corruption.
 - `e2e/`: the browser tests.
 - Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
   against a ColorChecker and exports the batch file the frame card reads. It is a separate
@@ -90,7 +97,11 @@ printed) is derived from the Chip list, so each Page has its own bottom row and 
 taps four Chips that exist on that Page (10YR: 8/1, 8/8, 5/8, 2/1; the grid's bottom right is
 usually empty) and the homography finds the rest. Each Chip is read in its solid middle, clear of
 the round holes, and corrected against the color computed from its notation, with the /1 column as
-the ladder. A Spot tapped inside a hole reads the soil behind the Page. The Gley, 10Y-5GY and WHITE
+the ladder. The correction is the ladder's curves and then a 3x3 pulled toward one gain per channel,
+not the ColorChecker's full 3x3: a Page's Chips have one hue, so they cannot say how the camera
+mixes the channels in the hue direction, and a free matrix there pulled every other color toward the
+Page's hue (the same wood behind the holes of four Pages came out 11.8 apart, against 2.4 raw; now
+4.3). The comparison is in [docs/correction-comparison.md](docs/correction-comparison.md). A Spot tapped inside a hole reads the soil behind the Page. The Gley, 10Y-5GY and WHITE
 Pages (which mix hues), and 10R (not checked against the book), are not Cards yet; their Chips are
 still matchable. If the soil's nearest Chip is on another Page, the Reading suggests retaking with
 the hue Page that holds it (a Gley 1 or 10Y-5GY Chip goes to 5Y, a 10R Chip to 2.5YR; nothing is
@@ -150,6 +161,7 @@ Two seams, and nothing else:
   and, with a swatch card in the scene, the measurement mode's (`measure.test.ts`).
 - **Browser** (`e2e/*.spec.ts`): the production build at a phone viewport. It picks an example,
   taps corners and Spots by coordinates and reads the text on screen.
+  `e2e/log.spec.ts` covers the Log: save, reload, edit, delete, and the downloaded CSV.
   `e2e/offline.spec.ts` covers install and offline: the manifest, Chromium's installability
   check, a Reading with the network off, and the notices for the first install and for each kind
   of new deploy (served through a small proxy that publishes new versions of the app). The

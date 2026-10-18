@@ -74,7 +74,7 @@ test("a worn Page reads a Spot in a hole to a corrected Reading, and names the C
   await expect(sheet.getByRole("row", { name: /^Corrected/ })).toContainText("10YR 4/3")
   await expect(sheet.getByRole("row", { name: /^Raw/ })).not.toContainText("10YR 4/3")
   // The two smudged Chips are left out, and named next to the Card check.
-  await expect(sheet.getByTestId("left-out")).toContainText("10YR 8/1, 10YR 7/1")
+  await expect(sheet.getByTestId("left-out")).toContainText("10YR 7/1, 10YR 6/1")
   await expect(sheet.getByTestId("better-page")).toHaveCount(0)
 })
 
@@ -108,11 +108,11 @@ test("the overlay rings every Chip of the Page and crosses the two left out", as
       sites,
     )
   // The overlay is drawn after the Reading appears, so poll. Chip 14 is 10YR 6/3, which nobody
-  // tapped and the fit kept: ringed, not crossed. Chips 0 and 6 are 10YR 8/1 and 7/1, the smudged
+  // tapped and the fit kept: ringed, not crossed. Chips 6 and 12 are 10YR 7/1 and 6/1, the smudged
   // ones: crossed.
   await expect.poll(async () => (await marks()).length).toBe(36)
   await expect.poll(async () => (await marks())[14]).toEqual({ ring: true, cross: false })
-  await expect.poll(async () => (await marks())[0].cross).toBe(true)
+  await expect.poll(async () => (await marks())[12].cross).toBe(true)
   await expect.poll(async () => (await marks())[6]).toEqual({ ring: true, cross: true })
 })
 

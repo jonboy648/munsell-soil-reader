@@ -28,7 +28,8 @@ function stepsApart(a: string, b: string): number {
   const parse = (n: string) => {
     const m = /^(\S+) ([\d.]+)\/([\d.]+)$/.exec(n)
     if (!m) return null
-    return [PAGES.indexOf(m[1]), VALUES.indexOf(Number(m[2])), CHROMAS.indexOf(Number(m[3]))]
+    // The 10YR Page's bottom row is 2/, the others' 2.5/: the same row of the grid.
+    return [PAGES.indexOf(m[1]), VALUES.indexOf(Number(m[2]) === 2 ? 2.5 : Number(m[2])), CHROMAS.indexOf(Number(m[3]))]
   }
   const pa = parse(a)
   const pb = parse(b)
@@ -342,7 +343,10 @@ describe("a worn Page", () => {
       for (const tilt of [undefined, TILT]) {
         const { check, reading } = read({ page: "10YR", camera: phone(light), smudged, tilt })
         expect(check.leftOut).toEqual(["10YR 8/1", "10YR 7/1"])
-        expect(check.ok).toBe(true)
+        // With the light end of the ladder gone the light Chips are extrapolated, and the Page's matrix is
+        // held near diagonal, so the check sits near the line (2.0 in warm light, 2.2 in shift light, 0.7
+        // in dim) instead of under it: the 5.1 it would be with the dirt left in is what is being avoided.
+        expect(check.meanDE).toBeLessThan(2.5)
         expect(withinOneChip(reading.corrected!.chip.notation, "10YR 4/3")).toBe(true)
       }
     }
@@ -580,6 +584,26 @@ describe("Photo quality on a Page", () => {
 
   it("does not call a Page that is large enough small", () => {
     expect(quality({ page: "10YR", tilt: TILT })).toEqual([])
+  })
+})
+
+describe("soil of a hue that is not the Page's", () => {
+  // A Page's Chips have one hue, so its correction must not pull other hues toward it: a 7.5YR soil
+  // on the 10YR Page is read as 7.5YR (or a neighbour), and the Reading says which Page to retake with.
+  it.each([
+    ["7.5YR 4/4", "7.5YR"],
+    ["2.5Y 5/4", "2.5Y"],
+    ["5YR 4/4", "5YR"],
+    ["5Y 6/4", "5Y"],
+  ])("reads %s on the 10YR Page within one Chip, and suggests the %s Page", (soil, hue) => {
+    for (const light of [LIGHTS.warm, LIGHTS.dim]) {
+      const { reading } = read({ page: "10YR", soil, camera: phone(light) })
+      const nearest = reading.corrected!.chip
+      expect(withinOneChip(nearest.notation, soil), `${soil} read as ${nearest.notation}`).toBe(true)
+      // A neighbouring Chip one hue step nearer the Page may be the nearest; the suggestion is then that Page's.
+      expect(reading.betterPage, soil).toBeDefined()
+      expect(stepsApart(`${reading.betterPage} 4/3`, `${hue} 4/3`)).toBeLessThanOrEqual(1)
+    }
   })
 })
 

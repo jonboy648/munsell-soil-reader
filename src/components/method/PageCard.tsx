@@ -14,6 +14,9 @@ import {
 } from "@/engine"
 import { Sub } from "./parts"
 
+/** The largest pairwise CIEDE2000 between the wood behind the holes on the four real Pages, corrected (pinned in realPages.test.ts). */
+const PAGE_WOOD_SPREAD = "4.3"
+
 /** The four Chips to tap on a Page, as the app names them. */
 const tapsOf = (hue: (typeof PAGE_HUES)[number]) =>
   pageModel(hue)
@@ -53,6 +56,33 @@ export function PageCard() {
           correction is strongest near the Page's own hue.
         </li>
       </ul>
+
+      <Sub>Which correction a Page uses</Sub>
+      <div className="grid gap-2" data-testid="page-correction">
+        <p>
+          A Page uses the same curves as the ColorChecker, but not its full 3x3 matrix. The
+          ColorChecker's patches cover the color space, so they say how the camera mixes the red,
+          green and blue channels. A Page's Chips all have one hue: they differ in lightness and
+          strength, not in hue, so they lie along one line of color space and say nothing about the
+          hue direction. A matrix left free there pulls every color that is not on the Page toward the
+          Page's hue.
+        </p>
+        <p>
+          <b>The check that showed it:</b> the same wood, in the same light, seen through the holes of
+          four Pages (10YR, 7.5YR, 2.5Y and 5Y). Raw, it comes out within 2.4 CIEDE2000 across the
+          four Photos. Corrected with the full matrix, it came out 11.8 apart, and read as 2.5Y on the
+          2.5Y Page and 5Y on the 5Y Page, so the better-Page hint never fired. The Page's matrix is now
+          held near one gain per channel (a ridge on the matrix's off-diagonal terms), and the wood is{" "}
+          {PAGE_WOOD_SPREAD} apart, as close as the wood's own grain lets four Photos be.
+        </p>
+        <p>
+          <b>The price:</b> a Page's own Card check is higher, because the matrix has less freedom to
+          fit the Page's own Chips (10YR 2.12 to 2.79). That is the part of the old check that came
+          from the pull. The strength was not chosen by the Card check, which can only see the Page's
+          own hue and would pick the weakest; it is the weakest that brings the wood to the noise floor.
+          The comparison of the candidates is in docs/correction-comparison.md.
+        </p>
+      </div>
 
       <Sub>Dirty Chips are left out</Sub>
       <p>
@@ -97,16 +127,16 @@ export function PageCard() {
         </li>
         <li>
           <b>10YR:</b> the Page has two smudged Chips, 8/1 and 7/1. Left in, the Card check was
-          5.11. The fit now leaves out 8/1, 7/1 and 3/6, and the check is 2.13.
+          7.56. The fit now leaves out 8/1, 7/1 and 3/6, and the check is 2.79.
         </li>
         <li>
           <b>7.5YR fails the Card check,</b> and honestly. It leaves out 3/3, 2.5/2 and 2.5/3, two of
           them in the 2.5/ row, so the row guard fails it. They are not dirt: the Page's darkest
           browns are darker and stronger than the gray column reaches, so the fit has to guess past
-          the end of it. Its check is 2.31.
+          the end of it. Its check is 2.98.
         </li>
         <li>
-          After leaving Chips out, 2.5Y read 2.20 and 5Y read 1.62. With the line at{" "}
+          After leaving Chips out, 2.5Y read 2.84 and 5Y read 1.83. With the line at{" "}
           {CARD_CHECK_GOOD}, three of the four real Pages would show "failed". That is the
           provisional line (issue #28), not the Pages.
         </li>

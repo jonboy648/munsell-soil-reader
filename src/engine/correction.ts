@@ -134,8 +134,47 @@ export const linearizeThen =
     return (lin) => matrix(linearize(lin))
   }
 
-/** The fit the engine uses. */
+/** The fit the engine uses for the ColorChecker. */
 export const fitCorrection: Fit = linearizeThen(pchip)
+
+/**
+ * A 3x3 matrix fitted by least squares with a ridge on its off-diagonal terms, which pulls it
+ * toward one gain per channel. `strength` is relative: 1 puts a penalty on each off-diagonal term
+ * as heavy as the references' mean squared channel value. Where the references say a lot about how
+ * the channels mix (the ColorChecker's patches), the data win; where they say little (a Page's
+ * Chips, which all have one hue and lie along one line of color space) the matrix stays near diagonal.
+ */
+export const fitRidgeMatrix =
+  (strength: number): Fit =>
+  (references) => {
+    const A = references.map((r) => [...r.measured])
+    const lambda = (strength * A.reduce((sum, row) => sum + row[0] ** 2 + row[1] ** 2 + row[2] ** 2, 0)) / 3
+    // X[from][to]: each output channel is fitted on its own, with its off-diagonal inputs penalised.
+    const X = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+    for (let to = 0; to < 3; to++) {
+      const rows = [...A]
+      const targets: Vec3[] = references.map((r) => [r.truth[to], 0, 0])
+      for (let from = 0; from < 3; from++) {
+        if (from === to) continue
+        rows.push([0, 1, 2].map((k) => (k === from ? Math.sqrt(lambda) : 0)))
+        targets.push([0, 0, 0])
+      }
+      const solved = leastSquares(rows, targets)
+      for (let from = 0; from < 3; from++) X[from][to] = solved[from][0]
+    }
+    return (lin) => [0, 1, 2].map((c) => lin[0] * X[0][c] + lin[1] * X[1][c] + lin[2] * X[2][c]) as Vec3
+  }
+
+/** How strongly a Page's matrix is pulled toward diagonal: chosen on real Photos, see docs/correction-comparison.md. */
+export const PAGE_MATRIX_RIDGE = 1
+
+/**
+ * The fit the engine uses for a Page: the ladder's curves, then a 3x3 pulled toward one gain per
+ * channel. With the full 3x3 after the curves, a Page pulled every color it was not made of toward
+ * its own hue (the same wood behind the holes of four Pages came out 11.8 CIEDE2000 apart, 2.4 raw).
+ * A Page's Chips cannot say how the camera mixes the channels, so the matrix is held near diagonal.
+ */
+export const fitPageCorrection: Fit = linearizeThen(pchip, fitRidgeMatrix(PAGE_MATRIX_RIDGE))
 
 // ---- the Card check ----
 const colorDifference = (a: Vec3, b: Vec3): number => deltaE2000(linearToLab(a), linearToLab(b))

@@ -216,6 +216,69 @@ extrapolation and misses whether it is dirty or not (a clean Card reaches 4 to 6
 and the worst of the six was the damaged one in only 638 of 1716 Photos. Judging the ladder by
 the references beside it does.
 
+## The Page's correction
+
+Ticket #59. The first real Photos (#15, `src/engine/realPages.test.ts`) showed that the full 3x3
+after the curves distorts colors that are not on a Page. A hue Page's Chips lie along one line of
+color space (value and chroma vary, hue does not), so they cannot say how the camera mixes the
+channels in the hue direction, and the matrix is free there: it extrapolates toward the Page's own
+hue. The same wood behind the holes of four Pages (10YR, 7.5YR, 2.5Y, 5Y; same light, same phone)
+is within 2.4 CIEDE2000 across them raw and 11.8 apart corrected; the raw 10YR wood read as 2.5Y on
+the 2.5Y Page and 5Y on the 5Y Page, so the hue suggestion never fired there. The ColorChecker's
+patches span color space, so it keeps its full correction.
+
+**Result: the Page uses the ladder's curves, then a 3x3 pulled toward one gain per channel (ridge
+on the off-diagonal terms, strength 1).** `fitPageCorrection` in `src/engine/correction.ts`.
+
+How the candidates were measured (all with the curves first; Chips left out as the engine does):
+- **Wood.** The mean corrected color of the wood through every hole (25 to 30) of each of the four
+  wood Pages, and the largest and mean pairwise CIEDE2000 between the four.
+- **Card check.** The Page's held-out mean on each real Photo (the 10YR fabric Photo is warm
+  indoor light, and the Page's worst).
+- **Simulated soils.** Pages of 10YR, 7.5YR and 5Y (8, 6 and 6 soils: on the Page's hue, one hue step
+  off, two or more steps off) in warm, dim and camera-shift light at tone 0.5: 60 Photos. The mean
+  CIEDE2000 between the corrected soil and its true color. The shift camera mixes the channels
+  strongly (a simulation choice), which is where a matrix helps.
+
+| Correction | Wood, largest / mean | Card check: 10YR, 7.5YR, 2.5Y, 5Y (fabric) | Sim. on hue | 1 step off | 2+ steps off | Sim. Card check |
+|---|---|---|---|---|---|---|
+| curves + full 3x3 (was) | 11.8 / 8.3 | 2.12, 2.30, 2.21, 1.80 (5.22) | 0.40 | 1.28 | 2.58 | 0.51 |
+| curves only | 4.2 / 3.2 | 3.43, 2.81, 2.50, 1.62 (4.53) | 1.19 | 1.24 | 1.29 | 1.22 |
+| curves + gain per channel | 4.0 / 3.1 | 2.73, 2.98, 2.85, 1.82 (4.02) | 0.79 | 0.91 | 1.22 | 1.02 |
+| ridge 0.001 | 8.3 / 5.5 | 2.21, 2.26, 2.18, 1.85 (2.83) | 0.46 | 0.86 | 2.10 | 0.53 |
+| ridge 0.01 | 5.8 / 4.2 | 2.58, 2.72, 2.48, 1.87 (5.69) | 0.48 | 0.88 | 1.83 | 0.59 |
+| ridge 0.1 | 4.9 / 3.5 | 2.64, 2.98, 2.80, 1.85 (6.52) | 0.46 | 0.84 | 1.65 | 0.68 |
+| ridge 0.3 | 4.7 / 3.2 | 2.76, 2.99, 2.83, 1.84 (6.65) | 0.56 | 0.77 | 1.48 | 0.82 |
+| ridge 0.5 | 4.5 / 3.2 | 2.77, 2.99, 2.84, 1.83 (6.71) | 0.62 | 0.80 | 1.37 | 0.89 |
+| **ridge 1 (ships)** | **4.3 / 3.1** | **2.79, 2.98, 2.84, 1.83 (3.98)** | **0.69** | **0.81** | **1.28** | **0.96** |
+| ridge 3 | 4.1 / 3.1 | 2.71, 2.98, 2.85, 1.82 (4.00) | 0.77 | 0.88 | 1.24 | 0.99 |
+
+(The ridge is on the off-diagonal terms, scaled by the references' mean squared channel value, so
+1 puts each term's penalty as high as the data's own scale; as it grows the fit tends to the gain
+per channel. The fabric column moves with which Chips are left out, which changes between rows.)
+
+What it says:
+- **Choosing the strength by held-out error alone picks the wrong one.** The Card check is made on
+  the Page's own Chips, which all have one hue, so it is lowest for the weakest ridge (2.21 at 0.001)
+  and cannot see the pull. That strength is the one that spreads the wood 8.3 apart. The strength is
+  the weakest that brings the wood to the noise floor: within one Photo the holes differ from their
+  own mean by a median of 2.6 to 6.9 (wood grain), so 3 to 4 between Pages is the floor, and the
+  ticket's line is 4.5. 1 gives 4.3; 0.5 gives 4.5 with no margin.
+- **Curves only and a gain per channel reach the floor** (4.2 and 4.0) and are simpler. They lose the
+  simulated shift camera, where the matrix is needed (on hue, shift light: 2.90 and 1.55 against 1.25
+  for the ridge and 0.59 for the full 3x3), and the curves only are worse on the Page's own Card
+  check (3.43 on 10YR).
+- **Off-hue soils are the point.** The full 3x3 reads a soil two or more hue steps off the Page 2.58
+  from its true color; the ridge, 1.28. On the Page's own hue it is 0.69 against 0.40, the price.
+- **The Page's own Card check goes up** (10YR 2.12 to 2.79, 7.5YR 2.30 to 2.98, 2.5Y 2.21 to 2.84,
+  5Y 1.80 to 1.83) because the matrix has less freedom to fit the Page's own Chips. A better Card
+  check was never a better Reading here: the 3x3's came from the pull.
+- **Hue suggestion.** The wood on the 2.5Y Page reads as 10YR again (13 of 25 holes 10YR 5/6, 9 of
+  4/6) and `betterPage` names 10YR for 23 of 25; on the 7.5YR Page for 29 of 29; on the 5Y Page
+  for 20 of 25 (12 say 10YR, 8 say 2.5Y, a neighbour).
+- Judging the strength on real Photos with a book Reading of the wood, if Jon gives one, would
+  replace "the wood agrees with itself across the Pages" with the right answer.
+
 ## Limits
 
 - **Provisional.** `CARD_CHECK_GOOD`, `CARD_CHECK_CAUTION` and the leave-out's limits come from

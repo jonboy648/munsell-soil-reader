@@ -62,7 +62,14 @@ test("explains how a Page is used, how dirty Chips are handled, and what has not
   await expect(cards).toContainText("The Page Card has no accuracy figure yet.")
   // The real Pages, as found.
   await expect(cards).toContainText("8/1, 7/1 and 3/6")
-  await expect(cards).toContainText("5.11")
+  await expect(cards).toContainText("7.56")
+  await expect(cards).toContainText("2.79")
+  // The correction a Page uses, and why.
+  const pageCorrection = page.getByTestId("page-correction")
+  await expect(pageCorrection).toContainText("not its full 3x3 matrix")
+  await expect(pageCorrection).toContainText("11.8 apart")
+  await expect(pageCorrection).toContainText("4.3 apart")
+  await expect(pageCorrection).toContainText("better-Page hint never fired")
   await expect(cards).toContainText("7.5YR fails the Card check,")
   await expect(cards).toContainText("What is not caught.")
   // And it is no longer a stub.

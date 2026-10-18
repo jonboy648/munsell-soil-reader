@@ -456,8 +456,12 @@ const hazyBlack =
   (lin) =>
     light(lin === PATCH_LINEAR[23] ? [lin[0] * 0.8 + 0.04, lin[1] * 0.8 + 0.04, lin[2] * 0.8 + 0.04] : lin)
 
-/** Jon's 10YR Page has dark smudges on 8/1 and 7/1, which are steps of the ladder. */
-const WORN_CHIPS = { "10YR 8/1": 0.3, "10YR 7/1": 0.3 }
+/**
+ * Two smudged steps of the ladder, as on Jon's 10YR Page (8/1 and 7/1 there). The lightest step is left
+ * clean here: without the light end of the ladder the simulated Page's Card check sits on the line, and
+ * the example is for seeing a corrected Reading.
+ */
+const WORN_CHIPS = { "10YR 7/1": 0.3, "10YR 6/1": 0.3 }
 
 export const EXAMPLES: ExamplePhoto[] = [
   {

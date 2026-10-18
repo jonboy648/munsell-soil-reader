@@ -7,6 +7,7 @@ import { FormExport, slug } from "@/components/FormExport"
 import { HydrologyForm } from "@/components/HydrologyForm"
 import { IndicatorsPanel } from "@/components/IndicatorsPanel"
 import { LayerForm } from "@/components/LayerForm"
+import { LocationLookup } from "@/components/LocationLookup"
 import { PagePreview } from "@/components/PagePreview"
 import { PointDetails, type PointDetailsChange } from "@/components/PointDetails"
 import { RestrictiveForm } from "@/components/RestrictiveForm"
@@ -74,6 +75,11 @@ function DetailsSummary({ project, point }: { project: Project; point: SamplingP
   return (
     <div data-testid="point-details" className="grid gap-1 text-sm">
       <p>{location.length > 0 ? location.join(", ") : "No latitude or longitude yet."}</p>
+      {(point.soilMapUnit || point.nwi) && (
+        <p data-testid="point-lookups">
+          {[point.soilMapUnit && `Soil map unit: ${point.soilMapUnit}`, point.nwi && `NWI: ${point.nwi}`].filter(Boolean).join(". ")}
+        </p>
+      )}
       <p>
         {pair
           ? `${pair.role === "wetland" ? "Wetland" : "Upland"} point, paired with the ${pair.role === "wetland" ? "upland" : "wetland"} point ${pair.other.name}.`
@@ -91,11 +97,15 @@ export function PointView({ project, point, change, onBack }: Props) {
   const layers = topToBottom(point.layers)
 
   // The pair is kept on this point; a pair another point recorded with this one is replaced by it.
-  const saveDetails = async ({ lat, long, datum, pair }: PointDetailsChange) => {
+  const saveDetails = async ({ lat, long, datum, soilMapUnit, nwi, pair }: PointDetailsChange) => {
     await change(project.id, (p) => ({
       ...p,
       points: p.points.map((pt) =>
-        pt.id === point.id ? { ...pt, lat, long, datum, pair: pair ?? undefined } : pt.pair?.with === point.id ? { ...pt, pair: undefined } : pt,
+        pt.id === point.id
+          ? { ...pt, lat, long, datum, soilMapUnit: soilMapUnit.trim() || undefined, nwi: nwi.trim() || undefined, pair: pair ?? undefined }
+          : pt.pair?.with === point.id
+            ? { ...pt, pair: undefined }
+            : pt,
       ),
     }))
     setEditingDetails(false)
@@ -132,6 +142,7 @@ export function PointView({ project, point, change, onBack }: Props) {
       ) : (
         <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
           <DetailsSummary project={project} point={point} />
+          <LocationLookup project={project} point={point} change={change} />
           <Button variant="outline" className="h-11 text-base" onClick={() => setEditingDetails(true)}>
             Edit location and pair
           </Button>

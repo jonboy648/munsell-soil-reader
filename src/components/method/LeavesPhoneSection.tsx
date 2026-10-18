@@ -1,6 +1,6 @@
-// What leaves the phone. Today: nothing of yours, and one check for a new version of the app.
-// Later: three things, each only on purpose.
-import { NotYet, Section } from "./parts"
+// What leaves the phone. Always: one check for a new version of the app. Only when a project has
+// location turned on and the user taps: the position, to two public services. Later: one more thing.
+import { NotYet, Section, Sub } from "./parts"
 
 export function LeavesPhoneSection() {
   return (
@@ -16,28 +16,42 @@ export function LeavesPhoneSection() {
         carries no Photo and no Reading, only what any web request carries: your network address and
         your browser's name. Between those, the app works with no signal.
       </p>
+      <Sub>Only when you turn on location for a project</Sub>
+      <div data-testid="leaves-lookups" className="grid gap-2">
+        <p>
+          Location is off for every project until you turn it on in that project. While it is off the
+          app never asks the phone for its position and sends no request but the one above. Once it
+          is on, nothing happens until you tap a button on a sampling point:
+        </p>
+        <ul className="grid list-disc gap-1 pl-5">
+          <li>
+            <b>Use my location</b> reads the phone's position (latitude and longitude, WGS84) and
+            writes it on the point. The position does not leave the phone for this.
+          </li>
+          <li>
+            <b>Look-ups by location.</b> With a signal, the point's position is sent to two public
+            services that need no account: the USDA NRCS Soil Data Access service (the Soil Map Unit
+            Name) and the US Fish and Wildlife Service National Wetlands Inventory map service (the
+            NWI classification). Each sees the position and your network address, and nothing else:
+            no Photo, no Reading, no project or point name. With no signal, the lookup says it is
+            unavailable and the two fields stay for you to type.
+          </li>
+        </ul>
+        <p>
+          What comes back is yours to edit, and what you type is never replaced by a later look-up.
+        </p>
+      </div>
       <NotYet testId="leaves-stub">
         <p>
-          Three things are planned that would send data off the phone. Each will happen only when
-          you ask for it, each will be off or hidden until then, and each will be listed here
-          before it ships.
+          One more thing is planned that would send data off the phone. It will happen only when you
+          ask for it, it will be off or hidden until then, and it will be listed here before it
+          ships.
         </p>
         <ul className="grid list-disc gap-1 pl-5">
           <li>
             <b>Plant photo identification.</b> One plant photo, the one you pick, goes to an
             identification service, and the best matches come back for you to choose from. It is
             hidden when you are offline, and no photo is sent without your tap.
-          </li>
-          <li>
-            <b>Your location.</b> Off by default and turned on per project. The phone's position is
-            used only while it is on.
-          </li>
-          <li>
-            <b>Look-ups by location.</b> With location on and a signal, the soil map unit (from the
-            USDA NRCS Soil Data Access service) and the wetland class (from the US Fish and
-            Wildlife Service National Wetlands Inventory) can be looked up for a sampling point.
-            The position is sent to those two public services, and what comes back is yours to
-            edit.
           </li>
         </ul>
       </NotYet>

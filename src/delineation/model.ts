@@ -116,6 +116,14 @@ export interface SamplingPoint {
   hydrology?: Hydrology
   /** The restrictive layer, if one was observed. */
   restrictive?: Restrictive
+  /**
+   * This point's own Soil Map Unit Name and NWI classification, when they differ from the project's
+   * header (a look-up by location finds them for the point). A blank one falls back to the header.
+   */
+  soilMapUnit?: string
+  nwi?: string
+  /** What the last look-up wrote into those two, so a later one can tell a value the user changed. */
+  lookedUp?: { soilMapUnit?: string; nwi?: string }
 }
 
 export type YesNo = "" | "yes" | "no"
@@ -169,6 +177,11 @@ export interface Project {
   points: SamplingPoint[]
   /** Picked once for the project. Until it is, an indicator that is limited to some subregions is not suggested. */
   subregion?: Subregion
+  /**
+   * Whether this project may use the device's position and look up the soil map unit and the NWI
+   * class by it. Off unless set; nothing is read or sent until it is.
+   */
+  location?: boolean
 }
 
 const NO_CONDITIONS: Conditions = { vegetation: "", soil: "", hydrology: "" }

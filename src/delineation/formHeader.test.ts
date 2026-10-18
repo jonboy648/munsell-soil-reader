@@ -41,6 +41,17 @@ const printed = (point: SamplingPoint, p: Project = project) =>
   Object.fromEntries(Object.entries(formFor(p, point).fields).filter(([id, text]) => id.startsWith("page1.") && text !== ""))
 
 describe("the header of page 1", () => {
+  test("a point's own soil map unit and NWI class, from a look-up or typed, print instead of the header's; blank falls back", () => {
+    const looked: SamplingPoint = { ...jf2, soilMapUnit: "Webster clay loam, 0 to 2 percent slopes", nwi: "PEM1A" }
+    expect(printed(looked)).toMatchObject({ "page1.soilMapUnit": "Webster clay loam, 0 to 2 percent slopes", "page1.nwi": "PEM1A" })
+    expect(printed({ ...jf2, soilMapUnit: "  ", nwi: "" })).toMatchObject({
+      "page1.soilMapUnit": "Clarion loam, 2 to 5 percent slopes",
+      "page1.nwi": "PEM1C",
+    })
+    // The other point of the project is untouched.
+    expect(printed(jf1, { ...project, points: [jf1, looked] })).toMatchObject({ "page1.nwi": "PEM1C" })
+  })
+
   test("a Project's lines are the same on every Sampling point's form; the point's own lines differ", () => {
     const first = printed(jf1)
     const second = printed(jf2)

@@ -60,6 +60,7 @@ export const NCNE: Region = {
     inset: 2,
     aboveRule: 2.5,
     samplingPoint: { column: [512.8, 571.2], rule: 53.8 },
+    restrictive: { type: { column: [83.4, 224.3], rule: 535.8 }, depth: { column: [114.2, 224.3], rule: 551.04 } },
     rowRules: [111.1, 129.2, 147.4, 165.5, 183.6, 201.7, 219.8, 238.0, 256.1, 274.2, 292.3],
     columns: {
       depth: [38.3, 83.5],

@@ -17,7 +17,7 @@ const problem = (d: LayerDraft) => {
 describe("a Layer typed into the form", () => {
   test("the third JF-1 layer, as typed", () => {
     const layer = value(
-      draft({ top: "25", bottom: "29", matrix: "10yr 4/2", matrixPercent: "97", redox: [{ color: "7.5YR 4/6", percent: "3" }] }),
+      draft({ top: "25", bottom: "29", matrix: "10yr 4/2", matrixPercent: "97", redox: [{ color: "7.5YR 4/6", percent: "3", type: "", location: "" }] }),
     )
     expect(layer).toMatchObject({
       top: 25,
@@ -29,7 +29,7 @@ describe("a Layer typed into the form", () => {
   })
 
   test("a layer with no matrix color is allowed (the form warns about it), and a blank redox row is dropped", () => {
-    const layer = value(draft({ top: "0", bottom: "6", redox: [{ color: "", percent: "" }], remarks: " roots " }))
+    const layer = value(draft({ top: "0", bottom: "6", redox: [{ color: "", percent: "", type: "", location: "" }], remarks: " roots " }))
     expect(layer.matrix).toBeNull()
     expect(layer.redox).toEqual([])
     expect(layer.remarks).toBe("roots")
@@ -41,8 +41,8 @@ describe("a Layer typed into the form", () => {
     expect(problem(draft({ top: "-1", bottom: "6" }))).toContain("zero or more")
     expect(problem(draft({ top: "0", bottom: "6", matrix: "brown" }))).toContain("Matrix: type a soil-book color")
     expect(problem(draft({ top: "0", bottom: "6", matrix: "10YR 4/2", matrixPercent: "0" }))).toContain("Matrix: A percent")
-    expect(problem(draft({ top: "0", bottom: "6", redox: [{ color: "7.5YR 4/6", percent: "" }] }))).toContain("Redox 1")
-    expect(problem(draft({ top: "0", bottom: "6", redox: [{ color: "", percent: "5" }] }))).toContain("Redox 1")
+    expect(problem(draft({ top: "0", bottom: "6", redox: [{ color: "7.5YR 4/6", percent: "", type: "", location: "" }] }))).toContain("Redox 1")
+    expect(problem(draft({ top: "0", bottom: "6", redox: [{ color: "", percent: "5", type: "", location: "" }] }))).toContain("Redox 1")
   })
 
   test("editing a Layer keeps its id and the Reading its colors came from, while the notation is unchanged", () => {

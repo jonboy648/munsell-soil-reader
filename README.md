@@ -72,7 +72,10 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   from the PDF. The PDF is the official page with the values drawn on it (pdf-lib, on the device),
   and the on-screen preview draws the same list of placed values. Page 1's Hydrology section (the 29
   indicators with the supplement's definitions and pages, `regions/ncne/hydrology-rules.md`, the
-  one-primary-or-two-secondary rule, depths and notes) is drawn on the same pages the same way.
+  one-primary-or-two-secondary rule, depths and notes) is drawn on the same pages the same way. A layer
+  also takes a texture from the NRCS Field Book's classes (`texture.ts`: the 21 classes, the mucky
+  modifier, muck, mucky peat and peat), the form's redox type and location codes, and colors typed by
+  hand, which are checked against the Chip list (`colorCheck.ts`).
 - `e2e/`: the browser tests.
 - Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
   against a ColorChecker and exports the batch file the frame card reads. It is a separate

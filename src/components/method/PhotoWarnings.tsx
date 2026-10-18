@@ -11,6 +11,7 @@ import {
   MIN_LIT_SAMPLES,
   MIN_SPACING_PX,
   NEAR_CLIP_LEVEL,
+  PAGE_UNEVEN_STOPS,
   WHITE_CLIPPED_LEVEL,
 } from "@/engine"
 import { Section } from "./parts"
@@ -34,12 +35,12 @@ const WARNINGS: { name: string; means: string; line: string }[] = [
     name: "Uneven light",
     means:
       "The light across the Card is not the same everywhere, for example a shadow over part of it. The correction assumes one light, so move into even light.",
-    line: `The ColorChecker's black frame is read at 15 places and a plane is fitted through them. If the light changes by more than ${FRAME_UNEVEN_STOPS} stops across the Card (and by less than ${FRAME_OFF_CARD_STOPS}, past which the places are probably not on the frame) the warning shows. A stop is a doubling of light.`,
+    line: `The ColorChecker's black frame is read at 15 places and a plane is fitted through them. If the light changes by more than ${FRAME_UNEVEN_STOPS} stops across the Card (and by less than ${FRAME_OFF_CARD_STOPS}, past which the places are probably not on the frame) the warning shows. A stop is a doubling of light. On a Page the white paper between the columns is read instead, with a limit of ${PAGE_UNEVEN_STOPS} stops, since a Page is big in the Photo and the light falls off across it.`,
   },
   {
     name: "Card too small",
     means: "The Card fills too little of the Photo for its patches to be read. Move closer.",
-    line: `Patches are closer than ${MIN_SPACING_PX} pixels apart in the Photo (measured from the Card's corners, in the scaled-down Photo).`,
+    line: `Patches are closer than ${MIN_SPACING_PX} pixels apart in the Photo (measured from the Card's corners, in the scaled-down Photo). On a Page it is the pitch of its columns.`,
   },
 ]
 

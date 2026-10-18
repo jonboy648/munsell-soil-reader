@@ -46,6 +46,29 @@ test("explains the steps, the Card check line and each warning with its number",
   await expect(correction).toContainText("Root-polynomial")
 })
 
+test("explains how a Page is used, how dirty Chips are handled, and what has not been checked", async ({ page }) => {
+  await openMethodPage(page)
+  const pageCard = page.getByTestId("page-card")
+  await expect(pageCard).toContainText("2.5YR, 5YR, 7.5YR, 10YR, 2.5Y, 5Y")
+  await expect(pageCard).toContainText("on the 10YR Page 8/1, 8/8, 5/8, 2/1")
+  await expect(pageCard).toContainText("on the 7.5YR Page 8/1, 8/6, 5/8, 2.5/1")
+  await expect(pageCard).toContainText("The soil is in a hole.")
+  await expect(pageCard).toContainText("The /1 column")
+
+  const cards = page.locator("#cards")
+  await expect(cards).toContainText("Dirty Chips are left out")
+  await expect(cards).toContainText("At most 4 Chips are left out, and at most 2 of them gray steps.")
+  await expect(cards).toContainText("The row guard.")
+  await expect(cards).toContainText("The Page Card has no accuracy figure yet.")
+  // The real Pages, as found.
+  await expect(cards).toContainText("8/1, 7/1 and 3/6")
+  await expect(cards).toContainText("5.11")
+  await expect(cards).toContainText("7.5YR fails the Card check,")
+  await expect(cards).toContainText("What is not caught.")
+  // And it is no longer a stub.
+  await expect(page.getByTestId("page-card-stub")).toHaveCount(0)
+})
+
 test("says the Card check line is provisional and that a pass is not a promise", async ({ page }) => {
   await openMethodPage(page)
   const correction = page.locator("#correction")
@@ -63,7 +86,7 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
   await openMethodPage(page)
   const cards = page.locator("#cards")
   await expect(cards).toContainText("a Page corrects against the same book the answer is read from")
-  await expect(cards).toContainText("cannot see a Page that has faded evenly")
+  await expect(cards).toContainText("A Page that has faded evenly shifts every Reading, and the Card check cannot see it")
   await expect(page.locator("#limits")).toContainText("Faded or dirty book pages")
   await expect(page.locator("#limits")).toContainText("Phone camera processing")
   await expect(page.locator("#limits")).toContainText("One hue per Page")
@@ -158,7 +181,7 @@ test("says the 20-soil test has not been run, and marks what is not in this vers
   await openMethodPage(page)
   await expect(page.getByTestId("soil-test-results")).toHaveText("The 20-soil test has not been run yet.")
 
-  for (const stub of ["page-card-stub", "frame-stub", "forms-stub", "leaves-stub"]) {
+  for (const stub of ["frame-stub", "forms-stub", "leaves-stub"]) {
     await expect(page.getByTestId(stub)).toContainText("Not yet in this version")
   }
   await expect(page.getByTestId("leaves-stub")).toContainText("Plant photo identification")

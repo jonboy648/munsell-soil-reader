@@ -1,8 +1,9 @@
 # Munsell Soil Reader
 
-Photograph soil next to an X-Rite ColorChecker Classic (24 patches), tap the Card's four
-corners and then the soil, and read its Munsell soil color, corrected for the light and the
-camera. Runs entirely in the browser; Photos are never uploaded.
+Photograph soil next to an X-Rite ColorChecker Classic (24 patches) or a Page of your own soil
+book, tap the Card's four corners (a Page: four named Chips) and then the soil, and read its
+Munsell soil color, corrected for the light and the camera. Runs entirely in the browser; Photos
+are never uploaded.
 
 The plan, in order of tickets, is in [issue #1](https://github.com/jonboy648/munsell-soil-reader/issues/1).
 The words used in the code and the interface are defined in [CONTEXT.md](CONTEXT.md).
@@ -79,6 +80,37 @@ transform, `src/engine/grid.ts`), so a Card photographed at an angle still lands
 and the read circle shrinks on the far side. Any four known grid positions fix it, so other
 Card kinds can reuse it.
 
+A Page is the other Card (ADR 0001, `src/engine/page.ts`). The hue Pages 2.5YR, 5YR, 7.5YR, 10YR,
+2.5Y and 5Y work; the grid (value rows, six evenly spaced chroma columns, gaps where nothing is
+printed) is derived from the Chip list, so each Page has its own bottom row and /8 column. The user
+taps four Chips that exist on that Page (10YR: 8/1, 8/8, 5/8, 2/1; the grid's bottom right is
+usually empty) and the homography finds the rest. Each Chip is read in its solid middle, clear of
+the round holes, and corrected against the color computed from its notation, with the /1 column as
+the ladder. A Spot tapped inside a hole reads the soil behind the Page. The Gley, 10Y-5GY and WHITE
+Pages (which mix hues), and 10R (not checked against the book), are not Cards yet; their Chips are
+still matchable. If the soil's nearest Chip is on another Page, the Reading suggests retaking with
+the hue Page that holds it (a Gley 1 or 10Y-5GY Chip goes to 5Y, a 10R Chip to 2.5YR; nothing is
+suggested that cannot be a Card).
+
+Worn Chips are left out of the fit (`src/engine/leftOut.ts`): a few smudged, hazed or blotchy Chips
+must not drag the correction. A Chip off the ladder is left out when its held-out error stands out
+from the rest. A ladder step cannot be judged that way (the curves pass exactly through the steps, a
+dark step bends a curve a lot for a small miss, and two dirty steps side by side vouch for each
+other), so a step is judged by its row-mates, the Chips off the ladder in its value row and the rows
+above and below: it is dirty when leaving it out makes the curves agree with them. At most four Chips
+are left out, two of them ladder steps, and the Card check names them. When two or more Chips off
+the ladder in one value row had to go, the Card check fails whatever the mean of the rest says: that
+row's ladder step is probably dirty, or its Chips lie beyond what the gray ladder can describe (on
+Jon's real 7.5YR Page the dark Chips 3/3, 2.5/2 and 2.5/3 measure far darker and more saturated than
+the gray steps reach, so that Page fails for this reason, not for dirt). The limits are provisional:
+derived from the simulated camera and sanity-checked on four of Jon's real Pages, not yet fitted to
+real Photos (issue 15). Held-out errors are made in one place, `heldOutErrors`.
+
+A Spot read on a Page is cut to fit the hole it is in: the hole is a circle two fifths of a column
+pitch in radius, which the Page's tilt turns into an ellipse, so its narrowest half-width in the
+Photo is found from the local map of the grid and the Spot's circle is that, less a tap's error (a
+tenth of a pitch). Away from the Page the usual circle stands.
+
 The frame finder (`src/engine/frame.ts`, `findCard(pixels)`) finds a printed frame by its four
 ArUco markers, IDs 0 to 3 at the frame's top left, top right, bottom right and bottom left, and
 returns the Card's corner patches, or null when any marker is missing. It uses
@@ -153,6 +185,13 @@ WebKit and Firefox cut off the fraction). A test that measures where a tap lande
 tap itself (see `tapPhoto` in `e2e/angled.spec.ts`) and allow for half a CSS pixel.
 
 ## Limits
+
+A Page is the book's own colors, so it can only be as good as the book. Books fade and get dirty
+over the years. A Chip worn by itself is left out and named, but a Page faded evenly shifts every
+Chip the same way: the Card check cannot see that, and the Reading it corrects is off by the same
+shift (ADR 0001). The ColorChecker stays supported as the independent reference. The method page
+(issue 13) should say this in plain words. The correction is also strongest near the Page's own
+hue, which is why the Reading suggests the Page the soil belongs on.
 
 The examples use a simulated camera, so real Photos will do worse: phones add tone curves, HDR
 and local processing that no per-channel curve and 3x3 correction can undo. A Card in the shot, in the same light as

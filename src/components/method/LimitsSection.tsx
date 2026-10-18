@@ -12,7 +12,7 @@ const LIMITS: { name: string; body: string }[] = [
   },
   {
     name: "One hue per Page",
-    body: "Most Pages of the soil book hold one hue. The correction works best close to the colors on the Card, so a Page far from the soil's hue corrects it less well. The 10Y-5GY, Gley and White Pages mix hues across the grid.",
+    body: "Most Pages of the soil book hold one hue. The correction works best close to the colors on the Card, so a Page far from the soil's hue corrects it less well. The 10Y-5GY, Gley and White Pages mix hues across the grid, and cannot be the Card yet.",
   },
   {
     name: "Light",

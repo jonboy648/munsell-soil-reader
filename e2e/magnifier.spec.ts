@@ -346,6 +346,141 @@ test("dragging after a hold does not scroll the page", async ({ page }) => {
   expect(await page.evaluate(() => scrollY)).toBe(0)
 })
 
+// Pinch-zoomed to about 2x, where the page has more to show than the screen does. The view is
+// "panned" when the visual viewport moves over the page, which scrollY alone does not show.
+async function zoomedTwice(page: Page, touch: Fingers) {
+  await pinch(page, touch, 60, 100)
+  await expect.poll(async () => (await glassOf(page)).scale).toBeGreaterThan(1.7)
+  expect((await glassOf(page)).scale).toBeLessThan(2.4)
+}
+const viewOf = (page: Page) => page.evaluate(() => ({ x: visualViewport!.pageLeft, y: visualViewport!.pageTop }))
+
+test("a swipe on the Photo pans a pinch-zoomed page and places nothing", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  await zoomedTwice(page, touch)
+  const swipe = async (dx: number, dy: number) => {
+    const start = await onScreen(page, { x: SIM_WIDTH / 2, y: SIM_HEIGHT / 2 })
+    await touch.send("touchStart", start)
+    for (const f of [0.25, 0.5, 0.75, 1]) await touch.send("touchMove", { x: start.x + dx * f, y: start.y + dy * f })
+    await touch.send("touchEnd")
+  }
+
+  // The finger going left moves the view right over the page, and going up moves it down. The
+  // browser pans along one axis at a time, so these are two swipes.
+  const before = await viewOf(page)
+  await swipe(-80, 0)
+  await expect.poll(async () => (await viewOf(page)).x - before.x).toBeGreaterThan(20)
+  await swipe(0, -80)
+  await expect.poll(async () => (await viewOf(page)).y - before.y).toBeGreaterThan(20)
+  await expectNothingPlaced(page, touch.lens)
+})
+
+test("after a hold, dragging on a pinch-zoomed page places a point and does not pan", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  await zoomedTwice(page, touch)
+  const before = await viewOf(page)
+
+  const from = await onScreen(page, { x: SIM_WIDTH / 2, y: SIM_HEIGHT / 2 })
+  await touch.holdDrag(from, { x: from.x - 30, y: from.y - 15 })
+
+  const after = await viewOf(page)
+  expect(Math.abs(after.x - before.x)).toBeLessThan(1)
+  expect(Math.abs(after.y - before.y)).toBeLessThan(1)
+  await expect(touch.lens).toHaveCount(0)
+  await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
+})
+
+// A swipe coasts on after the finger lifts, and the natural way to stop it is a tap on the page.
+// That tap is not a point to place.
+const tap = async (touch: Fingers, at: XY) => {
+  await touch.send("touchStart", at)
+  await touch.send("touchEnd")
+}
+
+type Moved = { lastMoved: number }
+
+/** Starts noting when the page last scrolled, panned or zoomed. */
+const watchMoves = (page: Page) =>
+  page.evaluate(() => {
+    const note = () => ((window as unknown as Moved).lastMoved = performance.now())
+    note()
+    addEventListener("scroll", note)
+    visualViewport!.addEventListener("scroll", note)
+    visualViewport!.addEventListener("resize", note)
+  })
+
+/** Waits for the page to have been still for half a second, long after a tap would count. */
+const untilStill = (page: Page) =>
+  expect
+    .poll(() => page.evaluate(() => performance.now() - (window as unknown as Moved).lastMoved), { timeout: 15_000 })
+    .toBeGreaterThan(500)
+
+/**
+ * Lifts the finger and taps at once. The lift and the tap are sent together, so how long the test
+ * takes to send them (a lot, when the machine is busy) is not part of what the page measures.
+ */
+const liftAndTap = (touch: Fingers, at: XY) =>
+  Promise.all([touch.send("touchEnd"), touch.send("touchStart", at), touch.send("touchEnd")])
+
+test("a tap that stops a coasting page places nothing, and a tap a moment later places", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  // Part way down the page, so a swipe down has page to scroll back over; y = 150 is on the Photo
+  // all the way from here to the top.
+  await page.evaluate(() => scrollTo(0, 150))
+  await watchMoves(page)
+  const on = { x: 206, y: 150 }
+
+  await touch.send("touchStart", on)
+  for (const dy of [30, 60, 90]) await touch.send("touchMove", { x: on.x, y: on.y + dy })
+  await liftAndTap(touch, on) // the page is still moving, or has only just stopped
+  await expectNothingPlaced(page, touch.lens)
+
+  await untilStill(page)
+  await tap(touch, on)
+  await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
+})
+
+test("a hold right after a swipe still places, since it is not a tap", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  await page.evaluate(() => scrollTo(0, 150))
+  const on = { x: 206, y: 150 }
+
+  await touch.send("touchStart", on)
+  for (const dy of [30, 60, 90, 120]) await touch.send("touchMove", { x: on.x, y: on.y + dy })
+  await touch.send("touchEnd")
+  await touch.holdDrag(on, on)
+  await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
+})
+
+test("a tap that stops a pinch-zoomed page from panning places nothing, and a tap a moment later places", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  await zoomedTwice(page, touch)
+  await watchMoves(page)
+  const middle = await onScreen(page, { x: SIM_WIDTH / 2, y: SIM_HEIGHT / 2 })
+
+  await touch.send("touchStart", middle)
+  for (const f of [0.25, 0.5, 0.75]) await touch.send("touchMove", { x: middle.x - 80 * f, y: middle.y })
+  await liftAndTap(touch, middle)
+  await expectNothingPlaced(page, touch.lens)
+
+  await untilStill(page)
+  await tap(touch, middle)
+  await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
+})
+
+test("a tap right after the app scrolls the page itself still places", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  await page.evaluate(() => scrollTo(0, 50))
+  await tap(touch, await onScreen(page, TL))
+  await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
+})
+
 test("a pinch places nothing, whether the second finger comes down early or after a hold", async ({ page }) => {
   await pickExample(page, "Warm shop light")
   const touch = await fingers(page)

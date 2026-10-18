@@ -24,6 +24,7 @@ import {
   sessionReducer,
   stepOf,
 } from "@/lib/session"
+import type { CardInfo } from "@/lib/verdict"
 
 export function App() {
   const page = usePage()
@@ -35,13 +36,15 @@ export function App() {
   const step = stepOf(session)
 
   // One engine call per change of Photo, Card or Spots.
-  const { photo, noCard, corners, spots } = session
+  const { photo, noCard, cardKind, hue, corners, spots } = session
   const result = React.useMemo(() => {
-    const card = cardOf({ photo, noCard, corners, spots })
+    const card = cardOf({ photo, noCard, cardKind, hue, corners, spots })
     return photo && card && spots.length > 0
       ? readPhoto({ pixels: photo.pixels, card, spots })
       : null
-  }, [photo, noCard, corners, spots])
+  }, [photo, noCard, cardKind, hue, corners, spots])
+  const spotRadii = React.useMemo(() => result?.readings.map((r) => r.radius), [result])
+  const cardInfo: CardInfo = cardKind === "page" && hue ? { kind: "page", hue } : { kind: "colorchecker" }
 
   // A new Photo is picked from controls below it; bring the Photo back into view.
   React.useEffect(() => {
@@ -50,7 +53,12 @@ export function App() {
 
   const pickExample = (example: ExamplePhoto) => {
     setProblem(null)
-    dispatch({ type: "load", photo: examplePhoto(example), noCard: example.scene.card === false })
+    dispatch({
+      type: "load",
+      photo: examplePhoto(example),
+      noCard: example.scene.card === false,
+      cardKind: example.scene.page ? "page" : "colorchecker",
+    })
   }
   const pickFile = async (file: File) => {
     try {
@@ -80,6 +88,7 @@ export function App() {
             cornersTapped={session.corners.length}
             cornerCount={CORNER_COUNT}
             noCard={session.noCard}
+            cardKind={cardKind}
             spotCount={session.spots.length}
           />
         </div>
@@ -88,6 +97,10 @@ export function App() {
           pixels={session.photo?.pixels ?? null}
           corners={session.corners}
           spots={session.spots}
+          spotRadii={spotRadii}
+          cardKind={cardKind}
+          hue={hue}
+          leftOut={result?.cardCheck?.leftOut}
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
 
@@ -102,7 +115,14 @@ export function App() {
               <p className="text-sm text-muted-foreground" data-testid="photo-name">
                 {session.photo.name}
               </p>
-              <CardPanel tapped={session.corners.length} noCard={session.noCard} />
+              <CardPanel
+                tapped={session.corners.length}
+                noCard={session.noCard}
+                cardKind={cardKind}
+                hue={hue}
+                onCardKind={(kind) => dispatch({ type: "cardKind", cardKind: kind })}
+                onHue={(h) => dispatch({ type: "hue", hue: h })}
+              />
               {step === "spots" && <SpotsPanel spotCount={session.spots.length} />}
             </>
           ) : (
@@ -127,7 +147,7 @@ export function App() {
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-xl">
-        <ReadingsPanel result={result} />
+        <ReadingsPanel result={result} card={cardInfo} />
         <BottomBar
           onFile={pickFile}
           onUndo={() => dispatch({ type: "undo" })}

@@ -15,7 +15,7 @@ const STEPS: { name: string; body: string }[] = [
   },
   {
     name: "Card check",
-    body: `Before you trust the corrected color, the app tests the fix on the Card itself. It leaves one patch out, fits the correction to the others, and sees how close the left-out patch comes to its true color. It does that for every patch and averages. Below ${CARD_CHECK_GOOD} the check is good. At ${CARD_CHECK_GOOD} or more it has failed, and the app shows the uncorrected Reading with a note instead.`,
+    body: `Before you trust the corrected color, the app tests the fix on the Card itself. It leaves one patch (or, on a Page, one Chip) out, fits the correction to the others, and sees how close the left-out one comes to its true color. It does that for every one and averages. Below ${CARD_CHECK_GOOD} the check is good. At ${CARD_CHECK_GOOD} or more it has failed, and the app shows the uncorrected Reading with a note instead.`,
   },
   {
     name: "Munsell conversion",

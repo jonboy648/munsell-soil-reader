@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs"
 import { expect, test, type Page } from "@playwright/test"
 import type { XY } from "../src/engine"
-import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
+import { EXAMPLES, SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH, simulatePhoto } from "../src/engine/simulate"
 
 const [TL, TR, BR, BL] = SIM_CORNERS
 // Bare ground below the Card, a different soil from the one in the middle of the Photo.
@@ -340,6 +340,23 @@ test.describe("with location switched on", () => {
     await openLog(page)
     await expect(logScreen(page).getByRole("region", { name: "Sample B2" })).not.toContainText("41.50000")
   })
+})
+
+test("a Reading made against a Page saves the Card kind and the Page hue", async ({ page }) => {
+  const example = simulatePhoto(EXAMPLES.find((e) => e.id === "page")!.scene)
+  await page.goto("/")
+  await page.getByRole("button", { name: /Soil-book Page, worn/ }).click()
+  await expect(page.getByTestId("photo")).toBeInViewport({ ratio: 1 })
+  await page.getByRole("group", { name: "Page hue" }).getByRole("button", { name: "10YR", exact: true }).click()
+  for (const corner of example.corners) await tapPhoto(page, corner)
+  await tapPhoto(page, example.holes[10])
+  await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
+
+  await saveToNewSample(page, { name: "P1", condition: "moist" })
+  const log = await openLog(page)
+  await expect(log.getByRole("region", { name: "Sample P1" })).toContainText("Page 10YR")
+  const [row] = csvRows((await exportCsv(page)).text)
+  expect([row["Card"], row["Page hue"], row["Card check"]]).toEqual(["page", "10YR", "good"])
 })
 
 test("saving again adds only the Spots not yet in the Log, until Start over", async ({ page }) => {
@@ -681,6 +698,22 @@ test("a Spot whose Reading was deleted from the Log can be saved again", async (
   await expect(page.getByTestId("log-summary")).toContainText("1 Sample, 1 Reading")
 })
 
+/** The notes of the first Sample as stored, read over a fresh connection to the database. */
+const storedNotes = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<string>((resolve) => {
+        const open = indexedDB.open("munsell-soil-reader")
+        open.onsuccess = () => {
+          const all = open.result.transaction("samples").objectStore("samples").getAll()
+          all.onsuccess = () => {
+            resolve(all.result[0]?.notes)
+            open.result.close()
+          }
+        }
+      }),
+  )
+
 test("editing a Sample sends only what was changed, so another tab's edit to another field survives", async ({ page, context }) => {
   // This tab never hears about changes, so its form goes stale on purpose.
   await page.addInitScript(() => {
@@ -699,6 +732,9 @@ test("editing a Sample sends only what was changed, so another tab's edit to ano
   await otherLog.getByLabel("Notes").fill("second")
   await otherLog.getByRole("button", { name: "Save changes" }).click()
   await expect(otherLog.getByRole("region", { name: "Sample A1" })).toContainText("second")
+  // Playwright's WebKit can lose a write if its tab is closed in the first moments after it, so
+  // wait until this tab can read the edit from the database before closing the other one.
+  await expect.poll(() => storedNotes(page)).toBe("second")
   await other.close()
 
   // This tab changes only the name. Its form still says "first" for the notes.

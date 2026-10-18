@@ -7,18 +7,20 @@ interface Props {
   step: Step
   cornersTapped: number
   cornerCount: number
-  noCard: boolean
   cardKind: CardKind
+  /** The frame step's state in a word or two: looking, found, ok. */
+  frameDetail: string
+  noCard: boolean
   spotCount: number
 }
 
-/** A compact two-step indicator: Card corners (a Page: its Chips), then Spots. */
-export function StepIndicator({ step, cornersTapped, cornerCount, noCard, cardKind, spotCount }: Props) {
+/** A compact two-step indicator: Card corners (a Page: its Chips; the frame: its outline), then Spots. */
+export function StepIndicator({ step, cornersTapped, cornerCount, cardKind, frameDetail, noCard, spotCount }: Props) {
   const steps = [
     {
-      label: noCard ? "Card skipped" : cardKind === "page" ? "Page Chips" : "Card corners",
-      detail: noCard ? "" : `${cornersTapped}/${cornerCount}`,
-      active: step === "corners",
+      label: noCard ? "Card skipped" : cardKind === "frame" ? "Frame" : cardKind === "page" ? "Page Chips" : "Card corners",
+      detail: noCard ? "" : cardKind === "frame" ? frameDetail : `${cornersTapped}/${cornerCount}`,
+      active: step === "corners" || step === "frame",
       done: step === "spots",
     },
     {
@@ -29,7 +31,7 @@ export function StepIndicator({ step, cornersTapped, cornerCount, noCard, cardKi
     },
   ]
   // The step the user is on, counting from 1; none until there is a Photo.
-  const current = step === "corners" ? 1 : step === "spots" ? 2 : 0
+  const current = step === "corners" || step === "frame" ? 1 : step === "spots" ? 2 : 0
   return (
     <Stepper
       value={current}

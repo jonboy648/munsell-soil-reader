@@ -26,11 +26,11 @@ async function pickPageExample(page: Page) {
 const chooseHue = (page: Page, hue: string) =>
   page.getByRole("radiogroup", { name: "Page hue" }).getByRole("radio", { name: hue, exact: true }).click()
 
-test("the Card picker offers ColorChecker or a Page, and a Page asks for one of six hues", async ({ page }) => {
+test("the Card picker offers ColorChecker, a Page or the frame, and a Page asks for one of six hues", async ({ page }) => {
   await page.goto("/")
   await page.getByRole("button", { name: /Warm shop light/ }).click()
   const kinds = page.getByRole("radiogroup", { name: "Card" })
-  await expect(kinds.getByRole("radio")).toHaveText(["ColorChecker", "Soil-book Page"])
+  await expect(kinds.getByRole("radio")).toHaveText(["ColorChecker", "Soil-book Page", "Frame"])
   await expect(kinds.getByRole("radio", { name: "ColorChecker" })).toBeChecked()
   await expect(page.getByTestId("corner-prompt")).toContainText("brown patch (top left)")
 

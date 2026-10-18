@@ -19,7 +19,7 @@ export interface MeasureState {
 }
 
 export type MeasureAction =
-  | Exclude<SessionAction, { type: "noCard" | "cardKind" | "hue" }>
+  | Exclude<SessionAction, { type: "noCard" | "cardKind" | "hue" | "frameFound" | "frameConfirm" | "batchCode" | "batchResult" }>
   | { type: "pick"; id: string }
   | { type: "addShot" }
   | { type: "dropShot"; index: number }

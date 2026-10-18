@@ -457,8 +457,8 @@ The frame finder (`src/engine/frame.ts`) reads ArUco markers with
 [js-aruco2](https://github.com/damianofalcioni/js-aruco2) 2.0.0 by Damiano Falcioni, a fork of
 [js-aruco](https://github.com/jcmellado/js-aruco) by Juan Mellado, which is a port of the
 [ArUco](https://www.uco.es/investiga/grupos/ava/portfolio/aruco/) library. It is used unmodified
-as a dependency (see `package.json`). The finder is hidden: nothing in the app imports it, so
-js-aruco2 is not in the built app until the finder is wired in. The two files it uses,
+as a dependency (see `package.json`). The finder is a chunk of its own, loaded only when the user
+chooses the frame as their Card, so users who never do never download js-aruco2. The two files it uses,
 `aruco.js` and `cv.js`, draw on ArUco (BSD), OpenCV (3-clause BSD) and Stack Blur by Mario
 Klingemann (MIT); the package's `LICENSE.txt`, in `node_modules/js-aruco2` after `npm install`,
 holds those notices. The package also has pose-estimation files (`posit1.js`, `posit2.js`,

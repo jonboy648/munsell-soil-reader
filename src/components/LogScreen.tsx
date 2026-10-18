@@ -28,7 +28,7 @@ interface Props {
   onDelete: (id: string) => Promise<unknown>
 }
 
-const CARD_TEXT = { colorchecker: "ColorChecker", none: "No Card" }
+const CARD_TEXT = { colorchecker: "ColorChecker", frame: "Frame", none: "No Card" }
 const cardText = ({ card }: SavedReading) =>
   card.kind === "page" ? `Page ${card.hue ?? ""}`.trim() : CARD_TEXT[card.kind]
 const CHECK_TEXT = { good: "Card check good", failed: "Card check failed", uncorrected: "Not corrected" }

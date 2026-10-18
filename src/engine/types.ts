@@ -1,5 +1,6 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
+import type { Batch } from "./batch"
 import type { Fit } from "./correction"
 import type { PageHue } from "./page"
 
@@ -24,6 +25,12 @@ export type Card =
   // The four Chips the user tapped, in the order of `pageModel(hue).taps`. Only the one-hue Pages
   // (`PAGE_HUES`) work as a Card; any other Page throws UnsupportedCardError.
   | { kind: "page"; hue: ChipPage; taps: Corners }
+  /**
+   * The frame (ADR 0003): a card with its own measured patches. `outline` is the outer corners of
+   * its four markers, top left, top right, bottom right, bottom left (what `findCard` returns,
+   * or the user's adjustment of it). `batch` holds the measured colors of its patches.
+   */
+  | { kind: "frame"; outline: Corners; batch: Batch }
   | { kind: "none" }
 
 /** The Pages of the soil book (2009 Revision) that hold the Chips the engine knows. */
@@ -63,6 +70,8 @@ export interface Reading {
    * strongest near the Page's own hue, so retaking with this Page would give a better Reading.
    */
   betterPage?: PageHue
+  /** Set when the Card is the frame and the Spot is not inside its window: not the soil in the window. */
+  outsideWindow?: true
 }
 
 export type QualityWarning = {

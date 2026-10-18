@@ -3,7 +3,8 @@
 import { PAGE_CHROMAS, PAGE_HUES, pageModel, type PageHue } from "@/engine"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group-1"
 import { cn } from "@/lib/utils"
-import { CORNER_COUNT, type CardKind } from "@/lib/session"
+import { FramePanel } from "@/components/FramePanel"
+import { CORNER_COUNT, type CardKind, type FrameSession } from "@/lib/session"
 
 // Corner patches in the order the user taps them, and how to find each on the Card.
 const CORNERS = [
@@ -34,6 +35,10 @@ interface Props {
   /** Absent where the Card is fixed (measurement mode), which hides the choice of Card. */
   onCardKind?: (kind: CardKind) => void
   onHue?: (hue: PageHue) => void
+  /** The frame as the Card: where the finder and the batch are. Absent where the frame is not offered. */
+  frame?: FrameSession
+  onBatchCode?: (code: string) => void
+  onConfirmOutline?: () => void
 }
 
 /** Two or more choices side by side, one chosen. Gray, so the choice never tints the Photo. */
@@ -157,7 +162,7 @@ function PageTapPrompt({ hue, tapped }: { hue: PageHue; tapped: number }) {
   )
 }
 
-export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: Props) {
+export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue, frame, onBatchCode, onConfirmOutline }: Props) {
   if (noCard) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -176,6 +181,7 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: 
         options={[
           { value: "colorchecker", text: "ColorChecker" },
           { value: "page", text: "Soil-book Page" },
+          { value: "frame", text: "Frame" },
         ]}
       />
       {cardKind === "page" && (
@@ -189,6 +195,14 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: 
       )}
     </div>
   )
+  if (cardKind === "frame" && frame && onBatchCode && onConfirmOutline) {
+    return (
+      <div className="grid gap-3">
+        {picker}
+        <FramePanel frame={frame} onBatchCode={onBatchCode} onConfirm={onConfirmOutline} />
+      </div>
+    )
+  }
   if (cardKind === "page" && !hue) {
     return (
       <div className="grid gap-2">

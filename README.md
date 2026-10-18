@@ -22,7 +22,7 @@ npm test                 # engine tests (Vitest)
 npx playwright install chromium   # once, for the browser tests
 npm run test:e2e         # browser tests (Playwright): builds, serves, drives Chromium on a phone viewport
 npx playwright install webkit firefox   # once, to run the other engines too
-npm run test:e2e -- --project=webkit    # one engine: chromium, webkit or firefox
+npm run test:e2e -- --project='webkit*'  # one engine: chromium*, webkit* or firefox*
 ```
 
 CI runs typecheck and `npm test` once, and the browser tests on Chromium, Firefox and WebKit, on
@@ -179,21 +179,38 @@ Two seams, and nothing else:
   browser tests run with service workers blocked (`playwright.config.ts`), so other specs never
   see these notices; the offline spec turns them back on.
 
-The browser tests run on three engines, one Playwright project each (`playwright.config.ts`):
+The browser tests run on three engines (`playwright.config.ts`). Each engine has two Playwright
+projects, named for it and with `-sw` added: the `-sw` one runs the specs that use service
+workers (`offline.spec.ts` and `method.spec.ts`) and the other runs the rest.
 
-| Project | Engine | Screen | CI runner |
+| Engine | Projects | Screen | CI runner |
 | --- | --- | --- | --- |
-| `chromium` | Chromium | Pixel 7 (emulated phone) | ubuntu-latest |
-| `firefox` | Firefox | 412 x 839 with touch; Firefox cannot emulate a phone | ubuntu-latest |
-| `webkit` | WebKit, the engine of Safari | iPhone 15 (emulated phone) | macos-latest |
+| Chromium | `chromium`, `chromium-sw` | Pixel 7 (emulated phone) | ubuntu-latest |
+| Firefox | `firefox`, `firefox-sw` | 412 x 839 with touch; Firefox cannot emulate a phone | ubuntu-latest |
+| WebKit, the engine of Safari | `webkit`, `webkit-sw` | iPhone 15 (emulated phone) | macos-latest |
 
-`npm run test:e2e` runs Chromium only, so one `npx playwright install chromium` is enough and
-`deploy.yml` is unchanged. Naming a project runs just that engine, and naming several runs
-those: `npm run test:e2e -- --project=webkit --project=firefox`. CI (`ci.yml`) runs every spec in
-`e2e/` on each engine as its own job, so a new spec joins all three by being added. All three
-jobs run to the end and the workflow fails if any one fails. A test that passes only on its
-retry counts as a failure in CI: it is fixed or ticketed, not retried away. Each job's summary
-page lists passed, skipped, flaky and failed (`scripts/e2e-summary.mjs`).
+`npm run test:e2e` runs Chromium only (both its projects), so one `npx playwright install
+chromium` is enough and `deploy.yml` is unchanged. Naming projects runs just those, and a pattern
+names both of an engine's: `npm run test:e2e -- --project='webkit*'`, or
+`-- --project='webkit*' --project='firefox*'`. Naming only `webkit` leaves out the service worker
+specs. CI (`ci.yml`) runs every spec in `e2e/` on each engine as its own job, so a new spec joins
+all three by being added (a new spec that uses service workers needs adding to
+`SERVICE_WORKER_SPECS` in the config). All three jobs run to the end and the workflow fails if any
+one fails. A test that passes only on its retry counts as a failure in CI: it is fixed or
+ticketed, not retried away. Each job's summary page lists passed, skipped, flaky and failed
+(`scripts/e2e-summary.mjs`).
+
+**Why the service worker specs have a browser of their own.** In CI, WebKit's service worker
+install sometimes never started: the registration exists, no worker (installing, waiting or
+active) ever appears, `navigator.serviceWorker.ready` never resolves, and the test times out.
+The page and `sw.js` load normally. Nothing recovers it: not waiting 30 seconds, `update()`,
+registering again or reloading. Measured with a loop of fresh-context installs on the macOS
+runner: 0 stalls in 600 installs in a fresh browser, and 13 in about 2,800 after other specs
+had run in the same browser (about one in a hundred after the whole suite; one in 360 after the
+log spec or the magnifier spec alone, none in 360 after the measurement spec alone). No CPU or memory pressure made it
+happen. It is not slow installs, not contention between workers (the job had one), and not the
+app. Cause inside WebKit not known; the stall only appears in a browser that has run other
+tests, so the service worker specs get a browser of their own.
 
 A test that only one engine can run is skipped on the others, with the reason, so it shows as
 skipped and is counted rather than passing without running. A test that drives touch through the

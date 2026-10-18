@@ -37,7 +37,7 @@ jobs:
   # No job cancels the others, so one pull request shows every engine's result, and the
   # workflow fails if any one of them fails.
   browser:
-    name: Browser tests (${{ matrix.engine }}${{ matrix.copy }})
+    name: Browser tests (${{ matrix.engine }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -46,15 +46,7 @@ jobs:
         include:
           - { engine: chromium, os: ubuntu-latest }
           - { engine: firefox, os: ubuntu-latest }
-          - { engine: webkit, os: macos-latest, arm: measure, copy: 1 }
-          - { engine: webkit, os: macos-latest, arm: measure, copy: 2 }
-          - { engine: webkit, os: macos-latest, arm: measure, copy: 3 }
-          - { engine: webkit, os: macos-latest, arm: magnifier, copy: 4 }
-          - { engine: webkit, os: macos-latest, arm: magnifier, copy: 5 }
-          - { engine: webkit, os: macos-latest, arm: magnifier, copy: 6 }
-          - { engine: webkit, os: macos-latest, arm: log, copy: 7 }
-          - { engine: webkit, os: macos-latest, arm: log, copy: 8 }
-          - { engine: webkit, os: macos-latest, arm: log, copy: 9 }
+          - { engine: webkit, os: macos-latest }
     steps:
       - uses: actions/checkout@v7
 
@@ -71,15 +63,7 @@ jobs:
       # Builds the production bundle, serves it with vite preview, and drives it in this engine.
       # A test that passes only on its retry fails the run (see failOnFlakyTests).
       - name: Browser tests (Playwright)
-        if: matrix.engine == 'webkit'
-        run: |
-          # Temporary: the service worker install loop after the "${{ matrix.arm }}" specs.
-          case "${{ matrix.arm }}" in
-            log) FILES="e2e/log.spec.ts" ;;
-            measure) FILES="e2e/measure.spec.ts" ;;
-            magnifier) FILES="e2e/magnifier.spec.ts" ;;
-          esac
-          npx playwright test $FILES e2e/zz-sw-loop.spec.ts --project=webkit --retries=0 --workers=1 || true
+        run: npm run test:e2e -- --project="${{ matrix.engine }}*"
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
       - name: Summarize

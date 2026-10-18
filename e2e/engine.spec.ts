@@ -7,6 +7,6 @@ test("the project runs the engine it is named for", async ({ page, browserName }
   const engine = await page.evaluate(() =>
     "userAgentData" in navigator ? "chromium" : CSS.supports("-moz-appearance", "none") ? "firefox" : "webkit",
   )
-  expect(testInfo.project.name).toBe(browserName)
+  expect(testInfo.project.name.replace(/-sw$/, "")).toBe(browserName)
   expect(engine).toBe(browserName)
 })

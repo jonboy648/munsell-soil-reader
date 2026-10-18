@@ -69,6 +69,14 @@ transform, `src/engine/grid.ts`), so a Card photographed at an angle still lands
 and the read circle shrinks on the far side. Any four known grid positions fix it, so other
 Card kinds can reuse it.
 
+The frame finder (`src/engine/frame.ts`, `findCard(pixels)`) finds a printed frame by its four
+ArUco markers, IDs 0 to 3 at the frame's top left, top right, bottom right and bottom left, and
+returns the Card's corner patches, or null when any marker is missing. It uses
+[js-aruco2](https://github.com/damianofalcioni/js-aruco2) and is built and tested on simulated
+Photos only. It is hidden: nothing in the app imports it, and `src/engine/frame.test.ts` checks
+that its code is not in the app bundle. No frame exists yet; switching it on later means wiring
+it in (a dynamic import, so js-aruco2 stays out of the main chunk).
+
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
 patches (ColorChecker "after November 2014" reference values): each channel is linearized along
 the six gray patches, undoing the camera's tone curve, and a 3x3 matrix is fitted to all 24. Then

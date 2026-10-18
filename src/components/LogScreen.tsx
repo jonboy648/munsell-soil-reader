@@ -1,5 +1,5 @@
 // The Log screen: browse Samples and their Readings, edit a Sample's fields, delete a Reading
-// or a Sample (after an in-page confirm), and export the lot as CSV.
+// or a Sample or remove a Sample's location (after an in-page confirm), and export the lot as CSV.
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { SampleForm } from "@/components/SampleForm"
@@ -9,8 +9,9 @@ import {
   draftOf,
   fieldsOf,
   problemWith,
-  type SampleDraft,
   type Sample,
+  type SampleDraft,
+  type SampleFields,
   type SavedReading,
 } from "@/lib/log"
 import { downloadCsv } from "@/lib/logCsv"
@@ -20,9 +21,11 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   samples: Sample[]
-  /** Both reject when the Log could not be written. */
-  onChange: (sample: Sample) => Promise<void>
-  onRemove: (id: string) => Promise<void>
+  /** Each rejects when the Log could not be written. */
+  onEdit: (id: string, fields: SampleFields) => Promise<unknown>
+  onRemoveReading: (id: string, readingId: string) => Promise<unknown>
+  onRemoveLocation: (id: string) => Promise<unknown>
+  onDelete: (id: string) => Promise<unknown>
 }
 
 const CARD_TEXT = { colorchecker: "ColorChecker", none: "No Card" }
@@ -35,20 +38,33 @@ const when = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 
 /** Asks "Delete this?" in the page, in place of the button that started it. */
-function Confirm({ what, onYes, onNo }: { what: string; onYes: () => void; onNo: () => void }) {
+function Confirm({
+  verb,
+  what,
+  onYes,
+  onNo,
+}: {
+  verb: "Delete" | "Remove"
+  what: string
+  onYes: () => void
+  onNo: () => void
+}) {
+  const lower = verb.toLowerCase()
   return (
     <div
       role="group"
-      aria-label={`Confirm: delete ${what}`}
+      aria-label={`Confirm: ${lower} ${what}`}
       className="grid gap-2 rounded-md border-2 border-foreground p-3"
     >
-      <p className="text-sm font-medium">Delete {what}? This cannot be undone.</p>
+      <p className="text-sm font-medium">
+        {verb} {what}? This cannot be undone.
+      </p>
       <div className="flex gap-2">
         <Button variant="outline" className="h-11 flex-1 text-base" onClick={onNo}>
           Keep
         </Button>
         <Button className="h-11 flex-1 text-base" onClick={onYes}>
-          Yes, delete
+          Yes, {lower}
         </Button>
       </div>
     </div>
@@ -107,7 +123,7 @@ function ReadingItem({
         </p>
       ))}
       {confirming ? (
-        <Confirm what="this Reading" onYes={onRemove} onNo={() => ask(false)} />
+        <Confirm verb="Delete" what="this Reading" onYes={onRemove} onNo={() => ask(false)} />
       ) : (
         <Button variant="outline" className="h-11 text-base" onClick={() => ask(true)}>
           Delete Reading
@@ -117,15 +133,20 @@ function ReadingItem({
   )
 }
 
-function SampleCard({ sample, onChange, onRemove }: Pick<Props, "onChange" | "onRemove"> & { sample: Sample }) {
+type SampleCardProps = Pick<Props, "onEdit" | "onRemoveReading" | "onRemoveLocation" | "onDelete"> & {
+  sample: Sample
+}
+
+function SampleCard({ sample, onEdit, onRemoveReading, onRemoveLocation, onDelete }: SampleCardProps) {
   const [draft, setDraft] = React.useState<SampleDraft | null>(null) // set while editing
-  const [confirming, setConfirming] = React.useState<string | null>(null) // "sample" or a Reading's id
+  const [confirming, setConfirming] = React.useState<string | null>(null) // "sample", "location" or a Reading's id
   const [problem, setProblem] = React.useState<string | null>(null)
 
-  const attempt = async (work: () => Promise<void>) => {
+  const attempt = async (work: () => Promise<unknown>) => {
     setProblem(null)
     try {
       await work()
+      setConfirming(null)
     } catch {
       setProblem("The Log could not be written on this device. Try again.")
     }
@@ -135,15 +156,10 @@ function SampleCard({ sample, onChange, onRemove }: Pick<Props, "onChange" | "on
     const invalid = problemWith(draft)
     if (invalid) return setProblem(invalid)
     void attempt(async () => {
-      await onChange({ ...sample, ...fieldsOf(draft) })
+      await onEdit(sample.id, fieldsOf(draft))
       setDraft(null)
     })
   }
-  const removeReading = (id: string) =>
-    attempt(async () => {
-      await onChange({ ...sample, readings: sample.readings.filter((r) => r.id !== id) })
-      setConfirming(null)
-    })
 
   const meta = [depthText(sample), sample.condition, when(sample.createdAt)].filter(Boolean).join(" · ")
   return (
@@ -176,10 +192,24 @@ function SampleCard({ sample, onChange, onRemove }: Pick<Props, "onChange" | "on
           <h3 className="font-heading text-lg font-bold">{sample.name}</h3>
           <p className="text-sm text-muted-foreground">{meta}</p>
           {sample.location && (
-            <p className="font-mono text-xs text-muted-foreground">
-              {sample.location.lat.toFixed(5)}, {sample.location.lon.toFixed(5)} (within{" "}
-              {Math.round(sample.location.accuracy)} m)
-            </p>
+            <div className="grid gap-2">
+              <p className="font-mono text-xs text-muted-foreground">
+                {sample.location.lat.toFixed(5)}, {sample.location.lon.toFixed(5)} (within{" "}
+                {Math.round(sample.location.accuracy)} m)
+              </p>
+              {confirming === "location" ? (
+                <Confirm
+                  verb="Remove"
+                  what="this Sample's location"
+                  onYes={() => attempt(() => onRemoveLocation(sample.id))}
+                  onNo={() => setConfirming(null)}
+                />
+              ) : (
+                <Button variant="outline" className="h-11 text-base" onClick={() => setConfirming("location")}>
+                  Remove location
+                </Button>
+              )}
+            </div>
           )}
           {sample.notes && <p className="text-sm whitespace-pre-wrap">{sample.notes}</p>}
           <div className="flex gap-2">
@@ -194,8 +224,9 @@ function SampleCard({ sample, onChange, onRemove }: Pick<Props, "onChange" | "on
           </div>
           {confirming === "sample" && (
             <Confirm
+              verb="Delete"
               what={`Sample ${sample.name} and its ${plural(sample.readings.length, "Reading")}`}
-              onYes={() => attempt(() => onRemove(sample.id))}
+              onYes={() => attempt(() => onDelete(sample.id))}
               onNo={() => setConfirming(null)}
             />
           )}
@@ -209,7 +240,7 @@ function SampleCard({ sample, onChange, onRemove }: Pick<Props, "onChange" | "on
                 saved={saved}
                 confirming={confirming === saved.id}
                 ask={(on) => setConfirming(on ? saved.id : null)}
-                onRemove={() => removeReading(saved.id)}
+                onRemove={() => attempt(() => onRemoveReading(sample.id, saved.id))}
               />
             ))}
           </ul>
@@ -224,7 +255,7 @@ function SampleCard({ sample, onChange, onRemove }: Pick<Props, "onChange" | "on
   )
 }
 
-export function LogScreen({ open, onOpenChange, samples, onChange, onRemove }: Props) {
+export function LogScreen({ open, onOpenChange, samples, ...changes }: Props) {
   const readingCount = samples.reduce((n, s) => n + s.readings.length, 0)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -232,11 +263,12 @@ export function LogScreen({ open, onOpenChange, samples, onChange, onRemove }: P
         <SheetHeader className="pr-14">
           <SheetTitle>Log</SheetTitle>
           <SheetDescription>
-            The Log lives only on this device. Nothing is uploaded, and clearing this browser's data
-            erases it. Export a CSV file to keep a copy or to move to another phone.
+            The Log lives only on this device. Nothing is uploaded. Your browser can also erase it on
+            its own (on iPhone, after a week without opening the app unless it is added to the Home
+            Screen), so export a CSV after each trip.
           </SheetDescription>
         </SheetHeader>
-        <div className="grid content-start gap-4 overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 pb-4">
           <Button
             size="lg"
             className="h-12 text-base"
@@ -248,10 +280,14 @@ export function LogScreen({ open, onOpenChange, samples, onChange, onRemove }: P
           {samples.length === 0 ? (
             <p className="text-base">Nothing saved yet. Read a Spot, then tap Save to Log.</p>
           ) : (
-            [...samples].reverse().map((sample) => (
-              <SampleCard key={sample.id} sample={sample} onChange={onChange} onRemove={onRemove} />
-            ))
+            [...samples].reverse().map((sample) => <SampleCard key={sample.id} sample={sample} {...changes} />)
           )}
+        </div>
+        {/* In the thumb zone, so closing never means reaching for the corner. */}
+        <div className="border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <Button variant="outline" size="lg" className="h-12 w-full text-base" onClick={() => onOpenChange(false)}>
+            Close Log
+          </Button>
         </div>
       </SheetContent>
     </Sheet>

@@ -99,7 +99,7 @@ export function App() {
           ) : (
             <p className="text-base">Take or choose a Photo with the Card beside the soil.</p>
           )}
-          <LogPanel result={result} card={cardOf(session)} />
+          <LogPanel result={result} card={cardOf(session)} spots={session.spots} />
           <ExamplePicker activeId={session.photo?.exampleId} onPick={pickExample} />
         </div>
 

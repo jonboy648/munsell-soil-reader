@@ -80,8 +80,10 @@ export function depthText(s: Pick<Sample, "depthTop" | "depthBottom">): string {
   return ""
 }
 
+export type SampleFields = Pick<Sample, "name" | "depthTop" | "depthBottom" | "condition" | "notes">
+
 /** The Sample's own fields from a form that passed `problemWith`. */
-export const fieldsOf = (d: SampleDraft) => ({
+export const fieldsOf = (d: SampleDraft): SampleFields => ({
   name: d.name.trim(),
   depthTop: depthOf(d.depthTop),
   depthBottom: depthOf(d.depthBottom),
@@ -89,11 +91,11 @@ export const fieldsOf = (d: SampleDraft) => ({
   notes: d.notes.trim(),
 })
 
-/** One SavedReading per Spot of the current Photo. */
-export function savedReadings(result: ReadPhotoResult, card: Card): SavedReading[] {
-  return result.readings.map((reading, i) => ({
+/** A SavedReading for each of the Photo's Spots listed in `which` (indexes into the Spots). */
+export function savedReadings(result: ReadPhotoResult, card: Card, which: number[]): SavedReading[] {
+  return which.map((i) => ({
     id: crypto.randomUUID(),
-    reading,
+    reading: result.readings[i],
     cardCheck: result.cardCheck,
     quality: result.quality.filter((w) => w.where === "card" || w.where === i),
     card: { kind: card.kind, ...(card.kind === "page" && { hue: card.hue }) },

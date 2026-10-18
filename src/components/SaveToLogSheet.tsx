@@ -1,4 +1,4 @@
-// "Save to Log": put the current Spots' Readings into a new Sample or an existing one.
+// "Save to Log": put the current Spots' new Readings into a new Sample or an existing one.
 import * as React from "react"
 import { SampleForm } from "@/components/SampleForm"
 import { Button } from "@/components/ui/button"
@@ -13,23 +13,31 @@ import {
   problemWith,
   setLocationSetting,
   type Sample,
+  type SampleFields,
 } from "@/lib/log"
 
-export type SaveTarget = { sampleId: string } | { fields: ReturnType<typeof fieldsOf> }
+export type SaveTarget = { sampleId: string } | { fields: SampleFields }
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  readingCount: number
+  /** Spots not yet in the Log, and Spots of this Photo that already are. */
+  newCount: number
+  savedCount: number
   samples: Sample[]
-  /** Rejects when the Log could not be written. */
-  onSave: (target: SaveTarget, withLocation: boolean) => Promise<void>
+  /** Resolves to a problem to show, or nothing when saved. Rejects when the Log could not be written. */
+  onSave: (target: SaveTarget, withLocation: boolean) => Promise<string | void>
 }
 
 const NEW = "new"
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
-function SaveForm({ readingCount, samples, onSave, onDone }: Omit<Props, "open" | "onOpenChange"> & { onDone: () => void }) {
+function SaveForm({
+  newCount,
+  samples,
+  onSave,
+  onDone,
+}: Pick<Props, "newCount" | "samples" | "onSave"> & { onDone: () => void }) {
   const [choice, setChoice] = React.useState(NEW)
   const [draft, setDraft] = React.useState(emptyDraft)
   const [withLocation, setWithLocation] = React.useState(locationSetting)
@@ -44,8 +52,14 @@ function SaveForm({ readingCount, samples, onSave, onDone }: Omit<Props, "open" 
     setProblem(null)
     setSaving(true)
     try {
-      await onSave(existing ? { sampleId: existing.id } : { fields: fieldsOf(draft) }, withLocation)
-      onDone()
+      const refused = await onSave(existing ? { sampleId: existing.id } : { fields: fieldsOf(draft) }, withLocation)
+      if (refused) {
+        setProblem(refused)
+        setChoice(NEW)
+        setSaving(false)
+      } else {
+        onDone()
+      }
     } catch {
       setProblem("The Log could not be written on this device. Try again.")
       setSaving(false)
@@ -106,20 +120,24 @@ function SaveForm({ readingCount, samples, onSave, onDone }: Omit<Props, "open" 
         </p>
       )}
       <Button type="submit" size="lg" className="h-12 text-base" disabled={saving}>
-        {saving ? "Saving..." : `Save ${plural(readingCount, "Reading")}`}
+        {saving ? "Saving..." : `Save ${plural(newCount, "Reading")}`}
+      </Button>
+      <Button type="button" variant="outline" size="lg" className="h-12 text-base" onClick={onDone}>
+        Cancel
       </Button>
     </form>
   )
 }
 
-export function SaveToLogSheet({ open, onOpenChange, ...rest }: Props) {
+export function SaveToLogSheet({ open, onOpenChange, savedCount, ...rest }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[92svh] rounded-t-xl pb-[env(safe-area-inset-bottom)]">
         <SheetHeader>
           <SheetTitle>Save to Log</SheetTitle>
           <SheetDescription>
-            {plural(rest.readingCount, "Reading")} from this Photo, one per Spot.
+            {plural(rest.newCount, "new Reading")} from this Photo
+            {savedCount > 0 && `, ${savedCount} already saved`}.
           </SheetDescription>
         </SheetHeader>
         <SaveForm {...rest} onDone={() => onOpenChange(false)} />

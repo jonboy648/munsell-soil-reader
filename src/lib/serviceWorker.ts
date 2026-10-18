@@ -94,16 +94,12 @@ export function useServiceWorker(): ServiceWorkerStatus {
     }
     document.addEventListener("visibilitychange", onVisible)
     window.addEventListener("online", look)
-    // Registered once the page has loaded, so the install does not compete with the page's own
-    // requests (the usual advice for a service worker, and WebKit's install stalled less this way).
-    if (document.readyState === "complete") start()
-    else window.addEventListener("load", start, { once: true })
+    start()
 
     return () => {
       stop = true
       document.removeEventListener("visibilitychange", onVisible)
       window.removeEventListener("online", look)
-      window.removeEventListener("load", start)
     }
   }, [])
 

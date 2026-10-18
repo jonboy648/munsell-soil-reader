@@ -74,9 +74,9 @@ jobs:
       - name: Browser tests (Playwright)
         run: |
           if [ "${{ matrix.engine }}" = "webkit" ]; then
-            echo "=== FULL"
-            npm run test:e2e -- --project="webkit*" --retries=0 || true
-            echo "=== SW x10"
+            echo "=== SW x10 first"
+            npm run test:e2e -- --project=webkit-sw --repeat-each=10 --retries=0 || true
+            echo "=== SW x10 second"
             npm run test:e2e -- --project=webkit-sw --repeat-each=10 --retries=0 || true
           else
             npm run test:e2e -- --project="${{ matrix.engine }}*"

@@ -282,6 +282,7 @@ describe("the wood behind the holes, as a stand-in sample", () => {
     const { max, mean } = spread(current.map((w) => w.corrected))
     expect(max).toBeLessThan(4.5)
     expect(mean).toBeLessThan(3.5)
+    expect(max.toFixed(1)).toBe("4.3") // the number the method page prints (PAGE_WOOD_SPREAD)
   })
 
   it("can fail: the full 3x3 after the curves, which the Page used to get, pulls the four Pages 8 to 15 apart", () => {

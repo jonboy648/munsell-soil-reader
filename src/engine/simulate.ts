@@ -5,7 +5,9 @@
 import * as munsell from "munsell"
 import { encode, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
+import { BOARD, MARKER_CELLS, MARKER_ORIGINS, MARKER_SIZE, markerCellIsWhite } from "./frameLayout"
 import { pageModel, type PageChip, type PageHue } from "./page"
+import { paintGlare, paintJpeg, paintShadow, type Glare, type Shadow } from "./simulateFaults"
 import type { Corners, Pixels, XY } from "./types"
 
 /** What the camera does to the light before and after the sensor. */
@@ -49,17 +51,23 @@ export const SIM_WIDTH = 960
 export const SIM_HEIGHT = 600
 const CARD = { x: 60, y: 120, patch: 62, gap: 12 }
 const SOIL_BOX = { x: 650, y: 150, w: 240, h: 240 }
-const PITCH = CARD.patch + CARD.gap
 
-const patchCenter = (r: number, c: number): XY => ({
-  x: CARD.x + c * PITCH + CARD.patch / 2,
-  y: CARD.y + r * PITCH + CARD.patch / 2,
-})
-
-const PATCH_CENTERS: XY[] = Array.from({ length: 24 }, (_, i) => patchCenter(Math.floor(i / 6), i % 6))
+/** The Card's layout at a size: its top left corner stays put, patches and gaps scale. */
+function cardLayout(scale: number, frameGap = CARD.gap) {
+  const patch = CARD.patch * scale
+  const gap = frameGap * scale
+  const pitch = patch + gap
+  const center = (r: number, c: number): XY => ({
+    x: CARD.x + c * pitch + patch / 2,
+    y: CARD.y + r * pitch + patch / 2,
+  })
+  return { patch, gap, pitch, center, frame: 16 * scale, corners: [center(0, 0), center(0, 5), center(3, 5), center(3, 0)] as Corners }
+}
 
 /** The Card's corner patch centers in the order the user taps them: TL, TR, BR, BL. */
-export const SIM_CORNERS: Corners = [patchCenter(0, 0), patchCenter(0, 5), patchCenter(3, 5), patchCenter(3, 0)]
+export const SIM_CORNERS: Corners = cardLayout(1).corners
+/** The middle of one patch of the usual-size Card, by row (0 to 3) and column (0 to 5). */
+export const simPatchCenter = (row: number, column: number): XY => cardLayout(1).center(row, column)
 /** The middle of the soil patch. */
 export const SIM_SPOT: XY = { x: SOIL_BOX.x + SOIL_BOX.w / 2, y: SOIL_BOX.y + SOIL_BOX.h / 2 }
 /** The Chip the simulated soil really is. */
@@ -73,6 +81,8 @@ export const SIM_SOIL = "10YR 4/3"
 export interface SimTilt {
   yaw: number
   pitch: number
+  /** How far the camera is from the middle of the scene, in scene pixels. Default: the scene's own. */
+  distance?: number
 }
 
 /** Where the camera stands: its lens, and the point of the scene it turns about and looks at. */
@@ -81,15 +91,18 @@ interface ViewGeometry {
   height: number
   /** Pinhole focal length in Photo pixels. */
   focal: number
-  /** How far the camera is from the pivot, in scene pixels. */
+  /** How far the camera is from the pivot, in scene pixels, unless the tilt says otherwise. */
   distance: number
   pivot: XY
 }
 
-const [FIRST, LAST] = [patchCenter(0, 0), patchCenter(3, 5)]
+const [FIRST, LAST] = [simPatchCenter(0, 0), simPatchCenter(3, 5)]
+/** The usual-size Card's patch pitch: the printed frame is laid out in its grid steps. */
+const PITCH = cardLayout(1).pitch
 /**
- * The ColorChecker scene: a focal length of about 70 degrees across the Photo's width, and the
- * camera this close to the middle of the Card's patch grid, close enough for strong perspective.
+ * The ColorChecker scene: a focal length of about 70 degrees across the Photo's width, and by
+ * default the camera this close to the middle of the Card's patch grid, close enough for strong
+ * perspective.
  */
 const CARD_VIEW: ViewGeometry = {
   width: SIM_WIDTH,
@@ -106,7 +119,11 @@ interface View {
   toScene: (x: number, y: number, out: XY) => void
 }
 
-function tiltedView({ yaw, pitch }: SimTilt, { width, height, focal, distance, pivot }: ViewGeometry): View {
+function tiltedView(
+  { yaw, pitch, distance: tiltDistance }: SimTilt,
+  { width, height, focal, distance: sceneDistance, pivot }: ViewGeometry,
+): View {
+  const distance = tiltDistance ?? sceneDistance
   const rad = Math.PI / 180
   const [sy, cy] = [Math.sin(yaw * rad), Math.cos(yaw * rad)]
   const [sp, cp] = [Math.sin(pitch * rad), Math.cos(pitch * rad)]
@@ -169,7 +186,10 @@ export interface SimPhoto {
    * has the four Chips the user taps instead (`pageModel(hue).taps`), in the same order.
    */
   corners: Corners
-  /** Every ColorChecker patch's true center, row by row (a Page scene: every printed Chip). Meaningless when the scene has no Card. */
+  /**
+   * Every ColorChecker patch's true center, row by row (a Page scene: every printed Chip).
+   * Meaningless when the scene has no Card.
+   */
   patches: XY[]
   /** The middle of the soil patch. */
   spot: XY
@@ -185,29 +205,73 @@ export interface SimScene {
   soil?: string
   /** Noise seed. Default 7. */
   seed?: number
+  /** How big the Card is, 1 being the usual size. Its top left corner stays put. */
+  cardScale?: number
+  /** Reflections painted over the finished Photo. */
+  glare?: Glare[]
+  /** A shadow edge painted over the finished Photo. */
+  shadow?: Shadow
+  /** The black frame between patches, in pixels at Card scale 1 (the patches are 62). Default 12. */
+  frameGap?: number
+  /** Sensor noise, as a multiple of the usual amount. Default 1. */
+  noise?: number
+  /** JPEG quality, 1 to 100, applied last. Absent: the Photo is not compressed. */
+  jpeg?: number
   /** Photograph the scene at an angle, so the Card is in perspective. Default: straight on. */
   tilt?: SimTilt
   /** Put a Page of the soil book in the shot, with the soil behind its holes, instead of the ColorChecker. */
   page?: PageHue
   /** A Page scene: Chips with dirt on them, as notation to the share of the Chip the dirt covers (0 to 1). */
   smudged?: Record<string, number>
+  /** A Page scene: a light film (dust, wax, a faded gloss) over Chips, as notation to its share (0 to 1). A film shows most on a dark Chip. */
+  hazed?: Record<string, number>
+  /**
+   * Put the printed frame around the Card: a light board with an ArUco marker in each corner
+   * (see frameLayout.ts). Default false.
+   */
+  frame?: boolean
+  /** Which of the frame's markers, 0 to 3, are printed, so a test can lose some. Default all four. */
+  frameMarkers?: readonly number[]
 }
 
 export function simulatePhoto(scene: SimScene): SimPhoto {
-  if (scene.page) return simulatePagePhoto({ ...scene, page: scene.page })
-  const { camera, card = true, soil = SIM_SOIL, seed = 7, tilt } = scene
+  return scene.page ? simulatePagePhoto({ ...scene, page: scene.page }) : simulateCardPhoto(scene)
+}
+
+/** The faults a real Photo has, painted over the finished pixels: shadow, glare, then JPEG. */
+function paintFaults(data: Uint8ClampedArray, { shadow, glare = [], jpeg }: SimScene) {
+  if (shadow) paintShadow(data, SIM_WIDTH, SIM_HEIGHT, shadow)
+  paintGlare(data, SIM_WIDTH, SIM_HEIGHT, glare)
+  if (jpeg !== undefined) paintJpeg(data, SIM_WIDTH, SIM_HEIGHT, jpeg)
+}
+
+function simulateCardPhoto({
+  camera,
+  card = true,
+  soil = SIM_SOIL,
+  seed = 7,
+  cardScale = 1,
+  frameGap,
+  noise: noiseScale = 1,
+  tilt,
+  frame: framed = false,
+  frameMarkers = [0, 1, 2, 3],
+  ...faults
+}: SimScene): SimPhoto {
   const rand = mulberry32(seed)
+  const layout = cardLayout(cardScale, frameGap)
   const view = tilt ? tiltedView(tilt, CARD_VIEW) : null // null: straight on, scene point = Photo pixel
   const looksAt: XY = { x: 0, y: 0 }
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
   const frame = shoot(camera, [0.012, 0.012, 0.012])
+  const board = shoot(camera, [0.6, 0.6, 0.6])
   const patches = PATCH_LINEAR.map((lin) => shoot(camera, lin))
   const data = new Uint8ClampedArray(SIM_WIDTH * SIM_HEIGHT * 4)
-  const fx0 = CARD.x - 16
-  const fx1 = CARD.x + 6 * PITCH - CARD.gap + 16
-  const fy0 = CARD.y - 16
-  const fy1 = CARD.y + 4 * PITCH - CARD.gap + 16
+  const fx0 = CARD.x - layout.frame
+  const fx1 = CARD.x + 6 * layout.pitch - layout.gap + layout.frame
+  const fy0 = CARD.y - layout.frame
+  const fy1 = CARD.y + 4 * layout.pitch - layout.gap + layout.frame
   for (let y = 0; y < SIM_HEIGHT; y++) {
     for (let x = 0; x < SIM_WIDTH; x++) {
       // Where in the flat scene this pixel looks.
@@ -220,14 +284,30 @@ export function simulatePhoto(scene: SimScene): SimPhoto {
       }
       let rgb = ground
       let noise = 12
+      if (framed) {
+        // Where in the Card's grid steps this scene point is.
+        const col = (u - FIRST.x) / PITCH
+        const row = (v - FIRST.y) / PITCH
+        if (col >= BOARD[0] && col < BOARD[1] && row >= BOARD[2] && row < BOARD[3]) {
+          rgb = board
+          noise = 2
+          for (const id of frameMarkers) {
+            const cellCol = Math.floor(((col - MARKER_ORIGINS[id].col) / MARKER_SIZE) * MARKER_CELLS)
+            const cellRow = Math.floor(((row - MARKER_ORIGINS[id].row) / MARKER_SIZE) * MARKER_CELLS)
+            if (cellCol >= 0 && cellRow >= 0 && cellCol < MARKER_CELLS && cellRow < MARKER_CELLS) {
+              rgb = markerCellIsWhite(id, cellRow, cellCol) ? board : frame
+            }
+          }
+        }
+      }
       if (card && u >= fx0 && u < fx1 && v >= fy0 && v < fy1) {
         rgb = frame
         noise = 2
         const cx = u - CARD.x
         const cy = v - CARD.y
-        const c = Math.floor(cx / PITCH)
-        const r = Math.floor(cy / PITCH)
-        if (cx >= 0 && cy >= 0 && cx % PITCH < CARD.patch && cy % PITCH < CARD.patch && c < 6 && r < 4) {
+        const c = Math.floor(cx / layout.pitch)
+        const r = Math.floor(cy / layout.pitch)
+        if (cx >= 0 && cy >= 0 && cx % layout.pitch < layout.patch && cy % layout.pitch < layout.patch && c < 6 && r < 4) {
           rgb = patches[r * 6 + c]
         }
       }
@@ -236,15 +316,16 @@ export function simulatePhoto(scene: SimScene): SimPhoto {
         noise = 5
       }
       const i = (y * SIM_WIDTH + x) * 4
-      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise)
+      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise * noiseScale)
       data[i + 3] = 255
     }
   }
+  paintFaults(data, { camera, ...faults })
   const at = ({ x, y }: XY) => (view ? view.toPhoto(x, y) : { x, y })
   return {
     pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data },
-    corners: SIM_CORNERS.map(at) as Corners,
-    patches: PATCH_CENTERS.map(at),
+    corners: layout.corners.map(at) as Corners,
+    patches: Array.from({ length: 24 }, (_, i) => at(layout.center(Math.floor(i / 6), i % 6))),
     spot: at(SIM_SPOT),
     holes: [],
   }
@@ -263,6 +344,8 @@ const PAGE_PAPER = { x0: 58, x1: 395, y0: 20, y1: 584 }
 const PAGE_PAPER_LINEAR: Vec3 = [0.78, 0.78, 0.8]
 /** What a smudge is made of: soot, nearly black. */
 const SMUDGE_LINEAR: Vec3 = [0.015, 0.014, 0.012]
+/** What a haze is made of: a light gray film. */
+const HAZE_LINEAR: Vec3 = [0.5, 0.5, 0.5]
 /** The Page scene is turned about the middle of the Photo, with the camera farther off than for the Card. */
 const PAGE_VIEW: ViewGeometry = {
   width: SIM_WIDTH,
@@ -281,6 +364,9 @@ function simulatePagePhoto({
   seed = 7,
   tilt,
   smudged = {},
+  hazed = {},
+  noise: noiseScale = 1,
+  ...faults
 }: SimScene & { page: PageHue }): SimPhoto {
   const rand = mulberry32(seed)
   const view = tilt ? tiltedView(tilt, PAGE_VIEW) : null
@@ -288,8 +374,8 @@ function simulatePagePhoto({
   const { chips, taps } = pageModel(page)
   const at = ({ x, y }: XY) => (view ? view.toPhoto(x, y) : { x, y })
   const dirty = (chip: PageChip): Vec3 => {
-    const share = smudged[chip.chip.notation] ?? 0
-    return chip.linear.map((v, k) => (1 - share) * v + share * SMUDGE_LINEAR[k]) as Vec3
+    const [soot, film] = [smudged[chip.chip.notation] ?? 0, hazed[chip.chip.notation] ?? 0]
+    return chip.linear.map((v, k) => (1 - soot) * ((1 - film) * v + film * HAZE_LINEAR[k]) + soot * SMUDGE_LINEAR[k]) as Vec3
   }
   const printed = new Map<string, Vec3>(chips.map((c) => [`${c.col},${c.row}`, shoot(camera, dirty(c))]))
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
@@ -332,10 +418,11 @@ function simulatePagePhoto({
         noise = 5
       }
       const i = (y * SIM_WIDTH + x) * 4
-      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise)
+      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise * noiseScale)
       data[i + 3] = 255
     }
   }
+  paintFaults(data, { camera, ...faults })
   const holes: XY[] = chips
     .filter((c) => chips.some((d) => d.col === c.col && d.row === c.row + 1))
     .map((c) => at(pageCenter(c.col, c.row + 0.5)))
@@ -349,7 +436,7 @@ function simulatePagePhoto({
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "page"
+export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "page"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -402,6 +489,18 @@ export const EXAMPLES: ExamplePhoto[] = [
     name: "Card at an angle",
     note: "The Card is tilted away from the camera, about 40 degrees. Tap its four corner patches where they are; every patch still lands.",
     scene: { camera: phone(LIGHTS.warm), tilt: ANGLED_TILT },
+  },
+  {
+    id: "glare",
+    name: "Glare on the Card and the soil",
+    note: "Bright reflections fall on one Card patch and on the soil. Each is flagged where it is, with what to do.",
+    scene: {
+      camera: phone(LIGHTS.warm),
+      glare: [
+        { at: simPatchCenter(1, 4), radius: 34, strength: 1.5 },
+        { at: { x: SIM_SPOT.x + 25, y: SIM_SPOT.y }, radius: 50, strength: 1.5 },
+      ],
+    },
   },
   {
     id: "page",

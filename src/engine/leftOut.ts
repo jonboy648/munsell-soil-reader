@@ -6,15 +6,20 @@
 //
 //  - A reference off the ladder is judged by its held-out error: the fit made without it, applied
 //    to it. Dropped worst first, while it stands out from the crowd of references off the ladder.
-//  - A ladder reference cannot be judged that way. The curves go exactly through the ladder, so
-//    a dirty step looks fine to its own fit, and two dirty steps side by side vouch for each other
-//    (Jon's 10YR 8/1 and 7/1 are both smudged). The references off the ladder are independent
-//    witnesses to the curves, so the ladder is judged by them: the dirty steps are the ones whose
-//    removal makes the curves agree with those references.
+//  - A ladder step cannot be judged that way. The curves go exactly through the ladder, so a dirty
+//    step looks fine to its own fit, a dark step bends the curve a lot for a small miss, and two
+//    dirty steps side by side vouch for each other (Jon's 10YR 8/1 and 7/1 are both smudged). The
+//    Chips beside a step, in its value row and the rows above and below it, are independent
+//    witnesses to the curve there, so a step is judged by them: it is dirty when leaving it out
+//    makes the curves agree with its row-mates.
 //
-// The per-reference held-out error here is a stand-in for `heldOutErrors` in correction.ts (#28),
-// which replaces `heldOutErrors` below when it lands. All the limits are provisional, derived
-// from a simulated camera, until Jon's real Photos are run (#15).
+// When two or more Chips off the ladder in one value row are left out, the fit is not trusted (see
+// `suspectRow`): either that row's ladder step is dirty by too little for the steps above to
+// catch, or the Chips are beyond what the ladder can describe. Leaving them out must not make the
+// Card check look better than it is.
+//
+// All the limits are provisional, derived from a simulated camera and four of Jon's real Pages,
+// until real Photos are run (#15).
 import { deltaE2000, linearToLab, type Vec3 } from "./color"
 import type { Fit, Reference } from "./correction"
 
@@ -22,36 +27,43 @@ import type { Fit, Reference } from "./correction"
 export const MAX_LEFT_OUT = 4
 /** Most steps of the ladder left out. A ladder always keeps enough steps to draw its curves. */
 const MAX_LADDER_LEFT_OUT = 2
+const MIN_LADDER_STEPS = 5
 
 /** An off-ladder reference is dirty when its held-out error is above this CIEDE2000 ... */
 const DIRTY_FLOOR = 4
-/** ... and above this many times the median held-out error. */
+/** ... and above this many times the median held-out error of the references off the ladder. */
 const DIRTY_FACTOR = 3
 
-/** The ladder is judged only when the references off it are fitted worse than this (CIEDE2000, 80th percentile) ... */
-const LADDER_FLOOR = 1
-/** ... and steps are left out only if that brings the error to under this share of what it was ... */
-const LADDER_GAIN = 0.75
-/** ... and each of them is a miss, to the fit made without them, of at least DIRTY_FLOOR. Each step left out costs this much in the comparison, so the fewest are left out. */
+/** Leaving ladder steps out must bring their row-mates' typical error down to under this share of what it was ... */
+const LADDER_GAIN = 0.5
+/** ... and by at least this much (CIEDE2000). */
+const LADDER_MIN_GAIN = 1.5
+/** ... and each step left out must be missed by the curves drawn without it by at least this much. */
+const LADDER_OWN_MISS = 3
+/** A step is judged only if it has at least this many row-mates. */
+const MIN_ROW_MATES = 2
+/** Each ladder step left out costs this much in the comparison, so the fewest are left out. */
 const LADDER_STEP_COST = 0.1
 
 const colorDifference = (a: Vec3, b: Vec3): number => deltaE2000(linearToLab(a), linearToLab(b))
 
 const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]
 
-/** The held-out error of the references at `which`: fitted without each, corrected, against its true color. */
-function heldOutErrors(references: Reference[], fit: Fit, which: number[]): number[] {
-  return which.map((i) => colorDifference(fit(references.filter((_, j) => j !== i))(references[i].measured), references[i].truth))
+/**
+ * The held-out error of each reference: the fit made without it, applied to it, against its true
+ * color (CIEDE2000). The one place the Card's per-reference held-out errors are made.
+ */
+export function heldOutErrors(references: Reference[], fit: Fit): number[] {
+  return references.map((held, i) =>
+    colorDifference(fit(references.filter((_, j) => j !== i))(held.measured), held.truth),
+  )
 }
 
-/** How well a fit agrees with the references off the ladder: the 80th percentile, ignoring the worst fifth. */
-function offLadderError(references: Reference[], fit: Fit): number {
+/** What the fit does to the references at `which`: its mean error on them, the worst one counting for little. */
+function typicalError(references: Reference[], which: number[], fit: Fit): number {
   const correct = fit(references)
-  const errors = references
-    .filter((r) => !r.ladder)
-    .map((r) => colorDifference(correct(r.measured), r.truth))
-    .sort((a, b) => a - b)
-  return errors[Math.floor(errors.length * 0.8)] ?? 0
+  const errors = which.map((i) => colorDifference(correct(references[i].measured), references[i].truth))
+  return median(errors)
 }
 
 /** Subsets of up to `size` of the items, smallest first. */
@@ -66,45 +78,76 @@ function subsets(items: number[], size: number): number[][] {
   return found.sort((a, b) => a.length - b.length)
 }
 
-/** The ladder steps to leave out, as indices into `references`. */
-function dirtyLadderSteps(references: Reference[], fit: Fit): number[] {
-  const steps = references.flatMap((r, i) => (r.ladder ? [i] : []))
-  const baseline = offLadderError(references, fit)
-  if (baseline <= LADDER_FLOOR) return []
-  const without = (out: number[]) => references.filter((_, i) => !out.includes(i))
-  const candidates = subsets(steps, Math.max(0, Math.min(MAX_LADDER_LEFT_OUT, steps.length - 4)))
-    .map((out) => ({ out, cost: offLadderError(without(out), fit) + LADDER_STEP_COST * out.length }))
-    .sort((a, b) => a.cost - b.cost)
-  for (const { out, cost } of candidates) {
-    if (cost > LADDER_GAIN * baseline) break
-    // The curves, drawn without these steps, must miss every one of them: a clean step that
-    // merely helps the comparison by chance is predicted well, a dirty one is not.
-    const correct = fit(without(out))
-    if (out.every((i) => colorDifference(correct(references[i].measured), references[i].truth) >= DIRTY_FLOOR)) {
-      return out
-    }
+/**
+ * The ladder steps to leave out next, as indices into `references`, or none. Of the sets of steps
+ * (up to `budget`, from those still kept) that leaving out would make the curves agree with
+ * their row-mates, the one that does it best.
+ */
+function nextDirtyLadderSteps(references: Reference[], rows: number[], fit: Fit, kept: number[], budget: number): number[] {
+  const rest = kept.map((i) => references[i])
+  const steps = kept.flatMap((i, k) => (references[i].ladder ? [k] : []))
+  let best: { out: number[]; cost: number } | null = null
+  for (const out of subsets(steps, Math.max(0, Math.min(budget, steps.length - MIN_LADDER_STEPS)))) {
+    const near = new Set(out.flatMap((k) => [rows[kept[k]] - 1, rows[kept[k]], rows[kept[k]] + 1]))
+    const mates = rest.flatMap((r, k) => (!r.ladder && near.has(rows[kept[k]]) ? [k] : []))
+    if (mates.length < MIN_ROW_MATES) continue
+    const without = rest.filter((_, k) => !out.includes(k))
+    const before = typicalError(rest, mates, fit)
+    const after = typicalError(without, mates.map((k) => k - out.filter((o) => o < k).length), fit)
+    if (after > LADDER_GAIN * before || before - after < LADDER_MIN_GAIN) continue
+    // Each step must also be a real miss to the curves drawn without it: a clean step that merely
+    // helps the comparison, by taking a model that cannot describe a row's Chips out of the ladder,
+    // is predicted well.
+    const correct = fit(without)
+    if (!out.every((k) => colorDifference(correct(rest[k].measured), rest[k].truth) >= LADDER_OWN_MISS)) continue
+    const cost = after + LADDER_STEP_COST * out.length
+    if (!best || cost < best.cost) best = { out, cost }
   }
-  return []
+  return best ? best.out.map((k) => kept[k]) : []
+}
+
+/** The ladder steps to leave out, as indices into `references`. */
+function dirtyLadderSteps(references: Reference[], rows: number[], fit: Fit): number[] {
+  const out: number[] = []
+  for (;;) {
+    const kept = references.map((_, i) => i).filter((i) => !out.includes(i))
+    const next = nextDirtyLadderSteps(references, rows, fit, kept, MAX_LADDER_LEFT_OUT - out.length)
+    if (next.length === 0) return out
+    out.push(...next)
+  }
+}
+
+export interface LeftOut {
+  /** Indices into the references, sorted. */
+  indices: number[]
+  /** Two or more references off the ladder in this value row were left out: the fit is not to be trusted. */
+  suspectRow?: number
 }
 
 /**
- * Which references to leave out of the fit, as sorted indices into `references`: none for a
- * clean Card, at most `MAX_LEFT_OUT` for a worn one. A Card that is wrong all over (corners tapped
- * out of order) has no outliers to find, so nothing is left out and the Card check fails.
+ * Which references to leave out of the fit: none for a clean Card, at most `MAX_LEFT_OUT` for a
+ * worn one. A Card that is wrong all over (corners tapped out of order) has no outliers to find,
+ * so nothing is left out and the Card check fails. `rows` gives the value row of each reference.
  */
-export function leftOut(references: Reference[], fit: Fit): number[] {
-  const out = dirtyLadderSteps(references, fit)
+export function leftOut(references: Reference[], rows: number[], fit: Fit): LeftOut {
+  const out = dirtyLadderSteps(references, rows, fit)
   const kept = references.map((_, i) => i).filter((i) => !out.includes(i))
+  const dropped: number[] = []
   while (out.length < MAX_LEFT_OUT) {
     // Only references off the ladder: a step's own held-out error is large at the ends of the ladder
     // whether it is dirty or not, and leaving more steps out would leave curves too thin to draw.
     const rest = kept.map((i) => references[i])
+    const errors = heldOutErrors(rest, fit)
     const off = rest.flatMap((r, k) => (r.ladder ? [] : [k]))
-    const errors = heldOutErrors(rest, fit, off)
-    const worst = errors.indexOf(Math.max(...errors))
-    if (errors[worst] < Math.max(DIRTY_FLOOR, DIRTY_FACTOR * median(errors))) break
-    out.push(kept[off[worst]])
-    kept.splice(off[worst], 1)
+    const worst = off.reduce((a, b) => (errors[b] > errors[a] ? b : a))
+    if (errors[worst] < Math.max(DIRTY_FLOOR, DIRTY_FACTOR * median(off.map((k) => errors[k])))) break
+    out.push(kept[worst])
+    dropped.push(kept[worst])
+    kept.splice(worst, 1)
   }
-  return out.sort((a, b) => a - b)
+  const suspect = dropped.find((i) => dropped.some((j) => j !== i && rows[j] === rows[i]))
+  return {
+    indices: out.sort((a, b) => a - b),
+    ...(suspect === undefined ? {} : { suspectRow: rows[suspect] }),
+  }
 }

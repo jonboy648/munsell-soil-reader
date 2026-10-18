@@ -9,7 +9,7 @@
 import * as munsell from "munsell"
 import { SOIL_BOOK_CHIPS } from "./chips"
 import type { Vec3 } from "./color"
-import { gridSites, type Four, type GridPoint, type Site } from "./grid"
+import { gridMap, gridSites, type Four, type GridPoint, type Site } from "./grid"
 import type { Chip, ChipPage, Corners, XY } from "./types"
 
 /** The Pages that hold one hue in rows of value and columns of chroma, and work as a Card. */
@@ -91,36 +91,119 @@ export function pageSites(hue: PageHue, taps: Corners): Site[] {
 }
 
 /**
- * Sites on the bare white paper: the grid positions inside the Page where no Chip is printed
- * (the empty bottom right of most Pages). There are no holes there. The paper is one color
- * under one light, so the quality checks can use it to tell uneven light from a tone curve.
+ * How much taller a row is than a column is wide, as the book prints them (a row pitch of 198
+ * pixels against a column pitch of 131 on Jon's 10YR Page). Holes and Chips are measured in
+ * column pitches.
+ */
+export const PAGE_ROW_PITCHES = 1.5
+
+/** The Page's column pitch in the Photo, in pixels, from the four taps: the median over the taps' pairs. */
+export function pageSpacing(hue: PageHue, taps: Corners): number {
+  const known = pageModel(hue).taps
+  const ratios = known.flatMap((a, i) =>
+    known.slice(i + 1).map((b, k) => {
+      const [p, q] = [taps[i], taps[i + 1 + k]]
+      const steps = Math.hypot(a.col - b.col, (a.row - b.row) * PAGE_ROW_PITCHES)
+      return Math.hypot(p.x - q.x, p.y - q.y) / steps
+    }),
+  )
+  return ratios.sort((x, y) => x - y)[Math.floor(ratios.length / 2)]
+}
+
+/** A paper gutter between two columns is a fifth of a column wide: its read circle is this share of a Chip's. */
+const GUTTER_TO_CHIP_RADIUS = 0.35
+
+/**
+ * Sites on the bare white paper, spread over the whole Page: the gutters between the columns, down
+ * every row, 35 of them. There are no holes in a gutter, and a gutter is paper on every hue Page,
+ * which the empty cells at the bottom right are not (they are Chips on another Page), so a Page
+ * read as the wrong hue still has its paper where the sites are. The paper is one color under one
+ * light, so the quality checks can use it to tell uneven light from a tone curve.
  */
 export function pagePaperSites(hue: PageHue, taps: Corners): Site[] {
   const { chips, taps: known } = pageModel(hue)
   const lastRow = Math.max(...chips.map((c) => c.row))
-  const empty: GridPoint[] = []
+  const gutters: GridPoint[] = []
   for (let row = 0; row <= lastRow; row++) {
-    for (let col = 0; col < PAGE_CHROMAS.length; col++) {
-      if (!chips.some((c) => c.col === col && c.row === row)) empty.push({ col, row })
-    }
+    for (let col = 0; col < PAGE_CHROMAS.length - 1; col++) gutters.push({ col: col + 0.5, row })
   }
-  return gridSites(known.map(gridPoint) as Four<GridPoint>, taps, empty)
+  return gridSites(known.map(gridPoint) as Four<GridPoint>, taps, gutters).map(({ center, radius }) => ({
+    center,
+    radius: Math.max(2, GUTTER_TO_CHIP_RADIUS * radius),
+  }))
 }
 
+/** A hole is a circle two fifths of a column pitch in radius (0.26 of the taller row pitch). */
+const HOLE_COLUMN_PITCHES = 0.4
 /**
- * A hole's radius is two fifths of the column pitch, and the Chip read circle a fifth of it, so a
- * Spot circle of three fifths of the pitch (one and a half Chip circles) stays inside a hole even if
- * the tap is a tenth of a pitch off center.
+ * A Spot's circle is this share of the hole's narrowest half-width in the Photo (the map at the
+ * nearest Chip overstates a hole on the far side of a tilted Page by up to a tenth) ...
  */
-const SPOT_TO_CHIP_RADIUS = 1.5
+const SPOT_IN_HOLE = 0.9
+/** ... less a tap's error: a tap is up to this many column pitches off center. */
+const TAP_ERROR_PITCHES = 0.1
 
 /**
  * The radius to read a Spot on a Page. A Page is often photographed small in the frame, so the
  * usual Spot circle (a share of the Photo) can be wider than a hole and read the Chips around it.
- * Near the Page the circle follows the Chips' own scale: that of the Chip nearest the Spot.
+ * Near the Page the circle is cut to fit the hole. Seen at an angle the hole is an ellipse, with
+ * the Page turned and squeezed by a different amount in each direction, so its narrowest half-width
+ * is found from how the grid moves across the Photo at the nearest Chip (the singular values of the
+ * local map), not from the pitch along either grid direction: that overstates a hole the Page's
+ * tilt has sheared. The circle is that, less a tap's error. Away from the Page, or with taps that
+ * give no sound view of it, the usual circle stands.
  */
-export function pageSpotRadius(sites: Site[], spot: XY, radius: number): number {
+export function pageSpotRadius(hue: PageHue, taps: Corners): (spot: XY, radius: number) => number {
+  const { chips, taps: known } = pageModel(hue)
+  const map = gridMap(known.map(gridPoint) as Four<GridPoint>, taps)
+  const centers = chips.map(map)
   const dist = (a: XY, b: XY) => Math.hypot(a.x - b.x, a.y - b.y)
-  const nearest = sites.reduce((a, b) => (dist(b.center, spot) < dist(a.center, spot) ? b : a))
-  return Math.max(2, Math.min(radius, SPOT_TO_CHIP_RADIUS * nearest.radius))
+  const rows = Math.max(...chips.map((c) => c.row))
+  const lastCol = PAGE_CHROMAS.length - 1
+  return (spot, radius) => {
+    let nearest = 0
+    centers.forEach((c, i) => {
+      if (dist(c, spot) < dist(centers[nearest], spot)) nearest = i
+    })
+    const { col, row } = chips[nearest]
+    const here = centers[nearest]
+    // How one column step and one row step move across the Photo, per column pitch of the Page.
+    const step = (to: GridPoint, scale: number): XY => {
+      const p = map(to)
+      return { x: ((p.x - here.x) * scale), y: ((p.y - here.y) * scale) }
+    }
+    const across = col < lastCol ? step({ col: col + 1, row }, 1) : step({ col: col - 1, row }, -1)
+    const down = row < rows ? step({ col, row: row + 1 }, 1 / PAGE_ROW_PITCHES) : step({ col, row: row - 1 }, -1 / PAGE_ROW_PITCHES)
+    // Singular values of the map [across down]: the hole's half-widths in the Photo, per unit radius.
+    const [aa, bb, ab] = [across.x ** 2 + across.y ** 2, down.x ** 2 + down.y ** 2, across.x * down.x + across.y * down.y]
+    const mean = (aa + bb) / 2
+    const spreadOut = Math.sqrt(((aa - bb) / 2) ** 2 + ab ** 2)
+    const narrowest = Math.sqrt(Math.max(0, mean - spreadOut))
+    // No sound view of the Page (the taps repeat or lie on a line): nothing to follow.
+    if (!(narrowest > 0)) return radius
+    // Not on the Page: the soil beside it.
+    if (dist(here, spot) > PAGE_ROW_PITCHES * Math.max(Math.sqrt(aa), Math.sqrt(bb))) return radius
+    return Math.max(2, Math.min(radius, SPOT_IN_HOLE * HOLE_COLUMN_PITCHES * narrowest - TAP_ERROR_PITCHES * Math.sqrt(aa)))
+  }
+}
+
+/**
+ * The hue Page the Reading should suggest retaking with, when the nearest Chip is not on the Page
+ * used; undefined when there is nothing better to suggest. Only the Pages that work as a Card are
+ * suggested. A Chip on a hue Page goes to that Page. A WHITE Chip goes to its own hue's Page, if it
+ * has one. Gley 1 and the 10Y-5GY Page, the yellow-greens, go to 5Y, the nearest hue Page; 10R, the
+ * red next to 2.5YR, goes to 2.5YR. Neutral Chips and Gley 2 have no hue Page nearer than the one used.
+ */
+export function suggestedPage(used: PageHue, chip: Chip): PageHue | undefined {
+  const onHuePage = chip.pages.find(isPageHue)
+  const suggestion: string | undefined = onHuePage
+    ? onHuePage
+    : chip.pages.includes("WHITE")
+      ? chip.hue
+      : chip.pages.includes("GLEY1") || chip.pages.includes("10Y-5GY")
+        ? "5Y"
+        : chip.pages.includes("10R")
+          ? "2.5YR"
+          : undefined
+  return suggestion && isPageHue(suggestion) && suggestion !== used && !chip.pages.includes(used) ? suggestion : undefined
 }

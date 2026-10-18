@@ -12,8 +12,16 @@ const CORNERS = [
   { cell: 18, name: "white patch (bottom left)" },
 ]
 
-// Where each of a Page's four Chips is on the Page, in the order they are tapped.
-const PAGE_TAP_NAMES = ["top left", "top right", "lowest in the last column", "bottom left"]
+/** Where each of a Page's four Chips is on the Page, in the order they are tapped. */
+function pageTapName(hue: PageHue, tapped: number): string {
+  if (tapped === 1) {
+    // The last Chip of the top row is at the top right only on a Page whose top row is full.
+    const { chips, taps } = pageModel(hue)
+    const lastCol = Math.max(...chips.map((c) => c.col))
+    return taps[1].col === lastCol ? "top right" : "last Chip of the top row"
+  }
+  return ["top left", "top right", "lowest in the last column", "bottom left"][tapped]
+}
 
 interface Props {
   /** How many corners are tapped so far. */
@@ -142,7 +150,7 @@ function PageTapPrompt({ hue, tapped }: { hue: PageHue; tapped: number }) {
       <b className="font-semibold underline decoration-2 underline-offset-4">
         {chip.value}/{chip.chroma}
       </b>{" "}
-      ({PAGE_TAP_NAMES[tapped]}).{" "}
+      ({pageTapName(hue, tapped)}).{" "}
       <span className="font-mono text-sm text-muted-foreground">{tapped + 1}/{CORNER_COUNT}</span>
     </p>
   )

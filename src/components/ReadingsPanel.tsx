@@ -1,8 +1,9 @@
 // The Readings: a peek at the latest one above the bottom bar, and every Spot's Reading in a
 // bottom sheet. Raw and corrected sit side by side, with the nearest Chip and the Card check.
 import { ChevronUp } from "lucide-react"
-import { isPageHue, type ChipPage, type ChipReading, type ReadPhotoResult, type RgbTriple } from "@/engine"
+import type { ChipReading, ReadPhotoResult, RgbTriple } from "@/engine"
 import { CardCheckBadge } from "@/components/CardCheckBadge"
+import { QualityFlag, QualityWarnings, cardWarnings, warningsFor } from "@/components/QualityWarnings"
 import {
   Drawer,
   DrawerContent,
@@ -14,8 +15,6 @@ import {
 import { shownReading, type CardInfo } from "@/lib/verdict"
 
 const css = (rgb: RgbTriple) => `rgb(${rgb.join(",")})`
-const PAGE_NAMES: Record<string, string> = { GLEY1: "Gley 1", GLEY2: "Gley 2", WHITE: "White" }
-const pageName = (page: ChipPage) => PAGE_NAMES[page] ?? page
 const fmt = (n: number) => n.toFixed(1)
 
 /** A block of color: the one place besides the Photo where color appears on screen. */
@@ -53,7 +52,7 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
 
 function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: number; card: CardInfo }) {
   const reading = result.readings[index]
-  const { verdict, main, why } = shownReading(reading, result.cardCheck, card)
+  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   const leftOut = result.cardCheck?.leftOut ?? []
   const better = verdict === "good" && card.kind === "page" ? reading.betterPage : undefined
   return (
@@ -87,14 +86,12 @@ function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: 
       )}
       {better && card.kind === "page" && (
         <p className="text-sm" data-testid="better-page">
-          <b className="font-semibold">Try the {pageName(better)} Page.</b> This soil reads on the{" "}
-          {pageName(better)} Page, not the {card.hue} Page you used, and the correction is strongest near
-          the Page's own hue.{" "}
-          {isPageHue(better)
-            ? `Retake the Photo with the ${better} Page beside the soil.`
-            : "That Page can't be the Card yet, so use the hue Page closest to it."}
+          <b className="font-semibold">Try the {better} Page.</b> This soil reads closer to the {better} Page
+          than to the {card.hue} Page you used, and the correction is strongest near the Page's own hue.
+          Retake the Photo with the {better} Page beside the soil.
         </p>
       )}
+      <QualityWarnings warnings={warningsFor(result.quality, index)} />
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
@@ -130,7 +127,7 @@ function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: 
 export function ReadingsPanel({ result, card }: { result: ReadPhotoResult | null; card: CardInfo }) {
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
-  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, card)
+  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   return (
     <Drawer>
       <DrawerTrigger asChild>
@@ -144,6 +141,7 @@ export function ReadingsPanel({ result, card }: { result: ReadPhotoResult | null
             <span data-testid="reading-notation" className="block font-mono text-3xl leading-tight font-semibold tracking-tight">
               {main.chip.notation}
             </span>
+            <QualityFlag warnings={warningsFor(result.quality, last)} />
           </span>
           <CardCheckBadge verdict={verdict} />
           <ChevronUp className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />

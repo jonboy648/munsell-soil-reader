@@ -1,6 +1,7 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
 import type { Fit } from "./correction"
+import type { PageHue } from "./page"
 
 /** A point in Photo pixels, origin at the top left. */
 export type XY = { x: number; y: number }
@@ -58,10 +59,10 @@ export interface Reading {
   corrected?: ChipReading // absent when the Card is 'none'
   /**
    * Set when the Card is a Page and the corrected Reading's nearest Chip is not printed on it:
-   * the Page that does hold that Chip. The correction is strongest near the Page's own hue, so
-   * retaking with this Page would give a better Reading.
+   * a hue Page to retake with, one that works as a Card (see `suggestedPage`). The correction is
+   * strongest near the Page's own hue, so retaking with this Page would give a better Reading.
    */
-  betterPage?: ChipPage
+  betterPage?: PageHue
 }
 
 export type QualityWarning = {
@@ -75,6 +76,12 @@ export interface CardCheck {
   ok: boolean // good when meanDE is below CARD_CHECK_GOOD
   /** Page only: the Chips the fit left out because they disagreed with the rest (smudged or worn). */
   leftOut?: string[]
+  /**
+   * Page only: the value (8, 3, 2.5) of a row where two or more Chips off the /1 column had to be
+   * left out. Then `ok` is false whatever the mean says: the row's /1 Chip is probably dirty, or the
+   * row's Chips are darker or stronger than the /1 column can describe.
+   */
+  suspectRow?: number
 }
 
 export interface ReadPhotoInput {
@@ -87,6 +94,7 @@ export interface ReadPhotoInput {
 
 export interface ReadPhotoResult {
   cardCheck?: CardCheck // absent when the Card is 'none'
-  quality: QualityWarning[] // empty until the quality checks land
+  offCard?: true // present when the grays on the Card came out in the wrong order: the corners are probably off the Card
+  quality: QualityWarning[] // problems with the Photo; empty when it is good
   readings: Reading[]
 }

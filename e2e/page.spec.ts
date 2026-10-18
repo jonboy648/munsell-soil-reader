@@ -116,11 +116,11 @@ test("the overlay rings every Chip of the Page and crosses the two left out", as
   await expect.poll(async () => (await marks())[6]).toEqual({ ring: true, cross: true })
 })
 
-test("the wrong hue shows a failed Card check, and says where to start over", async ({ page }) => {
+test("Chips tapped out of order show a failed Card check, and say where to start over", async ({ page }) => {
   await pickPageExample(page)
-  await chooseHue(page, "2.5Y")
-  // Tap the four Chips of the 2.5Y Page where the 10YR Page's four Chips really are: not its Chips.
-  for (const corner of example.corners) await tapPhoto(page, corner)
+  await chooseHue(page, "10YR")
+  const [tl, tr, br, bl] = example.corners
+  for (const corner of [bl, tl, tr, br]) await tapPhoto(page, corner) // starts on the lowest /1
   await tapPhoto(page, example.holes[10])
 
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "failed")
@@ -156,6 +156,18 @@ test("a soil of another hue suggests the Page to retake with", async ({ page, co
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
   await page.getByRole("button", { name: "Open Readings" }).click()
   const better = page.getByRole("dialog").getByTestId("better-page")
-  await expect(better).toContainText("not the 10YR Page you used")
+  await expect(better).toContainText("than to the 10YR Page you used")
   await expect(better).toContainText(/Retake the Photo with the (2\.5Y|5Y) Page/)
+})
+
+test("the prompt names the second Chip by where it really is: top right only when the top row is full", async ({ page }) => {
+  await pickPageExample(page)
+  await chooseHue(page, "10YR")
+  await tapPhoto(page, example.corners[0])
+  await expect(page.getByTestId("corner-prompt")).toContainText("8/8 (top right)")
+
+  // 7.5YR's top row stops at /6, so its second Chip is the last Chip of the top row, not the top right.
+  await chooseHue(page, "7.5YR")
+  await tapPhoto(page, example.corners[0])
+  await expect(page.getByTestId("corner-prompt")).toContainText("8/6 (last Chip of the top row)")
 })

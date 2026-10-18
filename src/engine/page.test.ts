@@ -11,6 +11,9 @@ import {
   pagePaperSites,
   pageSites,
   readPhoto,
+  spotRadius,
+  suggestedPage,
+  SOIL_BOOK_CHIPS,
 } from "./index"
 import type { Corners, PageHue, Pixels, Site, XY } from "./index"
 import { LIGHTS, PHONE_TONE_CURVE, simulatePhoto, type SimCamera, type SimScene, type SimTilt } from "./simulate"
@@ -303,14 +306,30 @@ describe("sampling stays on the solid middle of every Chip", () => {
     }
   })
 
-  it("puts the paper sites on bare white paper, away from Chips and holes", () => {
+  it("puts the paper sites on bare white paper, away from Chips and holes, spread over the whole Page", () => {
     for (const hue of PAGE_HUES) {
-      const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: hue, soil, tilt: TILT })
-      const paper = pagePaperSites(hue, sim.corners)
-      // The grid is 7 rows by 6 columns; what is not a Chip is paper.
-      expect(paper).toHaveLength(42 - pageModel(hue).chips.length)
-      paper.forEach((site, i) => expect(spread(circle(sim.pixels, site)), `${hue} paper ${i}`).toBeLessThanOrEqual(6))
+      for (const tilt of [undefined, TILT]) {
+        const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: hue, soil, tilt })
+        const paper = pagePaperSites(hue, sim.corners)
+        // The gutter between every two columns, down every row (5 x 7).
+        expect(paper).toHaveLength(35)
+        paper.forEach((site, i) => expect(spread(circle(sim.pixels, site)), `${hue} paper ${i}`).toBeLessThanOrEqual(6))
+        if (tilt) continue
+        // Not crowded into a corner: the sites cover the Page's width and height (flat: 245 by 444 pixels).
+        const [xs, ys] = [paper.map((s) => s.center.x), paper.map((s) => s.center.y)]
+        expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(190)
+        expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(430)
+      }
     }
+  })
+
+  it("keeps the paper sites on paper when the Page is read as the wrong hue", () => {
+    // A 10YR Page tapped as a 2.5Y Page: the four Chips asked for (8/1, 8/8, 6/8, 2.5/1) are tapped
+    // where the 10YR Page has Chips 8/1, 8/8, 6/8 and 2/1. The Chips read are not the 2.5Y Page's,
+    // but the gutters between the columns are paper on both.
+    const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: "10YR", soil })
+    const taps = [0, 5, 17, 34].map((i) => sim.patches[i]) as Corners
+    for (const site of pagePaperSites("2.5Y", taps)) expect(spread(circle(sim.pixels, site))).toBeLessThanOrEqual(6)
   })
 })
 
@@ -382,5 +401,206 @@ describe("the hue suggestion", () => {
     const sim = simulatePhoto({ camera: phone(LIGHTS.warm), soil: "2.5Y 6/4" })
     const result = readPhoto({ pixels: sim.pixels, card: { kind: "none" }, spots: [sim.spot] })
     expect(result.readings[0].betterPage).toBeUndefined()
+  })
+})
+
+describe("dirt on the dark end of the ladder", () => {
+  // A light film (dust, wax) shows most on a dark Chip: 4% on 10YR 3/1 is a miss of 3 or 4 on the
+  // step itself and a bend of the curve that moves every dark Chip.
+  const darkSoils = ["10YR 2/2", "10YR 3/3"]
+  const dark = (scene: Partial<SimScene>, soil: string) => read({ page: "10YR", soil, ...scene })
+
+  it.each([
+    ["3/1", { "10YR 3/1": 0.04 }],
+    ["2/1", { "10YR 2/1": 0.04 }],
+    ["3/1 and 2/1", { "10YR 3/1": 0.04, "10YR 2/1": 0.04 }],
+  ])("leaves out the hazed %s and only that, and reads the dark soils within one Chip", (_name, hazed) => {
+    for (const soil of darkSoils) {
+      const { check, reading } = dark({ hazed }, soil)
+      expect(check.leftOut).toEqual(Object.keys(hazed))
+      expect(check.suspectRow).toBeUndefined()
+      expect(check.ok).toBe(true)
+      expect(withinOneChip(reading.corrected!.chip.notation, soil), soil).toBe(true)
+    }
+  })
+
+  it("does not leave out the clean Chips beside a hazed step instead", () => {
+    // Before: the fit named 3/3, 3/4, 3/6 and 2/2, which are clean, and kept 3/1.
+    const { check } = dark({ hazed: { "10YR 3/1": 0.04 } }, "10YR 3/3")
+    for (const clean of ["10YR 3/3", "10YR 3/4", "10YR 3/6", "10YR 2/2"]) expect(check.leftOut).not.toContain(clean)
+  })
+
+  it("leaves out a smudged light step and a hazed dark one together", () => {
+    const { check, reading } = dark({ smudged: { "10YR 8/1": 0.3 }, hazed: { "10YR 3/1": 0.04 } }, "10YR 3/3")
+    expect(check.leftOut).toEqual(["10YR 8/1", "10YR 3/1"])
+    expect(check.ok).toBe(true)
+    expect(withinOneChip(reading.corrected!.chip.notation, "10YR 3/3")).toBe(true)
+  })
+
+  it("never passes the Card check while a dark soil reads more than one Chip off", () => {
+    // The bad case: the check passes, the Reading is wrong. Film on one or two steps of the dark
+    // end, three strengths, three lights, two dark soils.
+    const films = [{ "10YR 3/1": 1 }, { "10YR 2/1": 1 }, { "10YR 3/1": 1, "10YR 2/1": 1 }, { "10YR 4/1": 1 }]
+    let passed = 0
+    for (const share of [0.03, 0.06, 0.1]) {
+      for (const film of films) {
+        const hazed = Object.fromEntries(Object.keys(film).map((n) => [n, share]))
+        for (const light of [LIGHTS.warm, LIGHTS.dim, LIGHTS.shift]) {
+          for (const soil of darkSoils) {
+            const { check, reading } = read({ page: "10YR", soil, hazed, camera: phone(light) })
+            if (!check.ok) continue
+            passed++
+            expect(withinOneChip(reading.corrected!.chip.notation, soil), `${JSON.stringify(hazed)} ${soil}`).toBe(true)
+          }
+        }
+      }
+    }
+    expect(passed).toBeGreaterThan(40) // most of the 72 pass: the sweep is not just failing everything
+  }, 60_000)
+
+  it("fails the Card check, and says which row, when two Chips of one value row had to be left out", () => {
+    // Dirt on 3/3 and 3/4 at once: two Chips off the ladder in the 3/ row. Either the 3/1 step is
+    // dirty or the row is beyond the ladder; the mean of what is left would pass.
+    const { check } = read({ page: "10YR", smudged: { "10YR 3/3": 0.4, "10YR 3/4": 0.4 } })
+    expect(check.leftOut).toEqual(["10YR 3/3", "10YR 3/4"])
+    expect(check.suspectRow).toBe(3)
+    expect(check.meanDE).toBeLessThan(CARD_CHECK_GOOD)
+    expect(check.ok).toBe(false)
+  })
+
+  it("does not call two left-out Chips in different rows a failure", () => {
+    const { check } = read({ page: "10YR", smudged: { "10YR 4/6": 0.35, "10YR 6/3": 0.35 } })
+    expect(check.suspectRow).toBeUndefined()
+    expect(check.ok).toBe(true)
+  })
+})
+
+describe("a Spot inside a hole", () => {
+  // A soil that is nothing like any Chip, so a read circle that reaches a Chip is obvious.
+  const blue = "5PB 4/8"
+  /**
+   * The photographed column pitch is at least 45 pixels in every scene (a Page seen straight on is
+   * 49): rows squeezed to 1.1 times a column are the case where a circle of 0.3 pitches, the old
+   * rule, is wider than the hole's half-height of 0.26 row pitches.
+   */
+  const SCENES: [string, SimTilt][] = [
+    ["flat", { yaw: 0, pitch: 0, distance: 700 }],
+    ["tipped back 35 degrees", { yaw: 0, pitch: 35, distance: 700 }],
+    ["turned 25 degrees and tipped forward 25, rows squeezed", { yaw: 25, pitch: -25, distance: 700 }],
+    ["turned 20 degrees and tipped back 25", { yaw: 20, pitch: 25, distance: 700 }],
+  ]
+
+  it.each(SCENES)("reads only soil, even a tenth of a pitch off center, %s", (_name, tilt) => {
+    const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: "10YR", soil: blue, tilt })
+    expect(Math.hypot(sim.patches[0].x - sim.patches[1].x, sim.patches[0].y - sim.patches[1].y)).toBeGreaterThanOrEqual(45)
+    // How far across the soil of a hole is, walking from its middle: its width in the Photo says
+    // what the column pitch is there (a hole is 0.8 of a pitch wide), which the Page's tilt changes.
+    const { width, data } = sim.pixels
+    const isSoil = (x: number, y: number) => {
+      const i = (Math.round(y) * width + Math.round(x)) * 4
+      return data[i + 2] > data[i] + 20
+    }
+    const across = (h: XY, dx: number) => {
+      let n = 0
+      while (isSoil(h.x + dx * (n + 1), h.y)) n++
+      return n
+    }
+    const inside = sim.holes.filter((h) => h.x > 25 && h.x < 935 && h.y > 25 && h.y < 575)
+    expect(inside.length).toBeGreaterThanOrEqual(24)
+    // Every hole in the Photo, tapped dead center and a tenth of the local column pitch off in the four directions.
+    const offsets = [[0, 0], [0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]]
+    const taps = inside.flatMap((h) => {
+      const pitch = (across(h, -1) + across(h, 1)) / 0.8
+      return offsets.map(([dx, dy]) => ({ x: h.x + dx * pitch, y: h.y + dy * pitch }))
+    })
+    const { readings } = readPhoto({ pixels: sim.pixels, card: { kind: "page", hue: "10YR", taps: sim.corners }, spots: taps })
+    readings.forEach((reading, i) => {
+      // The circle that was read holds nothing but the blue of the soil: no pixel of a Chip.
+      expect(spread(circle(sim.pixels, { center: reading.spot, radius: reading.radius })), `Spot ${i}`).toBeLessThanOrEqual(6)
+      expect(reading.radius).toBeGreaterThan(4)
+    })
+  })
+
+  it("keeps the usual Spot circle on the soil beside the Page, and when the taps give no view of the Page", () => {
+    const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: "10YR" })
+    const usual = spotRadius(sim.pixels)
+    const read = (taps: Corners) =>
+      readPhoto({ pixels: sim.pixels, card: { kind: "page", hue: "10YR", taps }, spots: [sim.spot, sim.holes[3]] }).readings
+    const good = read(sim.corners)
+    expect(good[0].radius).toBe(usual) // beside the Page
+    expect(good[1].radius).toBeLessThan(usual) // in a hole
+    const p = { x: 300, y: 300 }
+    const [tl, tr, br, bl] = sim.corners
+    for (const taps of [[p, p, p, p], [tl, tr, bl, br]] as Corners[]) {
+      // Repeated or crossed taps: no sound view of the Page, so nothing to follow, and the circle is not cut to a few pixels.
+      expect(read(taps)[0].radius).toBe(usual)
+    }
+    expect(read([p, p, p, p])[1].radius).toBe(usual)
+  })
+})
+
+describe("Photo quality on a Page", () => {
+  const quality = (scene: Partial<SimScene> & { page: PageHue }, spots?: (sim: ReturnType<typeof simulatePhoto>) => XY[]) =>
+    read({ camera: phone(LIGHTS.warm), ...scene }, { spots }).result.quality.map((q) => [q.kind, q.where])
+
+  describe.each([
+    ["warm light", LIGHTS.warm],
+    ["dim light", LIGHTS.dim],
+    ["camera color shift", LIGHTS.shift],
+  ])("a clean Photo in %s", (_name, light) => {
+    it.each(["10YR", "2.5YR", "5Y"] as PageHue[])("raises no warning on the %s Page, flat or tilted, noisy and compressed", (hue) => {
+      for (const tilt of [undefined, TILT]) {
+        // A Spot beside the Page and a Spot in every hole.
+        expect(quality({ page: hue, camera: phone(light), tilt, noise: 2, jpeg: 75 }, (s) => [s.spot, ...s.holes])).toEqual([])
+      }
+    })
+  })
+
+  it.each(["10YR", "2.5YR"] as PageHue[])("flags a shadow across the top half of the %s Page as uneven light", (hue) => {
+    expect(quality({ page: hue, shadow: { from: 300, to: 290, gain: 0.5, axis: "y" } })).toEqual([["uneven-light", "card"]])
+  })
+
+  it.each(["10YR", "2.5YR"] as PageHue[])("flags a shadow across the left half of the %s Page, and one with a soft edge", (hue) => {
+    expect(quality({ page: hue, shadow: { from: 240, to: 220, gain: 0.5 } })).toEqual([["uneven-light", "card"]])
+    expect(quality({ page: hue, shadow: { from: 60, to: 520, gain: 0.5, axis: "y" } })).toEqual([["uneven-light", "card"]])
+  })
+
+  it("flags glare on the Page", () => {
+    const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: "10YR" })
+    const glare = [{ at: sim.patches[14], radius: 40, strength: 1.5 }]
+    expect(quality({ page: "10YR", glare })).toEqual([["glare", "card"]])
+  })
+
+  it("flags a Page that is small in the Photo", () => {
+    // 10YR seen from far enough that a column is under 24 pixels across.
+    const sim = simulatePhoto({ camera: phone(LIGHTS.warm), page: "10YR", tilt: { yaw: 0, pitch: 0, distance: 2600 } })
+    const result = readPhoto({ pixels: sim.pixels, card: { kind: "page", hue: "10YR", taps: sim.corners }, spots: [sim.spot] })
+    expect(result.quality.map((q) => q.kind)).toContain("card-too-small")
+  })
+
+  it("does not call a Page that is large enough small", () => {
+    expect(quality({ page: "10YR", tilt: TILT })).toEqual([])
+  })
+})
+
+describe("the Page to retake with", () => {
+  const notation = (n: string) => SOIL_BOOK_CHIPS.find((c) => c.notation === n)!
+  it.each<[used: PageHue, chip: string, suggested: PageHue | undefined]>([
+    ["10YR", "7.5YR 4/3", "7.5YR"], // on another hue Page
+    ["10YR", "10YR 4/3", undefined], // on the Page used
+    ["10YR", "10YR 8/2", undefined], // on the Page used and on WHITE
+    ["7.5YR", "10YR 8/2", "10YR"], // on another Page and on WHITE: the hue Page
+    ["10YR", "7.5YR 9/2", "7.5YR"], // on WHITE alone: its own hue's Page
+    ["7.5YR", "7.5YR 9/1", undefined], // on WHITE alone, and that hue is the Page used
+    ["10YR", "N 9/", undefined], // WHITE alone, neutral: no hue Page is nearer
+    ["10YR", "10Y 5/2", "5Y"], // the 10Y-5GY Page: the nearest hue Page
+    ["10YR", "10Y 3/1", "5Y"], // Gley 1
+    ["10YR", "N 5/", "5Y"], // Gley 1
+    ["5Y", "10Y 3/1", undefined], // Gley 1, and 5Y is already the Page used
+    ["10YR", "5PB 8/1", undefined], // Gley 2: no hue Page is nearer
+    ["10YR", "10R 4/6", "2.5YR"], // 10R is not a Card: the next red
+    ["2.5YR", "10R 4/6", undefined],
+  ])("suggests, with the %s Page used and the nearest Chip %s, %s", (used, chip, suggested) => {
+    expect(suggestedPage(used, notation(chip))).toBe(suggested)
   })
 })

@@ -1,15 +1,6 @@
 // Median sampling of a Photo around a point.
 import { rgb255ToLinear, type Vec3 } from "./color"
-import type { Corners, Pixels, XY } from "./types"
-
-const dist = (a: XY, b: XY) => Math.hypot(a.x - b.x, a.y - b.y)
-
-/**
- * Read radius for a Card patch. It follows the Card's size in the Photo: 20% of the patch
- * pitch, which is the distance between the top corner patches over five gaps.
- */
-export const patchRadius = (corners: Corners): number =>
-  Math.max(2, (0.2 * dist(corners[0], corners[1])) / 5)
+import type { Pixels, XY } from "./types"
 
 /** Read radius for a Spot. It follows the Photo's size. */
 export const spotRadius = (pixels: Pick<Pixels, "width" | "height">): number =>

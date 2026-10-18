@@ -3,13 +3,14 @@ import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
 import { HydrologyForm } from "@/components/HydrologyForm"
+import { IndicatorsPanel } from "@/components/IndicatorsPanel"
 import { LayerForm } from "@/components/LayerForm"
 import { PagePreview } from "@/components/PagePreview"
 import { VegetationEntry } from "@/components/VegetationEntry"
 import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
-import { topToBottom, withPoint, withVegetation, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
+import { topToBottom, withPoint, withVegetation, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
 import type { Vegetation } from "@/delineation/vegetation/entry"
 
 interface Props {
@@ -73,6 +74,18 @@ export function PointView({ project, point, change, onBack }: Props) {
   const changeVegetation = (fn: (vegetation: Vegetation) => Vegetation) =>
     change(project.id, (p) => withPoint(p, point.id, (pt) => withVegetation(pt, fn)))
 
+  const onChoose = (id: string, choice: IndicatorChoice | null) =>
+    change(project.id, (p) =>
+      withPoint(p, point.id, (pt) => {
+        const { [id]: _gone, ...rest } = pt.indicators ?? {}
+        return { ...pt, indicators: choice ? { ...rest, [id]: choice } : rest }
+      }),
+    )
+  const onHydric = (answer: "yes" | "no" | null) =>
+    change(project.id, (p) =>
+      withPoint(p, point.id, ({ hydricSoilPresent: _gone, ...pt }) => (answer ? { ...pt, hydricSoilPresent: answer } : pt)),
+    )
+
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <Button variant="ghost" className="h-11 justify-start px-1 text-base" onClick={onBack}>
@@ -114,6 +127,8 @@ export function PointView({ project, point, change, onBack }: Props) {
           </Button>
         )
       )}
+
+      <IndicatorsPanel project={project} point={point} form={form} onChoose={onChoose} onHydric={onHydric} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
       <PagePreview page="soil" project={project} point={point} form={form} />

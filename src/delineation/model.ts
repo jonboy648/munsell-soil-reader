@@ -4,6 +4,11 @@ import type { SavedReading } from "@/lib/log"
 import type { RegionId } from "./regions"
 import { emptyVegetation, type Vegetation } from "./vegetation/entry"
 
+/** The form's own codes for a redox feature: Concentration, Depletion, Reduced Matrix, Masked Sand grains. */
+export type RedoxType = "C" | "D" | "RM" | "MS"
+/** Where it is: Pore Lining or Matrix. */
+export type RedoxLocation = "PL" | "M"
+
 /** A color on a Layer: the Munsell notation, and how much of the Layer it covers. */
 export interface LayerColor {
   /** `10YR 4/2`, as it prints on the form. */
@@ -12,6 +17,9 @@ export interface LayerColor {
   percent: number
   /** The saved Reading it came from. Absent when the color was typed in. */
   reading?: SavedReading
+  /** A redox feature's type and location, when recorded. The indicator rules infer the type when it is not. */
+  type?: RedoxType
+  location?: RedoxLocation
 }
 
 export interface Layer {
@@ -23,6 +31,17 @@ export interface Layer {
   matrix: LayerColor | null
   redox: LayerColor[]
   remarks: string
+  /** The texture term from the Field Book's classes ("silt loam", "mucky sand", "muck"), when recorded. */
+  texture?: string
+}
+
+/** What the user decided about one indicator of the form. */
+export interface IndicatorChoice {
+  state: "confirmed" | "rejected"
+  /** The user's own words. A tick the app did not suggest carries the reason. */
+  remark?: string
+  /** True when the user ticked an indicator the app did not suggest. */
+  manual?: boolean
 }
 
 /** One of the three Field Observations: whether it was seen, and how deep (inches) when it was. */
@@ -67,8 +86,18 @@ export interface SamplingPoint {
   layers: Layer[]
   /** The vegetation plot. Absent on a point saved before the Vegetation page existed: read it with `vegetationOf`. */
   vegetation?: Vegetation
+  /** The user's decisions, by the indicator's id on the form. An indicator not in here is undecided. */
+  indicators?: Record<string, IndicatorChoice>
+  /** The user's answer to "Hydric Soil Present?". Unset until they confirm it. */
+  hydricSoilPresent?: "yes" | "no"
   /** Absent until something is recorded for the Hydrology section. */
   hydrology?: Hydrology
+}
+
+/** The Land Resource Region (and MLRA, when it matters) a project lies in. Decides which indicators apply. */
+export interface Subregion {
+  lrr: string
+  mlra?: string
 }
 
 export interface Project {
@@ -78,6 +107,8 @@ export interface Project {
   /** Milliseconds since 1970. */
   createdAt: number
   points: SamplingPoint[]
+  /** Picked once for the project. Until it is, an indicator that is limited to some subregions is not suggested. */
+  subregion?: Subregion
 }
 
 export const newProject = (name: string, region: RegionId): Project => ({

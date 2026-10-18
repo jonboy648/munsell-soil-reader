@@ -54,9 +54,10 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
 
 function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResult; index: number; card: CardInfo; onAssign: () => void }) {
   const reading = result.readings[index]
-  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard, card)
+  const { verdict, main, beside, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard, card)
+  const corrected = verdict === "good" || verdict === "caution"
   const leftOut = result.cardCheck?.leftOut ?? []
-  const better = verdict === "good" && card.kind === "page" ? reading.betterPage : undefined
+  const better = corrected && card.kind === "page" ? reading.betterPage : undefined
   return (
     <section aria-label={`Spot ${index + 1}`} className="grid gap-3 border-t border-border py-4 first:border-t-0">
       <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -71,7 +72,8 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
           <p className="mt-2 font-mono text-sm text-muted-foreground">exact {main.exact}</p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <ColorBlock rgb={main.rgb} label={verdict === "good" ? "Corrected" : "Raw"} />
+          <ColorBlock rgb={main.rgb} label={corrected ? "Corrected" : "Raw"} />
+          {beside && <ColorBlock rgb={beside.rgb} label="Raw" />}
           <ColorBlock rgb={main.chipRgb} label="Chip" />
         </div>
       </div>
@@ -79,7 +81,16 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
         <CardCheckBadge verdict={verdict} cardCheck={result.cardCheck} />
       </div>
       <p className="text-sm text-muted-foreground">{why}</p>
-      {leftOut.length > 0 && (
+      {reading.outsideWindow && (
+        <p
+          data-testid="outside-window"
+          className="rounded-sm border border-foreground/40 border-l-4 border-l-foreground py-2 pr-3 pl-3 text-sm"
+        >
+          <b className="font-semibold">Outside the window.</b> This Spot is not on the soil in the frame's window, so it may
+          be a different soil, or in different light, from the one the frame is next to. The Reading is still corrected.
+        </p>
+      )}
+      {card.kind === "page" && leftOut.length > 0 && (
         <p className="text-sm" data-testid="left-out">
           <b className="font-semibold">Left out of the fit:</b>{" "}
           <span className="font-mono">{leftOut.join(", ")}</span>. {leftOut.length === 1 ? "It" : "They"}{" "}

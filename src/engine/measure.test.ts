@@ -105,7 +105,7 @@ describe("measuring a swatch card photographed beside a ColorChecker", () => {
 
 describe("averaging shots", () => {
   const shot = (ok: boolean, swatches: [string, Vec3][], meanDE = ok ? 0.5 : 3): ShotMeasurement => ({
-    cardCheck: { meanDE, ok },
+    cardCheck: { meanDE, ok, verdict: ok ? "good" : "failed", leftOut: [] },
     swatches: swatches.map(([id, lab]) => ({ id, lab })),
   })
 
@@ -171,7 +171,7 @@ describe("the batch rows", () => {
   it("are keyed by frame slot, in slot order, with the method and date", () => {
     const summary = summarizeShots([
       {
-        cardCheck: { meanDE: 0.5, ok: true },
+        cardCheck: { meanDE: 0.5, ok: true, verdict: "good", leftOut: [] },
         swatches: [{ id: "swatch_07", lab: [40, 5, 20] }, { id: "swatch_01", lab: [95, 0, 1] }],
       },
     ])

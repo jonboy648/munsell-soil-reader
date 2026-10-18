@@ -1,0 +1,433 @@
+{
+ "frame": {
+  "width_mm": 150.0,
+  "height_mm": 100.0,
+  "thickness_mm": 3.5,
+  "origin": "top-left",
+  "y": "down",
+  "divider": "black base (neutral)",
+  "version": "prototype-1 2026-10-18"
+ },
+ "window": {
+  "x0": 51.0,
+  "y0": 30.0,
+  "x1": 99.0,
+  "y1": 70.0
+ },
+ "markers": [
+  {
+   "id": 0,
+   "dictionary": "ARUCO_MIP_36h12",
+   "position": "top-left",
+   "corners_tl_tr_br_bl": [
+    [
+     5.0,
+     5.0
+    ],
+    [
+     29.0,
+     5.0
+    ],
+    [
+     29.0,
+     29.0
+    ],
+    [
+     5.0,
+     29.0
+    ]
+   ],
+   "side_mm": 24.0,
+   "cell_mm": 3.0,
+   "quiet_zone_mm": 3.0
+  },
+  {
+   "id": 1,
+   "dictionary": "ARUCO_MIP_36h12",
+   "position": "top-right",
+   "corners_tl_tr_br_bl": [
+    [
+     121.0,
+     5.0
+    ],
+    [
+     145.0,
+     5.0
+    ],
+    [
+     145.0,
+     29.0
+    ],
+    [
+     121.0,
+     29.0
+    ]
+   ],
+   "side_mm": 24.0,
+   "cell_mm": 3.0,
+   "quiet_zone_mm": 3.0
+  },
+  {
+   "id": 2,
+   "dictionary": "ARUCO_MIP_36h12",
+   "position": "bottom-right",
+   "corners_tl_tr_br_bl": [
+    [
+     121.0,
+     71.0
+    ],
+    [
+     145.0,
+     71.0
+    ],
+    [
+     145.0,
+     95.0
+    ],
+    [
+     121.0,
+     95.0
+    ]
+   ],
+   "side_mm": 24.0,
+   "cell_mm": 3.0,
+   "quiet_zone_mm": 3.0
+  },
+  {
+   "id": 3,
+   "dictionary": "ARUCO_MIP_36h12",
+   "position": "bottom-left",
+   "corners_tl_tr_br_bl": [
+    [
+     5.0,
+     71.0
+    ],
+    [
+     29.0,
+     71.0
+    ],
+    [
+     29.0,
+     95.0
+    ],
+    [
+     5.0,
+     95.0
+    ]
+   ],
+   "side_mm": 24.0,
+   "cell_mm": 3.0,
+   "quiet_zone_mm": 3.0
+  }
+ ],
+ "patches": [
+  {
+   "id": "G1",
+   "kind": "gray",
+   "aim": "N9.5 white",
+   "center": [
+    10.0,
+    42.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "G2",
+   "kind": "gray",
+   "aim": "N8",
+   "center": [
+    26.0,
+    42.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "G3",
+   "kind": "gray",
+   "aim": "N6.5",
+   "center": [
+    42.0,
+    42.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "G4",
+   "kind": "gray",
+   "aim": "N5",
+   "center": [
+    10.0,
+    58.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "G5",
+   "kind": "gray",
+   "aim": "N3.5",
+   "center": [
+    26.0,
+    58.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "G6",
+   "kind": "gray",
+   "aim": "N2 black",
+   "center": [
+    42.0,
+    58.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S01",
+   "kind": "soil",
+   "aim": "10YR 2/1",
+   "center": [
+    108.0,
+    42.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S02",
+   "kind": "soil",
+   "aim": "10YR 3/2",
+   "center": [
+    124.0,
+    42.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S03",
+   "kind": "soil",
+   "aim": "10YR 4/3",
+   "center": [
+    140.0,
+    42.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S04",
+   "kind": "soil",
+   "aim": "10YR 5/4",
+   "center": [
+    108.0,
+    58.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S05",
+   "kind": "soil",
+   "aim": "10YR 6/6",
+   "center": [
+    124.0,
+    58.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S06",
+   "kind": "soil",
+   "aim": "7.5YR 4/4",
+   "center": [
+    140.0,
+    58.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S07",
+   "kind": "soil",
+   "aim": "7.5YR 5/6",
+   "center": [
+    43.0,
+    17.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S08",
+   "kind": "soil",
+   "aim": "5YR 4/6",
+   "center": [
+    59.0,
+    17.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S09",
+   "kind": "soil",
+   "aim": "2.5YR 4/6",
+   "center": [
+    75.0,
+    17.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S10",
+   "kind": "soil",
+   "aim": "10R 4/6",
+   "center": [
+    91.0,
+    17.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S11",
+   "kind": "soil",
+   "aim": "2.5Y 6/4",
+   "center": [
+    107.0,
+    17.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "S12",
+   "kind": "soil",
+   "aim": "5Y 5/2",
+   "center": [
+    43.0,
+    83.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": "TBD (per-lot, see notes)"
+  },
+  {
+   "id": "R1",
+   "kind": "reserved",
+   "aim": "batch code area (empty)",
+   "center": [
+    59.0,
+    83.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": null
+  },
+  {
+   "id": "R2",
+   "kind": "reserved",
+   "aim": "batch code area (empty)",
+   "center": [
+    75.0,
+    83.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": null
+  },
+  {
+   "id": "R3",
+   "kind": "reserved",
+   "aim": "batch code area (empty)",
+   "center": [
+    91.0,
+    83.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": null
+  },
+  {
+   "id": "R4",
+   "kind": "reserved",
+   "aim": "batch code area (empty)",
+   "center": [
+    107.0,
+    83.0
+   ],
+   "size": [
+    14.0,
+    14.0
+   ],
+   "filament": null
+  }
+ ]
+}

@@ -1,5 +1,6 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
+import type { Batch } from "./batch"
 import type { Fit } from "./correction"
 import type { PageHue } from "./page"
 
@@ -24,6 +25,12 @@ export type Card =
   // The four Chips the user tapped, in the order of `pageModel(hue).taps`. Only the one-hue Pages
   // (`PAGE_HUES`) work as a Card; any other Page throws UnsupportedCardError.
   | { kind: "page"; hue: ChipPage; taps: Corners }
+  /**
+   * The frame (ADR 0003): a card with its own measured patches. `outline` is the outer corners of
+   * its four markers, top left, top right, bottom right, bottom left (what `findCard` returns,
+   * or the user's adjustment of it). `batch` holds the measured colors of its patches.
+   */
+  | { kind: "frame"; outline: Corners; batch: Batch }
   | { kind: "none" }
 
 /** The Pages of the soil book (2009 Revision) that hold the Chips the engine knows. */
@@ -63,6 +70,8 @@ export interface Reading {
    * strongest near the Page's own hue, so retaking with this Page would give a better Reading.
    */
   betterPage?: PageHue
+  /** Set when the Card is the frame and the Spot is not inside its window: not the soil in the window. */
+  outsideWindow?: true
 }
 
 export type QualityWarning = {
@@ -71,15 +80,22 @@ export type QualityWarning = {
   advice: string
 }
 
+export type CardVerdict = "good" | "caution" | "failed"
+
 export interface CardCheck {
   meanDE: number // mean CIEDE2000 between each Card reference and its true color, corrected by a fit made without it
-  ok: boolean // good when meanDE is below CARD_CHECK_GOOD
-  /** Page only: the Chips the fit left out because they disagreed with the rest (smudged or worn). */
-  leftOut?: string[]
+  /**
+   * Good: below CARD_CHECK_GOOD, nothing left out. Caution: below CARD_CHECK_CAUTION, or a gray
+   * step or a Chip was left out. Failed: above that, or a row of the Page had to lose two Chips.
+   */
+  verdict: CardVerdict
+  ok: boolean // verdict is good
+  /** The references that looked dirty and were left out of the correction, by name (none for a clean Card). */
+  leftOut: string[]
   /**
    * Page only: the value (8, 3, 2.5) of a row where two or more Chips off the /1 column had to be
-   * left out. Then `ok` is false whatever the mean says: the row's /1 Chip is probably dirty, or the
-   * row's Chips are darker or stronger than the /1 column can describe.
+   * left out. Then the check has failed whatever the mean says: the row's /1 Chip is probably
+   * dirty, or the row's Chips are darker or stronger than the /1 column can describe.
    */
   suspectRow?: number
 }

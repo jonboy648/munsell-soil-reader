@@ -4,10 +4,12 @@
 // Rows are counted over the whole stratum, not the page: row 0 is the first plant of the stratum, and
 // the Vegetation page takes as many rows as it has, the Continued page the rest. The Dominant Species?
 // column, the dominance and prevalence worksheets and the indicators are blank here: they are the
-// arithmetic of #34, which fills `veg.<stratum>.<row>.dominant` and adds its own fields.
+// arithmetic of #34, which fills `veg.<stratum>.<row>.dominant` and adds its own fields. Every value is
+// text the PDF's font can print (../text.ts), as the Soil page's are.
 import { regionOf } from "../regions"
 import type { VegColumn } from "../regions/types"
 import { vegetationOf, type Project, type SamplingPoint } from "../model"
+import { printable, wrap } from "../text"
 import { STRATA, STRATUM_LABEL, SUGGESTED_PLOT, type Stratum } from "./strata"
 
 export type VegFieldId =
@@ -20,7 +22,7 @@ export type VegFieldId =
 export const vegFieldId = (stratum: Stratum, row: number, column: VegColumn): VegFieldId => `veg.${stratum}.${row}.${column}`
 
 export interface VegWarning {
-  kind: "veg-overflow" | "veg-not-identified" | "veg-genus" | "veg-left-out"
+  kind: "veg-overflow" | "veg-not-identified" | "veg-genus" | "veg-left-out" | "veg-remarks-cut" | "text-changed"
   text: string
 }
 
@@ -30,18 +32,46 @@ const written = (n: number): string => String(Math.round(n * 100) / 100)
 /** How many plants of a stratum the form holds: the Vegetation page and the Continued page. */
 export const strataCapacity = (project: Project, stratum: Stratum): number => regionOf(project.region).vegetation.strata[stratum].rowRules.length * 2
 
-export function vegetationFields(project: Project, point: SamplingPoint): { fields: Record<VegFieldId, string>; warnings: VegWarning[] } {
+const NEWLINE = "\n"
+const LINE_BREAK = /\r?\n/
+const TRAILING_BREAKS = /\n+$/
+
+/** The remarks as lines of the Remarks box: its paragraphs kept, each wrapped to the box, and how many lines the box holds. */
+export function remarkLines(project: Project, remarks: string): { lines: string[]; room: number } {
+  const { remarks: box, fontSize } = regionOf(project.region).vegetation
+  const lines = remarks.split(NEWLINE).flatMap((paragraph) => (paragraph === "" ? [""] : wrap(paragraph, box.right - box.left, fontSize)))
+  return { lines, room: Math.floor((box.lastBaseline - box.firstBaseline) / box.leading) + 1 }
+}
+
+/** `samplingPoint` is the point's name as the form prints it, which formFor has already made printable. */
+export function vegetationFields(
+  project: Project,
+  point: SamplingPoint,
+  samplingPoint: string,
+): { fields: Record<VegFieldId, string>; warnings: VegWarning[] } {
   const vegetation = vegetationOf(point)
-  const fields = { "veg.samplingPoint": point.name, "veg.remarks": vegetation.remarks.trim() } as Record<VegFieldId, string>
   const warnings: VegWarning[] = []
+  // Text the user typed, made printable; one warning for the page if any of it had to change.
+  let changed = false
+  const clean = (text: string): string => {
+    const { text: out, replaced } = printable(text)
+    changed ||= replaced
+    return out
+  }
+  const remarks = vegetation.remarks.trim().split(LINE_BREAK).map((line) => clean(line)).join(NEWLINE).replace(TRAILING_BREAKS, "")
+  const fields = { "veg.samplingPoint": samplingPoint, "veg.remarks": remarks } as Record<VegFieldId, string>
+  const cut = remarkLines(project, remarks)
+  if (cut.lines.length > cut.room) {
+    warnings.push({ kind: "veg-remarks-cut", text: `The vegetation remarks are longer than the ${cut.room} lines of the Remarks box, so the end is left off the page.` })
+  }
   for (const stratum of STRATA) {
     const plants = vegetation.plants.filter((p) => p.stratum === stratum)
     const capacity = strataCapacity(project, stratum)
-    fields[`veg.${stratum}.plotSize`] = vegetation.plotSizes[stratum] ?? (plants.length > 0 ? SUGGESTED_PLOT[stratum] : "")
+    fields[`veg.${stratum}.plotSize`] = clean(vegetation.plotSizes[stratum] ?? (plants.length > 0 ? SUGGESTED_PLOT[stratum] : ""))
     fields[`veg.${stratum}.total`] = plants.length > 0 ? written(plants.reduce((sum, p) => sum + p.cover, 0)) : ""
     for (let row = 0; row < capacity; row++) {
       const plant = plants[row]
-      fields[vegFieldId(stratum, row, "name")] = plant?.name ?? ""
+      fields[vegFieldId(stratum, row, "name")] = plant ? clean(plant.name) : ""
       fields[vegFieldId(stratum, row, "cover")] = plant ? written(plant.cover) : ""
       fields[vegFieldId(stratum, row, "dominant")] = ""
       fields[vegFieldId(stratum, row, "status")] = plant ? (plant.status ?? plant.listed) : ""
@@ -63,6 +93,7 @@ export function vegetationFields(project: Project, point: SamplingPoint): { fiel
       }
     }
   }
+  if (changed) warnings.push({ kind: "text-changed", text: "Some vegetation text has characters the form cannot print; they were replaced." })
   return { fields, warnings }
 }
 

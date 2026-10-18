@@ -1,8 +1,10 @@
 // The Card: which one it is, which corner or Chip to tap next, drawn as the Card itself, or what
 // is already marked.
 import { PAGE_CHROMAS, PAGE_HUES, pageModel, type PageHue } from "@/engine"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group-1"
 import { cn } from "@/lib/utils"
-import { CORNER_COUNT, type CardKind } from "@/lib/session"
+import { FramePanel } from "@/components/FramePanel"
+import { CORNER_COUNT, type CardKind, type FrameSession } from "@/lib/session"
 
 // Corner patches in the order the user taps them, and how to find each on the Card.
 const CORNERS = [
@@ -33,9 +35,13 @@ interface Props {
   /** Absent where the Card is fixed (measurement mode), which hides the choice of Card. */
   onCardKind?: (kind: CardKind) => void
   onHue?: (hue: PageHue) => void
+  /** The frame as the Card: where the finder and the batch are. Absent where the frame is not offered. */
+  frame?: FrameSession
+  onBatchCode?: (code: string) => void
+  onConfirmOutline?: () => void
 }
 
-/** Two or more choices side by side, one pressed. Gray, so the choice never tints the Photo. */
+/** Two or more choices side by side, one chosen. Gray, so the choice never tints the Photo. */
 function Choice<T extends string>({
   label,
   options,
@@ -50,24 +56,23 @@ function Choice<T extends string>({
   testId: string
 }) {
   return (
-    <div role="group" aria-label={label} data-testid={testId} className="flex flex-wrap gap-1.5">
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="lg"
+      aria-label={label}
+      data-testid={testId}
+      value={value ?? ""}
+      // Pressing the chosen one again would clear it; a choice stays chosen.
+      onValueChange={(picked) => picked && onPick(picked as T)}
+      className="w-fit max-w-full flex-wrap shadow-none"
+    >
       {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onPick(option.value)}
-          className={cn(
-            "min-h-10 rounded-md border px-3 text-sm font-medium",
-            value === option.value
-              ? "border-foreground bg-foreground text-background"
-              : "border-border bg-card text-foreground",
-          )}
-        >
+        <ToggleGroupItem key={option.value} value={option.value} className="text-sm">
           {option.text}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }
 
@@ -157,7 +162,7 @@ function PageTapPrompt({ hue, tapped }: { hue: PageHue; tapped: number }) {
   )
 }
 
-export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: Props) {
+export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue, frame, onBatchCode, onConfirmOutline }: Props) {
   if (noCard) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -176,6 +181,7 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: 
         options={[
           { value: "colorchecker", text: "ColorChecker" },
           { value: "page", text: "Soil-book Page" },
+          { value: "frame", text: "Frame" },
         ]}
       />
       {cardKind === "page" && (
@@ -189,6 +195,14 @@ export function CardPanel({ tapped, noCard, cardKind, hue, onCardKind, onHue }: 
       )}
     </div>
   )
+  if (cardKind === "frame" && frame && onBatchCode && onConfirmOutline) {
+    return (
+      <div className="grid gap-3">
+        {picker}
+        <FramePanel frame={frame} onBatchCode={onBatchCode} onConfirm={onConfirmOutline} />
+      </div>
+    )
+  }
   if (cardKind === "page" && !hue) {
     return (
       <div className="grid gap-2">

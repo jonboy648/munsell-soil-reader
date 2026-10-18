@@ -17,10 +17,34 @@ const SAMPLES = "samples"
 export const PROJECTS = "projects"
 
 let opened: Promise<IDBDatabase> | undefined
+let current: IDBDatabase | undefined
 
-function open(): Promise<IDBDatabase> {
-  if (opened) return opened
-  const connection = new Promise<IDBDatabase>((resolve, reject) => {
+/**
+ * Set when the upgrade to version 2 failed (the disk was full, say). The Log is then read as it
+ * was, converted in memory if it still holds centimeters, and cannot be written until a later
+ * start of the app gets the upgrade through. The upgrade is not tried again in the meantime.
+ */
+let readOnly = false
+let centimeters = false
+
+/** True while the Log can only be read, because its update could not finish. */
+export const logIsReadOnly = (): boolean => readOnly
+
+/** The browser can drop a connection (iOS does when the app is backgrounded), and the database can be deleted or cleared under us. Either way, connect afresh next time. */
+function remember(db: IDBDatabase): IDBDatabase {
+  current = db
+  db.onclose = db.onversionchange = () => {
+    if (current === db) {
+      opened = undefined
+      current = undefined
+    }
+    db.close()
+  }
+  return db
+}
+
+function openCurrent(): Promise<IDBDatabase> {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = (event) => {
       const db = request.result
@@ -37,18 +61,28 @@ function open(): Promise<IDBDatabase> {
         }
       }
     }
-    request.onsuccess = () => {
-      const db = request.result
-      // The browser can drop the connection (iOS does when the app is backgrounded), and the
-      // database can be deleted or cleared under us. Either way, connect afresh next time.
-      db.onclose = db.onversionchange = () => {
-        if (opened === connection) opened = undefined
-        db.close()
-      }
-      resolve(db)
-    }
+    request.onsuccess = () => resolve(remember(request.result))
     request.onerror = () => reject(request.error)
   })
+}
+
+/** After a failed upgrade: the Log as it is on disk, with no upgrade. Rejects with `failure` when there is nothing to read. */
+function openAsWas(failure: unknown): Promise<IDBDatabase> {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME)
+    request.onupgradeneeded = () => request.transaction?.abort() // there was no Log: do not make one
+    request.onsuccess = () => {
+      readOnly = true
+      centimeters = request.result.version < 2
+      resolve(remember(request.result))
+    }
+    request.onerror = () => reject(failure)
+  })
+}
+
+function open(): Promise<IDBDatabase> {
+  if (opened) return opened
+  const connection = readOnly ? openAsWas(null) : openCurrent().catch((error) => openAsWas(error))
   opened = connection
   connection.catch(() => {
     if (opened === connection) opened = undefined // so a later call can try again
@@ -84,6 +118,8 @@ export async function run<T>(
 ): Promise<T> {
   try {
     const db = await open()
+    if (mode === "readwrite" && readOnly) throw new DOMException("The Log is read-only until its update can finish", "ReadOnlyError")
+    if (!db.objectStoreNames.contains(store)) throw new DOMException(`The Log has no ${store} yet`, "NotFoundError")
     const value = await new Promise<T>((resolve, reject) => {
       const tx = db.transaction(store, mode)
       const result = work(tx.objectStore(store))
@@ -115,7 +151,7 @@ const modify = (id: string, change: (sample: Sample) => Sample): Promise<Sample 
 export const listSamples = (): Promise<Sample[]> =>
   run(SAMPLES, "readonly", (store) => {
     const request = store.getAll()
-    return () => request.result as Sample[]
+    return () => (centimeters ? (request.result as Sample[]).map(cmSampleToInches) : (request.result as Sample[]))
   })
 
 export const addSample = (sample: Sample): Promise<void> =>

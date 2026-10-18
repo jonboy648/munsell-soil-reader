@@ -11,7 +11,8 @@ import { emptyVegetation, plantEntryOf, type PlantEntry } from "./entry"
 import { loadPlantList } from "./loadPlantList"
 import { resolvePlant } from "./plantList"
 import type { Stratum } from "./strata"
-import { printable, textWidth, vegetationPlacements, wrapText } from "./vegetationPage"
+import { widthOf } from "../text"
+import { vegetationPlacements } from "./vegetationPage"
 import { vegetationPdf } from "./vegetationPdf"
 
 const read = (name: string) => readFileSync(new URL(`../regions/ncne/${name}`, import.meta.url))
@@ -102,6 +103,13 @@ describe("where the values are drawn", () => {
     expect(at("veg.samplingPoint")).toMatchObject({ text: "JF-1", baseline: page.samplingPoint.rule - page.aboveRule })
   })
 
+  test("a name too wide for its column is drawn smaller, to fit, and never wider", () => {
+    const wide = `Carex ${"w".repeat(60)}`
+    const p = vegetationPlacements(JF1_PROJECT, formFor(JF1_PROJECT, withPlants([plant(wide, 5, "herb", "w")]))).vegetation.find((q) => q.id === "veg.herb.0.name")!
+    expect(p.size).toBeLessThan(page.fontSize)
+    expect(widthOf(p.text, p.size)).toBeLessThanOrEqual(p.maxWidth + 0.01)
+  })
+
   test("nine plants fit on the first page: there is no Continued page", () => {
     expect(placements.continued).toBeNull()
   })
@@ -146,20 +154,16 @@ describe("the Remarks", () => {
     const lines = remarkLines(`First line\nSecond line\n${long}`)
     expect(lines.map((l) => l.text).slice(0, 2)).toEqual(["First line", "Second line"])
     expect(lines).toHaveLength(8)
-    for (const line of lines) expect(textWidth(line.text, 8)).toBeLessThanOrEqual(remarks.right - remarks.left + 0.01)
+    for (const line of lines) expect(widthOf(line.text, 8)).toBeLessThanOrEqual(remarks.right - remarks.left + 0.01)
     expect(lines[7].baseline).toBeLessThanOrEqual(remarks.lastBaseline)
   })
 
-  test("a word wider than a line is broken, not run off the page", () => {
-    const lines = wrapText("x".repeat(400), 100, 8)
-    expect(lines.length).toBeGreaterThan(1)
-    for (const l of lines) expect(textWidth(l, 8)).toBeLessThanOrEqual(100)
-    expect(lines.join("")).toBe("x".repeat(400))
-  })
-
-  test("what a phone's keyboard makes is printed as the form's font can: curly quotes and dashes plain, the unprintable a question mark", () => {
-    expect(printable("Lady’s thumb – “abundant” ≤ 5%")).toBe('Lady\'s thumb - "abundant" <= 5%')
-    expect(printable("café 中")).toBe("café ?")
+  test("remarks longer than the box are warned about, and what the form cannot print is replaced, with a warning", () => {
+    const long = Array.from({ length: 200 }, (_, i) => `word${i}`).join(" ")
+    expect(formFor(JF1_PROJECT, withPlants([], long)).warnings.map((w) => w.kind)).toEqual(["veg-remarks-cut"])
+    const f = formFor(JF1_PROJECT, withPlants([], "Lady’s thumb 中"))
+    expect(f.fields["veg.remarks"]).toBe("Lady’s thumb ?")
+    expect(f.warnings.map((w) => w.kind)).toEqual(["text-changed"])
   })
 })
 

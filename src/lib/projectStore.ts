@@ -8,6 +8,10 @@ export const listProjects = (): Promise<Project[]> =>
   run(PROJECTS, "readonly", (store) => {
     const request = store.getAll()
     return () => request.result as Project[]
+  }).catch((error) => {
+    // A Log that could not be updated has no projects store: there are none to show.
+    if (error instanceof DOMException && error.name === "NotFoundError") return []
+    throw error
   })
 
 export const addProject = (project: Project): Promise<void> =>

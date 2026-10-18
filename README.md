@@ -49,7 +49,7 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   call is `readPhoto({ pixels, card, spots })`.
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
   `ReadingsPanel`), plus the step indicator, example picker, bottom bar and theme toggle.
-  `src/components/ui/` is shadcn/ui.
+  `src/components/ui/` is shadcn/ui and four components from 21st.dev (see below).
 - `src/components/method/`: the accuracy and method page (how a Reading is made, the warnings and
   their numbers, the correction, limits, what leaves the phone, credits and license texts). It
   reads its numbers from the engine's constants and its license texts from `LICENSE` and
@@ -136,22 +136,36 @@ pitch in radius, which the Page's tilt turns into an ellipse, so its narrowest h
 Photo is found from the local map of the grid and the Spot's circle is that, less a tap's error (a
 tenth of a pitch). Away from the Page the usual circle stands.
 
-The frame finder (`src/engine/frame.ts`, `findCard(pixels)`) finds a printed frame by its four
-ArUco markers, IDs 0 to 3 at the frame's top left, top right, bottom right and bottom left, and
-returns the Card's corner patches, or null when any marker is missing. It uses
-[js-aruco2](https://github.com/damianofalcioni/js-aruco2) and is built and tested on simulated
-Photos only. It is hidden: nothing in the app imports it, and `src/engine/frame.test.ts` checks
-that its code is not in the app bundle. No frame exists yet; switching it on later means wiring
-it in (a dynamic import, so js-aruco2 stays out of the main chunk).
+The frame (ADR 0003) is a Card of its own: a printed card with a soil window, 18 measured
+reference patches (six grays, twelve soil colors) and an ArUco marker in each corner. Choose
+"Frame" on the Card step and the app finds the frame itself, so no corners are tapped:
+`findCard(pixels)` in `src/engine/frame.ts` reads the four markers (IDs 0 to 3, top left to
+bottom left, with [js-aruco2](https://github.com/damianofalcioni/js-aruco2)) and returns the
+frame's outline, the markers' outer corners, or null when any marker is missing or one shows
+twice. The user confirms the outline, and can press-drag a corner onto its marker with the
+magnifier. The outline fixes a homography from the frame's layout in millimetres
+(`src/engine/frameLayout.json`, agent-fab's prototype 1) to the Photo, which places every patch,
+the window and the black base used for the evenness check. The grays are the tone ladder. The
+first Spot goes in the middle of the window when the frame is ready (outline confirmed, batch measured), since that is where the soil is; Undo takes it back, and more Spots are tapped as usual. A Spot outside the window is read, with a note.
+
+The patches' true colors come from the frame's batch: a CSV per print batch, found by the batch
+code printed on the frame ([docs/frame-batches.md](docs/frame-batches.md)). No batch has been
+measured yet, so a frame is refused as a Card, with a plain message, until one is. The practice
+Photos of the frame carry a made-up batch of their own. The finder and js-aruco2 are a chunk that
+loads only when the frame is chosen; `src/engine/frame.test.ts` checks the main bundle stays
+without it.
 
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
-patches (ColorChecker "after November 2014" reference values): each channel is linearized along
-the six gray patches, undoing the camera's tone curve, and a 3x3 matrix is fitted to all 24. Then
-a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
-then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 over the Card's
-patches, each corrected by a fit made without it (leave one out); below 2 is good. Why this
-correction and this threshold, and how it compares with a plain 3x3 and root-polynomial
-correction: [docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
+patches (ColorChecker "after November 2014" reference values): one tone curve, shared by the three
+channels, is drawn through the six gray patches and undone, which removes the camera's tone curve,
+and a 3x3 matrix is fitted to all 24. (A Page draws a curve for each channel, through its /1 column.) A gray that looks dirty is named and left out. Then a conversion to Munsell with
+[munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0), then the nearest Chip by
+CIEDE2000. The Card check is the mean CIEDE2000 over the Card's patches, each corrected by a fit made
+without it (leave one out): below 2 is good, up to 3.5 is caution (the corrected Reading is still the
+answer, with the raw one beside it) and above that it has failed. Both limits are provisional until
+a real Photo has been run. Why this correction and these limits, and how it compares with a plain
+3x3, root-polynomial correction and a curve per channel:
+[docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
 the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
 what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
 list is only as complete as the checking, which is against one copy (Soil-Color Charts, 2009
@@ -160,6 +174,36 @@ Gley 2 and WHITE. Chips checked, names pending: 2.5Y and 5Y. Not checked: 10R, w
 binder's tabs do not show (they start at 2.5YR). Not known: whether the book has 5R or 7.5R Pages.
 Each Chip's color is computed from its notation, matching happens in Lab, and only the
 on-screen swatch is clamped to sRGB.
+
+## Adding 21st.dev components
+
+The step indicator, the Card picker and the Readings sheet are built on components from the
+[21st.dev](https://21st.dev) registry, copied into `src/components/ui/` and restyled to the
+interface's neutral grays. The registry wants an API key. `components.json` names it as
+`${API_KEY_21ST}` and never holds its value, so building, testing and CI need no key: the
+components are in the source.
+
+To add another, put the key in your shell first. It is a Windows user environment variable, which
+a new shell does not inherit; in bash:
+
+```sh
+export API_KEY_21ST="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('API_KEY_21ST','User')" | tr -d '\r')"
+npx shadcn add @21st/<author>/<component> -p src/components/ui
+```
+
+Things to know:
+
+- The registry's answers repeat the key in the addresses of a component's own dependencies
+  (`?api_key=...`). Do not paste, save or commit raw output from the registry or the CLI, and do
+  not run `shadcn view`; filter any output you share.
+- A registry component can bring files you do not want (its own button, new color variables in
+  `src/index.css`). Keep only what the app uses, and check `git diff` for a stray value in
+  `package.json`, `components.json` or the stylesheet.
+- Check the license of the component and of its upstream repository before you use it (the
+  registry's "License" line is the author's word), keep the gray tokens, and give it a header
+  comment (its address, its license, what you changed), a credit in `src/lib/credits.ts` and its
+  license text in `THIRD_PARTY_NOTICES.md`. The generated package list does not see it: it is
+  source, not a package.
 
 ## Tests
 
@@ -221,7 +265,7 @@ shift (ADR 0001). The ColorChecker stays supported as the independent reference.
 hue, which is why the Reading suggests the Page the soil belongs on.
 
 The examples use a simulated camera, so real Photos will do worse: phones add tone curves, HDR
-and local processing that no per-channel curve and 3x3 correction can undo. A Card in the shot, in the same light as
+and local processing that no curve per channel and 3x3 correction can undo. A Card in the shot, in the same light as
 the soil, is needed for a corrected Reading.
 
 Offline on iPhone and iPad: an app added to the Home Screen has its own storage, separate from

@@ -4,10 +4,12 @@ import { readFileSync } from "node:fs"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { XY } from "../src/engine"
 import { JF1_ROWS } from "../src/delineation/fixtures/jf1"
+import { widthOf } from "../src/delineation/text"
 import { pdfText } from "../src/delineation/testing/pdfText"
 import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
 
-const JF1_VALUES = JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))
+// The Sampling Point box at the top of the page is drawn first, then the profile rows.
+const JF1_VALUES = ["JF-1", ...JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))]
 
 const projects = (page: Page) => page.getByRole("dialog", { name: "Projects", exact: true })
 
@@ -92,7 +94,7 @@ test("a layer with no matrix color is warned about, and the page still comes out
   const sheet = await createPoint(page, "Pond", "SP-1")
   await addLayer(sheet, { top: "0", bottom: "6" })
   await expect(sheet.getByTestId("form-warnings")).toContainText("Layer 1 (0-6 in) has no matrix color")
-  await expect(sheet.getByTestId("preview-text")).toHaveText(["0-6"])
+  await expect(sheet.getByTestId("preview-text")).toHaveText(["SP-1", "0-6"])
 })
 
 test("layer problems are said in plain words, and a typed color is read as the book prints it", async ({ page }) => {
@@ -190,13 +192,13 @@ test("a Reading is assigned to a layer as its matrix color from the readings pan
   await again.getByRole("button", { name: "Open project" }).click()
   await again.getByRole("button", { name: "Open point" }).click()
   await expect(again.getByTestId("layer")).toContainText("Matrix 10YR 4/3, 90%")
-  await expect(again.getByTestId("preview-text")).toHaveText(["0-6", "10YR 4/3", "90"])
+  await expect(again.getByTestId("preview-text")).toHaveText(["SP-1", "0-6", "10YR 4/3", "90"])
   await expect(again.getByTestId("form-warnings")).toHaveCount(0)
   void SIM_HEIGHT
 })
 
-test("a Log from before inches, with its depths in centimeters, opens with inches and is converted once", async ({ page }) => {
-  // The first version of the database, made by hand on the app's own origin before the app runs.
+/** The first version of the database, with one Sample in centimeters, made by hand on the app's own origin before the app runs. */
+async function seedCmLog(page: Page) {
   await page.goto("/icon-192.png")
   await page.evaluate(
     () =>
@@ -224,7 +226,26 @@ test("a Log from before inches, with its depths in centimeters, opens with inche
         request.onerror = () => reject(request.error)
       }),
   )
+}
 
+const databaseState = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<{ version: number; stores: string[]; depthBottom: number }>((resolve) => {
+        const request = indexedDB.open("munsell-soil-reader")
+        request.onsuccess = () => {
+          const { version, objectStoreNames } = request.result
+          const get = request.result.transaction("samples").objectStore("samples").get("cm-era")
+          get.onsuccess = () => {
+            request.result.close()
+            resolve({ version, stores: [...objectStoreNames].sort(), depthBottom: get.result.depthBottom })
+          }
+        }
+      }),
+  )
+
+test("a Log from before inches, with its depths in centimeters, opens with inches and is converted once", async ({ page }) => {
+  await seedCmLog(page)
   await page.goto("/")
   await page.getByRole("button", { name: "Open Log" }).click()
   const log = page.getByRole("dialog", { name: "Log", exact: true })
@@ -234,16 +255,61 @@ test("a Log from before inches, with its depths in centimeters, opens with inche
   await page.reload()
   await page.getByRole("button", { name: "Open Log" }).click()
   await expect(page.getByRole("dialog", { name: "Log", exact: true }).getByRole("region", { name: "Sample Old pit" })).toContainText("0-5.9 in")
-  const version = await page.evaluate(
-    () =>
-      new Promise<[number, string[]]>((resolve) => {
-        const request = indexedDB.open("munsell-soil-reader")
-        request.onsuccess = () => {
-          const { version, objectStoreNames } = request.result
-          request.result.close()
-          resolve([version, [...objectStoreNames].sort()])
-        }
-      }),
-  )
-  expect(version).toEqual([2, ["projects", "samples"]])
+  expect(await databaseState(page)).toEqual({ version: 2, stores: ["projects", "samples"], depthBottom: 5.9 })
+})
+
+test("when the update to inches cannot finish, the old Log is still shown and can be exported, but not changed", async ({ page }) => {
+  await seedCmLog(page)
+  // The disk is full: the upgrade's first write fails, which aborts it.
+  await page.addInitScript(() => {
+    IDBCursor.prototype.update = function () {
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError")
+    }
+  })
+  await page.goto("/")
+
+  // The Log opens as it was, with a note, and its depths are shown in inches (converted for reading).
+  await expect(page.getByTestId("log-read-only")).toContainText("The update of the Log could not finish")
+  await page.getByRole("button", { name: "Open Log" }).click()
+  const log = page.getByRole("dialog", { name: "Log", exact: true })
+  await expect(log.getByRole("region", { name: "Sample Old pit" })).toContainText("0-5.9 in")
+
+  // Nothing was written: the database is still version 1, with the centimeters in it.
+  expect(await databaseState(page)).toEqual({ version: 1, stores: ["samples"], depthBottom: 15 })
+
+  // It cannot be changed, and says so, without looping or breaking.
+  await log.getByRole("button", { name: "Delete Sample" }).click()
+  await log.getByRole("button", { name: "Yes, delete" }).click()
+  await expect(log.getByRole("alert")).toContainText("The Log could not be written")
+  await expect(log.getByRole("region", { name: "Sample Old pit" })).toBeVisible()
+  await log.getByRole("button", { name: "Close Log", exact: true }).click()
+  await expect(page.getByRole("button", { name: "Save to Log" })).toBeDisabled()
+  const projectsSheet = await openProjects(page)
+  await expect(projectsSheet.getByRole("alert")).toContainText("could not finish")
+  await projectsSheet.getByRole("button", { name: "Close Projects" }).click()
+
+  // The next start, with the disk free again, gets the upgrade through.
+  await page.reload()
+  expect(await databaseState(page)).toEqual({ version: 1, stores: ["samples"], depthBottom: 15 })
+})
+
+test("remarks too wide for their column wrap onto the rows below, and symbols the PDF's font lacks are spelled out", async ({ page }) => {
+  await page.goto("/")
+  const sheet = await createPoint(page, "Pond", "SP-1")
+  const remarks = "pH \u2264 5 \u2192 dark organic surface with many fine roots, small stones and some clay"
+  await addLayer(sheet, { top: "0", bottom: "6", matrix: "10YR 3/2", remarks })
+  await expect(sheet.getByTestId("form-warnings")).toContainText("Layer 1: the remarks have characters the form cannot print")
+
+  const spelled = "pH <= 5 -> dark organic surface with many fine roots, small stones and some clay"
+  const lines = await sheet.locator('[data-testid="preview-text"][data-field$=".remarks"]').allTextContents()
+  expect(lines.length).toBeGreaterThan(1)
+  expect(lines.join(" ")).toBe(spelled)
+
+  // The PDF is made (the font has no such symbols) and no line of it crosses the table's right rule.
+  const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download PDF" }).click()])
+  const drawn = await pdfText(new Uint8Array(readFileSync(await download.path())))
+  // The remarks are the last text drawn: the name and the row's depth, color and percent come before them.
+  const remarkLines = drawn.slice(-lines.length)
+  expect(remarkLines.map((d) => d.text)).toEqual(lines)
+  for (const d of remarkLines) expect(d.x + widthOf(d.text, 8)).toBeLessThanOrEqual(571.2)
 })

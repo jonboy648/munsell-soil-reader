@@ -3,11 +3,14 @@
 import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
+import { FormExport, slug } from "@/components/FormExport"
+import { HeaderForm } from "@/components/HeaderForm"
 import { PointView } from "@/components/PointView"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { PROJECT_FIELDS } from "@/delineation/headerFields"
 import { newPoint, newProject, withPoint, type Project, type SamplingPoint } from "@/delineation/model"
 import { REGIONS, regionOf, type RegionId } from "@/delineation/regions"
 import { useProjects } from "@/lib/useProjects"
@@ -108,6 +111,35 @@ function PointRow({ project, point, change, onOpen }: { project: Project; point:
   )
 }
 
+/** The header of page 1 for the whole Project: a count of the lines filled, and the form to change them. */
+function HeaderCard({ project, change }: { project: Project; change: Change }) {
+  const [editing, setEditing] = React.useState(false)
+  if (editing) {
+    return (
+      <HeaderForm
+        header={project.header}
+        onCancel={() => setEditing(false)}
+        onSave={async (header) => {
+          await change(project.id, (p) => ({ ...p, header }))
+          setEditing(false)
+        }}
+      />
+    )
+  }
+  const filled = PROJECT_FIELDS.filter(({ key }) => String(project.header[key]).trim() !== "").length
+  return (
+    <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
+      <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Form header, page 1</h4>
+      <p data-testid="header-summary" className="text-sm">
+        {filled} of {PROJECT_FIELDS.length} lines filled. They print on every sampling point's form.
+      </p>
+      <Button variant="outline" className="h-11 text-base" onClick={() => setEditing(true)}>
+        Edit header
+      </Button>
+    </div>
+  )
+}
+
 function ProjectView({ project, change, onOpen, onBack }: { project: Project; change: Change; onOpen: (pointId: string) => void; onBack: () => void }) {
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -116,6 +148,7 @@ function ProjectView({ project, change, onOpen, onBack }: { project: Project; ch
       </Button>
       <NameRow label="Project" name={project.name} onSave={(name) => change(project.id, (p) => ({ ...p, name }))} />
       <p className="text-sm text-muted-foreground">{regionOf(project.region).name}</p>
+      <HeaderCard project={project} change={change} />
       {project.points.length === 0 && <p className="text-base">No sampling points yet.</p>}
       <ul className="grid gap-3">
         {project.points.map((point) => (
@@ -126,6 +159,17 @@ function ProjectView({ project, change, onOpen, onBack }: { project: Project; ch
         label="Sampling point"
         button="Add sampling point"
         onAdd={(name) => change(project.id, (p) => ({ ...p, points: [...p.points, newPoint(name)] }))}
+      />
+      <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Project PDF</h4>
+      <p className="text-sm text-muted-foreground">
+        Every sampling point's form in one file, in the order above: page 1, the Soil page and the Privacy Act page of each.
+      </p>
+      <FormExport
+        project={project}
+        points={project.points}
+        label="Download project PDF"
+        filename={`wetland-forms-${slug(project.name)}`}
+        title={project.name}
       />
     </div>
   )

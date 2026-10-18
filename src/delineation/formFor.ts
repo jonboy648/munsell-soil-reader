@@ -1,18 +1,29 @@
 // The form engine: the values of every printed field of a form, for one sampling point. Pure: no
 // UI, no files. The on-screen preview and the PDF both draw from what this returns.
 //
-// Only the Soil page is filled so far: the Sampling Point box (`soil.samplingPoint`) and the profile
-// description table. The table's fields are named `soil.profile.<row>.<column>`, rows from 0, and
-// every one is in `fields`, blank when unknown. Every value is already text the PDF's font can print.
+// Filled so far: the header of page 1 (`page1.<line>`, and `page1.remarks` for the note of a pair), the
+// Soil page's Sampling Point box (`soil.samplingPoint`) and its profile description table. The table's
+// fields are named `soil.profile.<row>.<column>`, rows from 0, and every one is in `fields`, blank when
+// unknown. Every value is already text the PDF's font can print.
+import { PROJECT_FIELDS, POINT_FIELDS, writtenDate } from "./headerFields"
 import { regionOf } from "./regions"
-import { PROFILE_COLUMNS, type ProfileColumn, type SoilPage } from "./regions/types"
-import { printable, truncate, widthOf, wrap } from "./text"
-import { topToBottom, type LayerColor, type Project, type SamplingPoint } from "./model"
+import {
+  PAGE1_MARK_FIELDS,
+  PAGE1_TEXT_FIELDS,
+  PROFILE_COLUMNS,
+  type Page1,
+  type Page1Field,
+  type ProfileColumn,
+  type SoilPage,
+} from "./regions/types"
+import { fit, printable, truncate, widthOf, wrap } from "./text"
+import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
 
-export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint"
+type Page1Id = `page1.${Page1Field}` | "page1.remarks"
+export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint" | Page1Id
 
 export interface FormWarning {
-  kind: "no-matrix" | "bad-depth" | "overlap" | "gap" | "too-many-rows" | "remarks-cut" | "text-changed"
+  kind: "no-matrix" | "bad-depth" | "overlap" | "gap" | "too-many-rows" | "remarks-cut" | "text-changed" | "field-cut"
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
   text: string
@@ -34,6 +45,53 @@ export const fieldId = (row: number, column: ProfileColumn): FieldId => `soil.pr
 export const columnRoom = (soil: SoilPage, column: ProfileColumn): number => {
   const [left, right] = soil.columns[column]
   return right - left - 2 * soil.inset
+}
+
+/** How wide a line of page 1 takes text: the rule less a gap at each end. */
+export const ruleRoom = (page1: Page1, field: Page1Field): number => {
+  const { left, right } = page1.fields[field]
+  return right - left - 2 * page1.inset
+}
+
+const FLAG = { yes: "Y", no: "N", "": "" } as const satisfies Record<YesNo, string>
+
+/** Page 1's header as printed: the Project's lines, the Sampling point's, the Y, N and tick blanks. */
+function page1Fields(project: Project, point: SamplingPoint, warnings: FormWarning[]): Record<Page1Id, string> {
+  const { page1 } = regionOf(project.region)
+  const header: ProjectHeader = project.header
+  const out = {} as Record<Page1Id, string>
+  for (const field of [...PAGE1_TEXT_FIELDS, ...PAGE1_MARK_FIELDS]) out[`page1.${field}`] = ""
+
+  const put = (field: (typeof PAGE1_TEXT_FIELDS)[number], label: string, value: string) => {
+    const { text, replaced } = printable(value)
+    if (replaced) warnings.push({ kind: "text-changed", text: `${label}: the text has characters the form cannot print; they were replaced.` })
+    const shown = fit(text, ruleRoom(page1, field), page1.fontSize).text
+    if (shown !== text) warnings.push({ kind: "field-cut", text: `${label} is too long for its line on the form, so it is cut there.` })
+    out[`page1.${field}`] = shown
+  }
+  for (const { key, field, label } of PROJECT_FIELDS) {
+    put(field, label, key === "date" ? writtenDate(header.date) : String(header[key]))
+  }
+  for (const { key, field, label } of POINT_FIELDS) put(field, label, String(point[key]))
+
+  if (header.normalCircumstances === "yes") out["page1.normalYes"] = "X"
+  if (header.normalCircumstances === "no") out["page1.normalNo"] = "X"
+  out["page1.disturbedVegetation"] = FLAG[header.disturbed.vegetation]
+  out["page1.disturbedSoil"] = FLAG[header.disturbed.soil]
+  out["page1.disturbedHydrology"] = FLAG[header.disturbed.hydrology]
+  out["page1.problematicVegetation"] = FLAG[header.problematic.vegetation]
+  out["page1.problematicSoil"] = FLAG[header.problematic.soil]
+  out["page1.problematicHydrology"] = FLAG[header.problematic.hydrology]
+
+  // The Summary Remarks box starts with the pair, so both forms of a pair say so.
+  const pair = pairOf(project, point)
+  if (pair) {
+    const [mine, theirs] = pair.role === "wetland" ? ["Wetland", "upland"] : ["Upland", "wetland"]
+    out["page1.remarks"] = printable(`${mine} point, paired with the ${theirs} point ${pair.other.name}.`).text
+  } else {
+    out["page1.remarks"] = ""
+  }
+  return out
 }
 
 /** A number as it is written on a form: 20, 2.5, not 20.0. */
@@ -129,7 +187,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     warnings.push({ kind: "too-many-rows", text: "A layer has more redox colors than the form has rows. The rest are left off the page." })
   }
 
-  const fields = { "soil.samplingPoint": name.text } as Record<FieldId, string>
+  const fields = { ...page1Fields(project, point, warnings), "soil.samplingPoint": name.text } as Record<FieldId, string>
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }

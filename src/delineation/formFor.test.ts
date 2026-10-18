@@ -33,7 +33,7 @@ describe("JF-1 through the form engine", () => {
   test("every other field is blank, and there is nothing to suggest, conclude or warn about", () => {
     const rows = soil.rowRules.length
     expect(rows).toBe(11)
-    const filled = Object.entries(form.fields).filter(([, text]) => text !== "")
+    const filled = Object.entries(form.fields).filter(([id, text]) => id.startsWith("soil.") && text !== "")
     expect(filled).toHaveLength(17)
     for (let row = 0; row < rows; row++) {
       for (const column of PROFILE_COLUMNS) {
@@ -85,7 +85,7 @@ describe("layers in any order, with problems, still make a form", () => {
 
   test("a point with no layers is a blank table with its name on the page", () => {
     const form = formFor(project, newPoint("SP-1"))
-    const filled = Object.entries(form.fields).filter(([, text]) => text !== "")
+    const filled = Object.entries(form.fields).filter(([id, text]) => id.startsWith("soil.") && text !== "")
     expect(filled).toEqual([["soil.samplingPoint", "SP-1"]])
     expect(form.warnings).toEqual([])
   })

@@ -80,6 +80,20 @@ export const CREDITS: Credit[] = [
     notice: "Fonts (SIL Open Font License 1.1)",
   },
   {
+    name: "ReUI components, from 21st.dev",
+    license: "MIT",
+    by: "Keenthemes Inc (ReUI, by Sean Hello), through the 21st.dev registry",
+    used: "The step indicator, the Card picker and the Readings sheet are built from four ReUI components copied into the app's source and restyled in neutral grays.",
+    links: [
+      { label: "Stepper", href: "https://21st.dev/@sean0205/components/stepper" },
+      { label: "Toggle group", href: "https://21st.dev/@sean0205/components/toggle-group-1" },
+      { label: "Toggle", href: "https://21st.dev/@sean0205/components/toggle-1" },
+      { label: "Drawer", href: "https://21st.dev/@sean0205/components/drawer" },
+      { label: "ReUI", href: "https://github.com/keenthemes/reui" },
+    ],
+    notice: "21st.dev components (ReUI, MIT)",
+  },
+  {
     name: "js-aruco2",
     license: "MIT",
     by: "Damiano Falcioni, from js-aruco by Juan Mellado",

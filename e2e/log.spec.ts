@@ -347,7 +347,7 @@ test("a Reading made against a Page saves the Card kind and the Page hue", async
   await page.goto("/")
   await page.getByRole("button", { name: /Soil-book Page, worn/ }).click()
   await expect(page.getByTestId("photo")).toBeInViewport({ ratio: 1 })
-  await page.getByRole("group", { name: "Page hue" }).getByRole("button", { name: "10YR", exact: true }).click()
+  await page.getByRole("radiogroup", { name: "Page hue" }).getByRole("radio", { name: "10YR", exact: true }).click()
   for (const corner of example.corners) await tapPhoto(page, corner)
   await tapPhoto(page, example.holes[10])
   await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")

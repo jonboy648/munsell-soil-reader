@@ -24,19 +24,19 @@ async function pickPageExample(page: Page) {
 }
 
 const chooseHue = (page: Page, hue: string) =>
-  page.getByRole("group", { name: "Page hue" }).getByRole("button", { name: hue, exact: true }).click()
+  page.getByRole("radiogroup", { name: "Page hue" }).getByRole("radio", { name: hue, exact: true }).click()
 
 test("the Card picker offers ColorChecker or a Page, and a Page asks for one of six hues", async ({ page }) => {
   await page.goto("/")
   await page.getByRole("button", { name: /Warm shop light/ }).click()
-  const kinds = page.getByRole("group", { name: "Card" })
-  await expect(kinds.getByRole("button")).toHaveText(["ColorChecker", "Soil-book Page"])
-  await expect(kinds.getByRole("button", { name: "ColorChecker" })).toHaveAttribute("aria-pressed", "true")
+  const kinds = page.getByRole("radiogroup", { name: "Card" })
+  await expect(kinds.getByRole("radio")).toHaveText(["ColorChecker", "Soil-book Page"])
+  await expect(kinds.getByRole("radio", { name: "ColorChecker" })).toBeChecked()
   await expect(page.getByTestId("corner-prompt")).toContainText("brown patch (top left)")
 
-  await kinds.getByRole("button", { name: "Soil-book Page" }).click()
+  await kinds.getByRole("radio", { name: "Soil-book Page" }).click()
   await expect(page.getByTestId("hue-prompt")).toBeVisible()
-  await expect(page.getByRole("group", { name: "Page hue" }).getByRole("button")).toHaveText([
+  await expect(page.getByRole("radiogroup", { name: "Page hue" }).getByRole("radio")).toHaveText([
     "2.5YR", "5YR", "7.5YR", "10YR", "2.5Y", "5Y",
   ])
   // Nothing can be tapped until the Chips are known: the Photo ignores the tap.
@@ -47,10 +47,7 @@ test("the Card picker offers ColorChecker or a Page, and a Page asks for one of 
 
 test("a worn Page reads a Spot in a hole to a corrected Reading, and names the Chips left out", async ({ page }) => {
   await pickPageExample(page)
-  await expect(page.getByRole("group", { name: "Card" }).getByRole("button", { name: "Soil-book Page" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  )
+  await expect(page.getByRole("radiogroup", { name: "Card" }).getByRole("radio", { name: "Soil-book Page" })).toBeChecked()
   await expect(page.getByTestId("hue-prompt")).toContainText("Choose the hue")
   await chooseHue(page, "10YR")
 

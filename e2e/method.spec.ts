@@ -103,7 +103,7 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
 test("lists every credit with its license", async ({ page }) => {
   await openMethodPage(page)
   const credits = page.getByTestId("credit")
-  await expect(credits).toHaveCount(7)
+  await expect(credits).toHaveCount(8)
   const expected: [string, string][] = [
     ["Munsell Soil Reader", "MIT"],
     ["munsell.js", "MPL-2.0"],
@@ -111,6 +111,7 @@ test("lists every credit with its license", async ({ page }) => {
     ["X-Rite ColorChecker Classic reference values", "BSD-3-Clause"],
     ["colour-science root-polynomial correction", "BSD-3-Clause"],
     ["Archivo, Public Sans and IBM Plex Mono", "SIL OFL 1.1"],
+    ["ReUI components, from 21st.dev", "MIT"],
     ["js-aruco2", "MIT"],
   ]
   for (const [name, license] of expected) {
@@ -163,6 +164,7 @@ test("opens the full license text of each credit that has one", async ({ page })
     ["X-Rite ColorChecker Classic reference values", "Redistribution and use in source and binary forms"],
     ["colour-science root-polynomial correction", "Copyright 2013 Colour Developers"],
     ["js-aruco2", "Copyright (c) 2020 Damiano Falcioni"],
+    ["ReUI components, from 21st.dev", "Copyright (c) 2025 Keenthemes Inc"],
   ]
   for (const [name, snippet] of texts) {
     const credit = page.getByTestId("credit").filter({ hasText: name })

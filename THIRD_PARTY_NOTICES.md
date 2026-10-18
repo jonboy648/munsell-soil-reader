@@ -601,6 +601,31 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
+## 21st.dev components (ReUI, MIT)
+
+Four components are copied into the source, in `src/components/ui/`, from the
+[21st.dev](https://21st.dev) registry, where [ReUI](https://github.com/keenthemes/reui) by
+Keenthemes Inc (author Sean Hello) publishes them under the MIT license: the
+[stepper](https://21st.dev/@sean0205/components/stepper) of the step indicator, the
+[toggle group](https://21st.dev/@sean0205/components/toggle-group-1) and its
+[toggle](https://21st.dev/@sean0205/components/toggle-1) of the Card picker, and the
+[drawer](https://21st.dev/@sean0205/components/drawer) of the Readings sheet. Each file begins
+with its source address and what was changed in it (colors and sizes only, to the neutral grays
+of the interface). They are source, not packages, so they are not in the generated list of
+packages; their license, as ReUI keeps it:
+
+```text
+MIT License
+
+Copyright (c) 2025 Keenthemes Inc
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
 ## Everything else the app ships
 
 The other packages whose code or files are in the built app (React, the Radix UI and vaul

@@ -49,7 +49,7 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   call is `readPhoto({ pixels, card, spots })`.
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
   `ReadingsPanel`), plus the step indicator, example picker, bottom bar and theme toggle.
-  `src/components/ui/` is shadcn/ui.
+  `src/components/ui/` is shadcn/ui and four components from 21st.dev (see below).
 - `src/components/method/`: the accuracy and method page (how a Reading is made, the warnings and
   their numbers, the correction, limits, what leaves the phone, credits and license texts). It
   reads its numbers from the engine's constants and its license texts from `LICENSE` and
@@ -150,6 +150,36 @@ Gley 2 and WHITE. Chips checked, names pending: 2.5Y and 5Y. Not checked: 10R, w
 binder's tabs do not show (they start at 2.5YR). Not known: whether the book has 5R or 7.5R Pages.
 Each Chip's color is computed from its notation, matching happens in Lab, and only the
 on-screen swatch is clamped to sRGB.
+
+## Adding 21st.dev components
+
+The step indicator, the Card picker and the Readings sheet are built on components from the
+[21st.dev](https://21st.dev) registry, copied into `src/components/ui/` and restyled to the
+interface's neutral grays. The registry wants an API key. `components.json` names it as
+`${API_KEY_21ST}` and never holds its value, so building, testing and CI need no key: the
+components are in the source.
+
+To add another, put the key in your shell first. It is a Windows user environment variable, which
+a new shell does not inherit; in bash:
+
+```sh
+export API_KEY_21ST="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('API_KEY_21ST','User')" | tr -d '\r')"
+npx shadcn add @21st/<author>/<component> -p src/components/ui
+```
+
+Things to know:
+
+- The registry's answers repeat the key in the addresses of a component's own dependencies
+  (`?api_key=...`). Do not paste, save or commit raw output from the registry or the CLI, and do
+  not run `shadcn view`; filter any output you share.
+- A registry component can bring files you do not want (its own button, new color variables in
+  `src/index.css`). Keep only what the app uses, and check `git diff` for a stray value in
+  `package.json`, `components.json` or the stylesheet.
+- Check the license of the component and of its upstream repository before you use it (the
+  registry's "License" line is the author's word), keep the gray tokens, and give it a header
+  comment (its address, its license, what you changed), a credit in `src/lib/credits.ts` and its
+  license text in `THIRD_PARTY_NOTICES.md`. The generated package list does not see it: it is
+  source, not a package.
 
 ## Tests
 

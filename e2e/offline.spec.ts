@@ -6,7 +6,7 @@ import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { chromium, devices, expect, test as base, type BrowserContext, type Page } from "@playwright/test"
+import { chromium, devices, expect, test as base, type BrowserContext, type Locator, type Page } from "@playwright/test"
 import type { XY } from "../src/engine"
 import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
 
@@ -23,6 +23,8 @@ type Site = {
   failPrecache: (on: boolean) => void
   /** How many times a precached file has answered 503. */
   precacheFailures: () => number
+  /** Make a precached file slow, so the first install finishes this many ms late. */
+  delayPrecache: (ms: number) => void
 }
 
 // Playwright cannot swap files mid-test, so the app is served through a small proxy to the
@@ -51,8 +53,10 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
     let failInstall = false
     let failPrecache = false
     let failures = 0
+    let delay = 0
     const proxy = createServer(async (req, res) => {
       const target = new URL(req.url ?? "/", baseURL)
+      if (delay && target.pathname === "/icon-512.png") await new Promise((r) => setTimeout(r, delay))
       if (failPrecache && target.pathname === "/icon-512.png") {
         failures++
         res.writeHead(503).end()
@@ -88,10 +92,17 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
         failPrecache = on
       },
       precacheFailures: () => failures,
+      delayPrecache: (ms) => {
+        delay = ms
+      },
     })
     proxy.close()
   },
 })
+
+// playwright.config.ts blocks service workers, so the other specs never see their notices; this
+// spec is the one about them.
+test.use({ serviceWorkers: "allow" })
 
 /** Open the app and wait for the first install to finish; the page is not controlled yet. */
 async function openFirstVisit(page: Page, url = "/") {
@@ -287,7 +298,7 @@ test.describe("iPhone and iPad", () => {
 
   test("the ready-offline notice carries the Home Screen caveat", async ({ page, site }) => {
     await openFirstVisit(page, site.url)
-    await expect(page.getByTestId("offline-notice")).toContainText("open the icon once with signal")
+    await expect(page.getByTestId("offline-notice")).toContainText("open it once online")
   })
 
   test("the installed app does not show the hint", async ({ page }) => {
@@ -311,7 +322,7 @@ test("a new deploy shows a Reload notice, and Reload switches to the new version
 
   site.deploy(2)
   await lookForUpdate(page)
-  await expect(page.getByTestId("update-notice")).toContainText("A new version is ready")
+  await expect(page.getByTestId("update-notice")).toContainText("Update ready")
   // Until the user taps Reload the page stays as it was.
   expect(await hasWaitingWorker(page)).toBe(true)
   await expect(page.locator("html")).not.toHaveAttribute("data-deploy", /.*/)
@@ -374,7 +385,7 @@ test.describe("a page that has been open for more than a minute", () => {
   })
 })
 
-test("with a Photo open, resuming the app offers Reload (clears this Photo), and Later hides it until the next resume", async ({
+test("with a Photo open, resuming the app offers Reload and says it clears the Photo, and Later hides it until the next resume", async ({
   page,
   site,
 }) => {
@@ -387,7 +398,8 @@ test("with a Photo open, resuming the app offers Reload (clears this Photo), and
   site.deploy(2)
   await lookForUpdate(page)
   const notice = page.getByTestId("update-notice")
-  await expect(notice.getByRole("button", { name: "Reload (clears this Photo)" })).toBeVisible()
+  await expect(notice).toContainText("Reload clears this Photo")
+  await expect(notice.getByRole("button", { name: "Reload" })).toBeVisible()
   await expect(page.getByTestId("photo-name")).toBeVisible()
 
   await notice.getByRole("button", { name: "Later" }).click()
@@ -421,22 +433,68 @@ test("with a Photo open, closing the app and opening it again has the new versio
   await expect(reopened.getByTestId("update-notice")).toHaveCount(0)
 })
 
+/** Where the header, the step indicator and the Photo are: none of them may move or be covered. */
+async function layout(page: Page) {
+  const boxes = await Promise.all(
+    [page.getByRole("banner"), page.getByRole("list", { name: "Steps" }), page.getByTestId("photo")].map((l) =>
+      l.boundingBox(),
+    ),
+  )
+  return boxes
+}
+
+/** The notice replaces the title, so it must be no bigger than the header and hold its content. */
+async function expectNoticeFits(notice: Locator, page: Page) {
+  const [noticeBox, headerBox] = await Promise.all([notice.boundingBox(), page.getByRole("banner").boundingBox()])
+  expect(noticeBox).toEqual(headerBox)
+  const size = await notice.evaluate((el) => ({
+    over: el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth,
+  }))
+  expect(size.over).toBe(false)
+}
+
 test.describe("on a 320 x 568 phone", () => {
   test.use({ viewport: { width: 320, height: 568 } })
 
-  test("the update notice does not cover the Photo or block a tap on it", async ({ page, site }) => {
+  test("an update notice with a Photo open moves and covers nothing, and the Photo stays tappable", async ({
+    page,
+    site,
+  }) => {
     await openControlled(page, site.url)
     await pickExample(page)
+    await expect(page.getByTestId("corner-prompt")).toContainText("brown patch (top left)")
+    const before = await layout(page)
+
     site.deploy(2)
     await lookForUpdate(page)
     const notice = page.getByTestId("update-notice")
-    await expect(notice).toBeVisible()
-    await expect(page.getByTestId("corner-prompt")).toContainText("brown patch (top left)")
+    await expect(notice).toContainText("Reload clears this Photo")
+    expect(await layout(page)).toEqual(before)
+    await expectNoticeFits(notice, page)
 
-    const [noticeBox, photoBox] = await Promise.all([notice.boundingBox(), page.getByTestId("photo").boundingBox()])
-    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(photoBox!.y)
     await tapPhoto(page, SIM_CORNERS[0])
     await expect(page.getByTestId("corner-prompt")).toContainText("bluish-green patch (top right)")
+  })
+
+  test("the ready-offline notice arriving with a Photo open moves and covers nothing", async ({ page, site }) => {
+    site.delayPrecache(2000) // the install finishes after the Photo is up
+    await page.goto(site.url)
+    await pickExample(page)
+    await expect(page.getByTestId("corner-prompt")).toContainText("brown patch (top left)")
+    const before = await layout(page)
+    await expect(page.getByTestId("offline-notice")).toBeVisible()
+    expect(await layout(page)).toEqual(before)
+    await expectNoticeFits(page.getByTestId("offline-notice"), page)
+  })
+
+  test.describe("on an iPhone", () => {
+    test.use({ userAgent: devices["iPhone 14"].userAgent })
+
+    test("the ready-offline notice with the Home Screen caveat still fits the header", async ({ page, site }) => {
+      await openFirstVisit(page, site.url)
+      await expect(page.getByTestId("offline-notice")).toContainText("open it once online")
+      await expectNoticeFits(page.getByTestId("offline-notice"), page)
+    })
   })
 })
 

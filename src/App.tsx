@@ -56,12 +56,12 @@ export function App() {
 
   return (
     <div className="mx-auto flex min-h-svh max-w-xl flex-col">
-      <header className="px-4 pt-[env(safe-area-inset-top)]">
+      <header className="relative px-4 pt-[env(safe-area-inset-top)]">
         <h1 className="py-3 font-heading text-xl font-extrabold tracking-tight [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
+        <UpdateNotice hasPhoto={session.photo !== null} />
       </header>
-      <UpdateNotice hasPhoto={session.photo !== null} />
 
       <main className="flex flex-1 flex-col gap-4 pb-44">
         <div className="px-4">

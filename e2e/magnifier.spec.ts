@@ -399,21 +399,46 @@ const tap = async (touch: Fingers, at: XY) => {
   await touch.send("touchEnd")
 }
 
+type Moved = { lastMoved: number }
+
+/** Starts noting when the page last scrolled, panned or zoomed. */
+const watchMoves = (page: Page) =>
+  page.evaluate(() => {
+    const note = () => ((window as unknown as Moved).lastMoved = performance.now())
+    note()
+    addEventListener("scroll", note)
+    visualViewport!.addEventListener("scroll", note)
+    visualViewport!.addEventListener("resize", note)
+  })
+
+/** Waits for the page to have been still for half a second, long after a tap would count. */
+const untilStill = (page: Page) =>
+  expect
+    .poll(() => page.evaluate(() => performance.now() - (window as unknown as Moved).lastMoved), { timeout: 15_000 })
+    .toBeGreaterThan(500)
+
+/**
+ * Lifts the finger and taps at once. The lift and the tap are sent together, so how long the test
+ * takes to send them (a lot, when the machine is busy) is not part of what the page measures.
+ */
+const liftAndTap = (touch: Fingers, at: XY) =>
+  Promise.all([touch.send("touchEnd"), touch.send("touchStart", at), touch.send("touchEnd")])
+
 test("a tap that stops a coasting page places nothing, and a tap a moment later places", async ({ page }) => {
   await pickExample(page, "Warm shop light")
   const touch = await fingers(page)
   // Part way down the page, so a swipe down has page to scroll back over; y = 150 is on the Photo
   // all the way from here to the top.
   await page.evaluate(() => scrollTo(0, 150))
+  await watchMoves(page)
   const on = { x: 206, y: 150 }
 
   await touch.send("touchStart", on)
-  for (const dy of [30, 60, 90, 120]) await touch.send("touchMove", { x: on.x, y: on.y + dy })
-  await touch.send("touchEnd")
-  await tap(touch, on) // the page is still moving, or has only just stopped
+  for (const dy of [30, 60, 90]) await touch.send("touchMove", { x: on.x, y: on.y + dy })
+  await liftAndTap(touch, on) // the page is still moving, or has only just stopped
   await expectNothingPlaced(page, touch.lens)
 
-  await page.waitForTimeout(1000)
+  await untilStill(page)
   await tap(touch, on)
   await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
 })
@@ -435,15 +460,15 @@ test("a tap that stops a pinch-zoomed page from panning places nothing, and a ta
   await pickExample(page, "Warm shop light")
   const touch = await fingers(page)
   await zoomedTwice(page, touch)
+  await watchMoves(page)
   const middle = await onScreen(page, { x: SIM_WIDTH / 2, y: SIM_HEIGHT / 2 })
 
   await touch.send("touchStart", middle)
-  for (const f of [0.25, 0.5, 0.75, 1]) await touch.send("touchMove", { x: middle.x - 80 * f, y: middle.y })
-  await touch.send("touchEnd")
-  await tap(touch, middle)
+  for (const f of [0.25, 0.5, 0.75]) await touch.send("touchMove", { x: middle.x - 80 * f, y: middle.y })
+  await liftAndTap(touch, middle)
   await expectNothingPlaced(page, touch.lens)
 
-  await page.waitForTimeout(1000)
+  await untilStill(page)
   await tap(touch, middle)
   await expect(page.getByTestId("corner-prompt")).toContainText(SECOND_CORNER)
 })

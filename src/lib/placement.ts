@@ -70,9 +70,13 @@ export function usePlacement(canvas: HTMLCanvasElement | null, onPlace: (point: 
     const pageMoved = () => {
       pageMovedAt.current = performance.now()
     }
-    // The browser takes a finger over (a pointercancel) to scroll, pan or zoom the page.
+    // The browser takes a finger over (a pointercancel) to scroll, pan or zoom the page. The
+    // scroll events follow on the next frame, which a quick tap can beat, so the page counts as
+    // moving from here.
     const onAnyCancel = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") fingerMovedPage.current = true
+      if (e.pointerType === "mouse") return
+      fingerMovedPage.current = true
+      pageMoved()
     }
     const onAnyDown = (e: PointerEvent) => {
       // A second finger is a pinch, wherever it lands.

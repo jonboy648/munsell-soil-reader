@@ -84,10 +84,9 @@ const PIVOT: XY = { x: (FIRST.x + LAST.x) / 2, y: (FIRST.y + LAST.y) / 2 }
 /** The scene is a flat plane. A view maps its points to the Photo and the Photo's pixels back. */
 interface View {
   toPhoto: (u: number, v: number) => XY
-  toScene: (x: number, y: number) => XY
+  /** Writes the scene point that Photo pixel (x, y) looks at into `out`; -Infinity above the horizon. */
+  toScene: (x: number, y: number, out: XY) => void
 }
-
-const STRAIGHT_ON: View = { toPhoto: (u, v) => ({ x: u, y: v }), toScene: (x, y) => ({ x, y }) }
 
 function tiltedView({ yaw, pitch }: SimTilt): View {
   const rad = Math.PI / 180
@@ -97,7 +96,10 @@ function tiltedView({ yaw, pitch }: SimTilt): View {
   const right = [cy, -sp * sy, cp * sy]
   const down = [0, cp, sp]
   const normal = [-sy, -sp * cy, cp * cy]
-  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  // A pixel's ray hits the plane at t = DISTANCE * normal.z / (ray . normal), which makes the
+  // scene point a ratio of two linear functions of the ray: the same for u (right) and v (down).
+  const across = (axis: number[], k: number) => normal[2] * axis[k] - axis[2] * normal[k]
+  const [ux, uy, vx, vy] = [across(right, 0), across(right, 1), across(down, 0), across(down, 1)]
   return {
     toPhoto: (u, v) => {
       const a = u - PIVOT.x
@@ -108,14 +110,16 @@ function tiltedView({ yaw, pitch }: SimTilt): View {
         y: SIM_HEIGHT / 2 + (FOCAL * (a * right[1] + b * down[1])) / z,
       }
     },
-    toScene: (x, y) => {
-      // Cast the pixel's ray onto the plane through the pivot. Above the horizon: nowhere.
-      const ray = [(x - SIM_WIDTH / 2) / FOCAL, (y - SIM_HEIGHT / 2) / FOCAL, 1]
-      const facing = dot(ray, normal)
-      if (facing <= 0) return { x: -Infinity, y: -Infinity }
-      const t = (DISTANCE * normal[2]) / facing
-      const hit = [t * ray[0], t * ray[1], t * ray[2] - DISTANCE]
-      return { x: PIVOT.x + dot(hit, right), y: PIVOT.y + dot(hit, down) }
+    toScene: (x, y, out) => {
+      const rx = (x - SIM_WIDTH / 2) / FOCAL
+      const ry = (y - SIM_HEIGHT / 2) / FOCAL
+      const facing = normal[0] * rx + normal[1] * ry + normal[2]
+      if (facing <= 0) {
+        out.x = out.y = -Infinity
+        return
+      }
+      out.x = PIVOT.x + (DISTANCE * (ux * rx + uy * ry)) / facing
+      out.y = PIVOT.y + (DISTANCE * (vx * rx + vy * ry)) / facing
     },
   }
 }
@@ -164,7 +168,8 @@ export interface SimScene {
 
 export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7, tilt }: SimScene): SimPhoto {
   const rand = mulberry32(seed)
-  const view = tilt ? tiltedView(tilt) : STRAIGHT_ON
+  const view = tilt ? tiltedView(tilt) : null // null: straight on, scene point = Photo pixel
+  const looksAt: XY = { x: 0, y: 0 }
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
   const frame = shoot(camera, [0.012, 0.012, 0.012])
@@ -177,7 +182,13 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7, 
   for (let y = 0; y < SIM_HEIGHT; y++) {
     for (let x = 0; x < SIM_WIDTH; x++) {
       // Where in the flat scene this pixel looks.
-      const { x: u, y: v } = view.toScene(x, y)
+      let u = x
+      let v = y
+      if (view) {
+        view.toScene(x, y, looksAt)
+        u = looksAt.x
+        v = looksAt.y
+      }
       let rgb = ground
       let noise = 12
       if (card && u >= fx0 && u < fx1 && v >= fy0 && v < fy1) {
@@ -200,7 +211,7 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7, 
       data[i + 3] = 255
     }
   }
-  const at = ({ x, y }: XY) => view.toPhoto(x, y)
+  const at = ({ x, y }: XY) => (view ? view.toPhoto(x, y) : { x, y })
   return {
     pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data },
     corners: SIM_CORNERS.map(at) as Corners,

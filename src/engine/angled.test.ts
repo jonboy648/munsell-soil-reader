@@ -1,8 +1,8 @@
 // Seam 1: a Card photographed at an angle. Every test builds a simulated Photo with the Card
 // in perspective, calls readPhoto, and checks what a caller would see.
 import { describe, expect, it } from "vitest"
-import { CARD_CHECK_GOOD, readPhoto } from "./index"
-import type { Corners, XY } from "./index"
+import { CARD_CHECK_GOOD, gridSites, patchSites, readPhoto } from "./index"
+import type { Corners, Four, GridPoint, XY } from "./index"
 import {
   LIGHTS,
   PHONE_TONE_CURVE,
@@ -140,3 +140,52 @@ describe("an angled ColorChecker", () => {
     expect(stuck.result.cardCheck?.ok).toBe(false)
   })
 })
+
+describe("corners tapped in any order on an angled Card", () => {
+  const sim = simulatePhoto({ camera, tilt: TILTS[0][1] })
+  const orders = permutations([0, 1, 2, 3]).filter((order) => order.join() !== "0,1,2,3")
+  const span = (taps: Corners) => Math.max(...taps.flatMap((a) => taps.map((b) => dist(a, b))))
+
+  it.each(orders)("order %i %i %i %i fails the Card check at once, with every read circle inside the tap span", (...order) => {
+    const taps = order.map((i) => sim.corners[i]) as Corners
+    const started = performance.now()
+    const result = readPhoto({ pixels: sim.pixels, card: { kind: "colorchecker", corners: taps }, spots: [sim.spot] })
+    // A read circle thousands of pixels wide used to freeze the page on every tap.
+    expect(performance.now() - started).toBeLessThan(200)
+    expect(result.cardCheck?.ok).toBe(false)
+    for (const { radius } of patchSites(taps)) expect(radius).toBeLessThanOrEqual(0.1 * span(taps))
+  })
+})
+
+describe("corners tapped anywhere", () => {
+  it("never read a circle wider than a tenth of the tap span", () => {
+    let seed = 12345
+    const rand = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296
+    for (let n = 0; n < 500; n++) {
+      const taps = Array.from({ length: 4 }, () => ({ x: rand() * SIM_WIDTH, y: rand() * SIM_HEIGHT })) as Corners
+      const longest = Math.max(...taps.flatMap((a) => taps.map((b) => dist(a, b))))
+      for (const { radius } of patchSites(taps)) expect(radius).toBeLessThanOrEqual(Math.max(2, 0.1 * longest))
+    }
+  })
+})
+
+describe("the grid mapping, for Cards other than the ColorChecker", () => {
+  // A perspective view of a small block of the grid, then asked about positions far outside it.
+  const known: Four<GridPoint> = [{ col: 0, row: 0 }, { col: 1, row: 0 }, { col: 1, row: 1 }, { col: 0, row: 1 }]
+  const taps: Four<XY> = [{ x: 100, y: 100 }, { x: 220, y: 130 }, { x: 205, y: 215 }, { x: 105, y: 240 }]
+  const far = Array.from({ length: 121 * 121 }, (_, i) => ({ col: (i % 121) / 2 - 30, row: Math.floor(i / 121) / 2 - 30 }))
+
+  it("reads the taps back, and never a circle wider than a fifth of the tap span", () => {
+    const sites = gridSites(known, taps, [...known, ...far])
+    sites.slice(0, 4).forEach((site, i) => expect(dist(site.center, taps[i])).toBeLessThan(1e-6))
+    const longest = Math.max(...taps.flatMap((a) => taps.map((b) => dist(a, b))))
+    for (const { radius } of sites) expect(radius).toBeLessThanOrEqual(0.2 * longest)
+  })
+})
+
+function permutations<T>(items: T[]): T[][] {
+  if (items.length <= 1) return [items]
+  return items.flatMap((item, i) =>
+    permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [item, ...rest]),
+  )
+}

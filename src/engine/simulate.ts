@@ -611,7 +611,7 @@ function simulatePagePhoto({
 
 // ---- the example Photos ----
 export type ExampleId =
-  | "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "page"
+  | "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "page" | "smudge"
   | "swatches-warm" | "swatches-angled"
   | "frame" | "frame-angled" | "frame-hidden"
 
@@ -626,6 +626,12 @@ const phone = (light: SimCamera["light"]): SimCamera => ({ light, toneCurve: PHO
 
 /** A strong tilt: the right side of the scene turned 40 degrees away. */
 export const ANGLED_TILT: SimTilt = { yaw: 40, pitch: 0 }
+
+/** A black patch gone gray with handling: the scene color lifted toward a dull gray before the camera sees it. */
+const hazyBlack =
+  (light: SimCamera["light"]): SimCamera["light"] =>
+  (lin) =>
+    light(lin === PATCH_LINEAR[23] ? [lin[0] * 0.8 + 0.04, lin[1] * 0.8 + 0.04, lin[2] * 0.8 + 0.04] : lin)
 
 /**
  * Two smudged steps of the ladder, as on Jon's 10YR Page (8/1 and 7/1 there). The lightest step is left
@@ -688,6 +694,12 @@ export const EXAMPLES: ExamplePhoto[] = [
     name: "Soil-book Page, worn",
     note: "A 10YR Page lies on the soil, and the soil shows through its holes. Pick Soil-book Page and 10YR, tap the four Chips shown, then tap inside a hole. Two Chips are smudged, as on a well-used book; the Card check leaves them out.",
     scene: { camera: phone(LIGHTS.warm), page: "10YR", smudged: WORN_CHIPS },
+  },
+  {
+    id: "smudge",
+    name: "Smudged black patch",
+    note: "The Card's black patch has gone gray with handling, and the soil is dark. The Card check names the patch, leaves it out and still reads the soil.",
+    scene: { camera: phone(hazyBlack(LIGHTS.warm)), soil: "10YR 3/2" },
   },
   {
     id: "frame",

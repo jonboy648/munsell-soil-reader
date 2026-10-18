@@ -29,7 +29,7 @@ export const CSV_HEADER = [
   "Warnings",
 ]
 
-const CARD_CHECK_TEXT = { good: "good", failed: "failed", uncorrected: "not corrected" }
+const CARD_CHECK_TEXT = { good: "good", caution: "caution", failed: "failed", uncorrected: "not corrected" }
 
 // Excel and similar tools run a cell that starts with = + - @ (or a tab or a carriage return) as
 // a formula, and turn other text into a number, a time, a date or TRUE/FALSE: 001, 1-2, 3/4,

@@ -80,15 +80,22 @@ export type QualityWarning = {
   advice: string
 }
 
+export type CardVerdict = "good" | "caution" | "failed"
+
 export interface CardCheck {
   meanDE: number // mean CIEDE2000 between each Card reference and its true color, corrected by a fit made without it
-  ok: boolean // good when meanDE is below CARD_CHECK_GOOD
-  /** Page only: the Chips the fit left out because they disagreed with the rest (smudged or worn). */
-  leftOut?: string[]
+  /**
+   * Good: below CARD_CHECK_GOOD, nothing left out. Caution: below CARD_CHECK_CAUTION, or a gray
+   * step or a Chip was left out. Failed: above that, or a row of the Page had to lose two Chips.
+   */
+  verdict: CardVerdict
+  ok: boolean // verdict is good
+  /** The references that looked dirty and were left out of the correction, by name (none for a clean Card). */
+  leftOut: string[]
   /**
    * Page only: the value (8, 3, 2.5) of a row where two or more Chips off the /1 column had to be
-   * left out. Then `ok` is false whatever the mean says: the row's /1 Chip is probably dirty, or the
-   * row's Chips are darker or stronger than the /1 column can describe.
+   * left out. Then the check has failed whatever the mean says: the row's /1 Chip is probably
+   * dirty, or the row's Chips are darker or stronger than the /1 column can describe.
    */
   suspectRow?: number
 }

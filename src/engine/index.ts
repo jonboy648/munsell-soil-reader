@@ -1,12 +1,12 @@
 // The reading engine's public surface. Pure TypeScript: no DOM, no React.
 export {
   readPhoto,
-  CARD_CHECK_GOOD,
   FRAME_OFF_CARD_STOPS,
   FRAME_UNEVEN_STOPS,
   PAGE_UNEVEN_STOPS,
   UnsupportedCardError,
 } from "./readPhoto"
+export { CARD_CHECK_GOOD, CARD_CHECK_CAUTION } from "./cardCheck"
 export {
   BLOWN_CHANNELS,
   BLOWN_LEVEL,

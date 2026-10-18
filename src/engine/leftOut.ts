@@ -21,7 +21,7 @@
 // All the limits are provisional, derived from a simulated camera and four of Jon's real Pages,
 // until real Photos are run (#15).
 import { deltaE2000, linearToLab, type Vec3 } from "./color"
-import type { Fit, Reference } from "./correction"
+import { heldOutErrors, type Fit, type Reference } from "./correction"
 
 /** Most references left out: a few dirty Chips, not a Page that is dirty all over. */
 export const MAX_LEFT_OUT = 4
@@ -48,16 +48,6 @@ const LADDER_STEP_COST = 0.1
 const colorDifference = (a: Vec3, b: Vec3): number => deltaE2000(linearToLab(a), linearToLab(b))
 
 const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]
-
-/**
- * The held-out error of each reference: the fit made without it, applied to it, against its true
- * color (CIEDE2000). The one place the Card's per-reference held-out errors are made.
- */
-export function heldOutErrors(references: Reference[], fit: Fit): number[] {
-  return references.map((held, i) =>
-    colorDifference(fit(references.filter((_, j) => j !== i))(held.measured), held.truth),
-  )
-}
 
 /** What the fit does to the references at `which`: its mean error on them, the worst one counting for little. */
 function typicalError(references: Reference[], which: number[], fit: Fit): number {
@@ -106,8 +96,11 @@ function nextDirtyLadderSteps(references: Reference[], rows: number[], fit: Fit,
   return best ? best.out.map((k) => kept[k]) : []
 }
 
-/** The ladder steps to leave out, as indices into `references`. */
-function dirtyLadderSteps(references: Reference[], rows: number[], fit: Fit): number[] {
+/**
+ * The ladder steps to leave out, as indices into `references`. The one ladder rule, for the
+ * ColorChecker's grays and a Page's /1 column alike.
+ */
+export function dirtyLadderSteps(references: Reference[], rows: number[], fit: Fit): number[] {
   const out: number[] = []
   for (;;) {
     const kept = references.map((_, i) => i).filter((i) => !out.includes(i))

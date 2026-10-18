@@ -347,7 +347,7 @@ test("a Reading made against a Page saves the Card kind and the Page hue", async
   await page.goto("/")
   await page.getByRole("button", { name: /Soil-book Page, worn/ }).click()
   await expect(page.getByTestId("photo")).toBeInViewport({ ratio: 1 })
-  await page.getByRole("group", { name: "Page hue" }).getByRole("button", { name: "10YR", exact: true }).click()
+  await page.getByRole("radiogroup", { name: "Page hue" }).getByRole("radio", { name: "10YR", exact: true }).click()
   for (const corner of example.corners) await tapPhoto(page, corner)
   await tapPhoto(page, example.holes[10])
   await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
@@ -356,7 +356,8 @@ test("a Reading made against a Page saves the Card kind and the Page hue", async
   const log = await openLog(page)
   await expect(log.getByRole("region", { name: "Sample P1" })).toContainText("Page 10YR")
   const [row] = csvRows((await exportCsv(page)).text)
-  expect([row["Card"], row["Page hue"], row["Card check"]]).toEqual(["page", "10YR", "good"])
+  // Two ladder steps of the worn Page are smudged and left out, which makes the Card check caution.
+  expect([row["Card"], row["Page hue"], row["Card check"]]).toEqual(["page", "10YR", "caution"])
 })
 
 test("saving again adds only the Spots not yet in the Log, until Start over", async ({ page }) => {

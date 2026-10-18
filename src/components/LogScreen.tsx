@@ -32,7 +32,7 @@ interface Props {
 const CARD_TEXT = { colorchecker: "ColorChecker", frame: "Frame", none: "No Card" }
 const cardText = ({ card }: SavedReading) =>
   card.kind === "page" ? `Page ${card.hue ?? ""}`.trim() : CARD_TEXT[card.kind]
-const CHECK_TEXT = { good: "Card check good", failed: "Card check failed", uncorrected: "Not corrected" }
+const CHECK_TEXT = { good: "Card check good", caution: "Card check caution", failed: "Card check failed", uncorrected: "Not corrected" }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 const when = (ms: number) =>

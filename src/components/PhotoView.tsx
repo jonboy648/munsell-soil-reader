@@ -11,6 +11,10 @@ interface Props {
   corners: XY[]
   spots: XY[]
   onTap: (point: XY) => void
+  /** What each Spot is called on the Photo; their numbers when absent. */
+  spotLabels?: string[]
+  /** The radius to draw a Spot at, in Photo pixels; the Spot's own read radius when absent. */
+  radiusOf?: (spot: XY) => number
 }
 
 // Marks are white with a black edge: neutral, and visible on any soil or Card color.
@@ -41,7 +45,14 @@ function label(ctx: CanvasRenderingContext2D, p: XY, text: string, px: number) {
   ctx.fillText(text, at.x, at.y + px * 0.5)
 }
 
-function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots: XY[]) {
+function draw(
+  canvas: HTMLCanvasElement,
+  pixels: ImageData,
+  corners: XY[],
+  spots: XY[],
+  spotLabels?: string[],
+  radiusOf?: (spot: XY) => number,
+) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   ctx.putImageData(pixels, 0, 0)
@@ -58,12 +69,12 @@ function draw(canvas: HTMLCanvasElement, pixels: ImageData, corners: XY[], spots
   })
   const r = spotRadius(pixels)
   spots.forEach((s, i) => {
-    ring(ctx, s, r, px)
-    label(ctx, s, String(i + 1), px)
+    ring(ctx, s, radiusOf ? radiusOf(s) : r, px)
+    label(ctx, s, spotLabels?.[i] ?? String(i + 1), px)
   })
 }
 
-export function PhotoView({ pixels, corners, spots, onTap }: Props) {
+export function PhotoView({ pixels, corners, spots, onTap, spotLabels, radiusOf }: Props) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const [shownWidth, setShownWidth] = React.useState(0)
   const { placing, handlers } = usePlacement(onTap)
@@ -78,8 +89,8 @@ export function PhotoView({ pixels, corners, spots, onTap }: Props) {
 
   React.useEffect(() => {
     const canvas = canvasRef.current
-    if (canvas && pixels) draw(canvas, pixels, corners, spots)
-  }, [pixels, corners, spots, shownWidth])
+    if (canvas && pixels) draw(canvas, pixels, corners, spots, spotLabels, radiusOf)
+  }, [pixels, corners, spots, shownWidth, spotLabels, radiusOf])
 
   if (!pixels) {
     return (

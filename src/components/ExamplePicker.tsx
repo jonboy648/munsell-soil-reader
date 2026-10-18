@@ -5,16 +5,18 @@ import { cn } from "@/lib/utils"
 interface Props {
   activeId: string | undefined
   onPick: (example: ExamplePhoto) => void
+  /** The examples to offer; the soil Photos by default. */
+  examples?: ExamplePhoto[]
 }
 
-export function ExamplePicker({ activeId, onPick }: Props) {
+export function ExamplePicker({ activeId, onPick, examples = EXAMPLES }: Props) {
   return (
     <section aria-label="Example Photos" className="grid gap-2">
       <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
         Practice Photos (simulated camera)
       </h2>
       <ul className="grid gap-2">
-        {EXAMPLES.map((example) => (
+        {examples.map((example) => (
           <li key={example.id}>
             <button
               type="button"

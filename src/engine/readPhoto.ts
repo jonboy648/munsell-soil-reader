@@ -57,7 +57,8 @@ function readColor(lin: Vec3): ChipReading {
   }
 }
 
-function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
+/** Fits the correction to a ColorChecker in the Photo and runs the Card check on it. */
+export function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
   const references: Reference[] = patchSites(corners).map(({ center, radius }, i) => ({
     measured: medianLinear(pixels, center, radius),
     truth: PATCH_LINEAR[i],

@@ -7,7 +7,7 @@ import {
   mul,
   type Vec3,
 } from "./color"
-import { gridSites, type Four, type GridPoint, type Site } from "./grid"
+import { gridMap, gridSites, type Four, type GridPoint, type Site } from "./grid"
 import type { Corners } from "./types"
 
 export const PATCH_NAMES = [
@@ -61,3 +61,27 @@ const ALL_PATCHES: GridPoint[] = Array.from({ length: PATCH_ROWS * PATCH_COLUMNS
  */
 export const patchSites = (corners: Corners): Site[] =>
   gridSites(TAPPED_PATCHES, corners, ALL_PATCHES)
+
+/** Share of the diagonal between two patches that the frame read circle takes as its radius. */
+const FRAME_READ_FRACTION = 0.25
+
+/**
+ * Where to read the Card's black frame: the places where four patches meet, 15 of them. Each
+ * circle is a quarter of the way across the diagonal between the patches around it, so it holds
+ * plenty of frame whichever way the Card is turned, and a tap a few pixels off does not move it
+ * off the frame. The radius follows the perspective like the patches' does.
+ */
+export function frameSites(corners: Corners): Site[] {
+  const map = gridMap(TAPPED_PATCHES, corners)
+  const sites: Site[] = []
+  for (let row = 0; row < PATCH_ROWS - 1; row++) {
+    for (let col = 0; col < PATCH_COLUMNS - 1; col++) {
+      const [a, b] = [map({ col, row }), map({ col: col + 1, row: row + 1 })]
+      sites.push({
+        center: map({ col: col + 0.5, row: row + 0.5 }),
+        radius: FRAME_READ_FRACTION * Math.hypot(a.x - b.x, a.y - b.y),
+      })
+    }
+  }
+  return sites
+}

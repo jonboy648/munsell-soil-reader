@@ -197,7 +197,7 @@ test("a Reading is assigned to a layer as its matrix color from the readings pan
 
 test("a Log from before inches, with its depths in centimeters, opens with inches and is converted once", async ({ page }) => {
   // The first version of the database, made by hand on the app's own origin before the app runs.
-  await page.goto("/manifest.webmanifest")
+  await page.goto("/icon-192.png")
   await page.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {

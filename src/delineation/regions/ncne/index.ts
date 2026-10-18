@@ -1,7 +1,7 @@
 // Northcentral and Northeast: ENG Form 6116-8, Sep 2024. The positions were measured from the
 // official PDF's own drawing, page 3 (the Soil page): its profile table is 11 rows of rules, one
 // filled rectangle per column per row, about 1 point thick and 18.1 points apart, and the first
-// rule under the column headings is not a row. `soil-page.pdf` is that page cut from the official
+// rule under the column headings is not a row. The Sampling Point box at the top is one more rule. `soil-page.pdf` is that page cut from the official
 // PDF with scripts/extract-form-page.mjs.
 import type { Region } from "../types"
 
@@ -15,6 +15,7 @@ export const NCNE: Region = {
     fontSize: 8,
     inset: 2,
     aboveRule: 2.5,
+    samplingPoint: { column: [512.8, 571.2], rule: 53.8 },
     rowRules: [111.1, 129.2, 147.4, 165.5, 183.6, 201.7, 219.8, 238.0, 256.1, 274.2, 292.3],
     columns: {
       depth: [38.3, 83.5],

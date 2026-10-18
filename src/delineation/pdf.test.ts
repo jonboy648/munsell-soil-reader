@@ -16,8 +16,9 @@ describe("the Soil page PDF", () => {
 
   test("the official page is still there, with the profile values drawn after it, in row order", async () => {
     const drawn = await pdfText(await soilPagePdf(blank, JF1_PROJECT, JF1_POINT, form))
-    const values = JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))
-    // The official page's own text comes first; what was drawn on it follows in drawing order.
+    const values = ["JF-1", ...JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))]
+    // The official page's own text comes first; what was drawn on it follows in drawing order: the
+    // Sampling Point box at the top, then the profile rows.
     expect(drawn.slice(-values.length).map((d) => d.text)).toEqual(values)
     expect(drawn.some((d) => d.text.includes("Profile Description"))).toBe(true)
     expect(drawn.some((d) => d.text.includes("ENG FORM 6116-8"))).toBe(true)
@@ -25,7 +26,7 @@ describe("the Soil page PDF", () => {
 
   test("each value is where it was placed: on its column, just above its rule", async () => {
     const { soil } = regionOf("NCNE")
-    const drawn = (await pdfText(await soilPagePdf(blank, JF1_PROJECT, JF1_POINT, form))).slice(-16)
+    const drawn = (await pdfText(await soilPagePdf(blank, JF1_PROJECT, JF1_POINT, form))).slice(-17)
     soilPlacements(JF1_PROJECT, form).forEach((placed, i) => {
       expect(drawn[i].text).toBe(placed.text)
       expect(drawn[i].x).toBeCloseTo(placed.x, 1)
@@ -34,10 +35,10 @@ describe("the Soil page PDF", () => {
     expect(soil.fontSize).toBe(8)
   })
 
-  test("a point with no layers is the blank page, unchanged", async () => {
+  test("a point with no layers is the blank page with only its name on it", async () => {
     const empty = { ...JF1_POINT, layers: [] }
     const drawn = await pdfText(await soilPagePdf(blank, JF1_PROJECT, empty, formFor(JF1_PROJECT, empty)))
     const original = await pdfText(new Uint8Array(blank))
-    expect(drawn.map((d) => d.text)).toEqual(original.map((d) => d.text))
+    expect(drawn.map((d) => d.text)).toEqual([...original.map((d) => d.text), "JF-1"])
   })
 })

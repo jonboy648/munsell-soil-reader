@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Project } from "@/delineation/model"
-import { watchLog } from "@/lib/logStore"
+import { logIsReadOnly, watchLog } from "@/lib/logStore"
 import { addProject, changeProject, deleteProject, listProjects } from "@/lib/projectStore"
 
 /**
@@ -14,7 +14,7 @@ export function useProjects() {
   const refresh = React.useCallback(async () => {
     try {
       setProjects((await listProjects()).sort((a, b) => b.createdAt - a.createdAt))
-      setProblem(null)
+      setProblem(logIsReadOnly() ? "The update of the Log could not finish, so projects cannot be added or changed yet. Reload to try again." : null)
     } catch {
       setProblem("The projects can't be opened on this device.")
     }

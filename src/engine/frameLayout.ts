@@ -3,8 +3,9 @@
 // one description, so the two cannot drift apart. No js-aruco2 here: the simulated camera is
 // part of the app, and the finder is not.
 //
-// This is the simulation's frame, not a product design. The real frame comes later, and its
-// numbers replace these.
+// This is the simulation's frame, not a product design: markers around a ColorChecker, as ticket
+// #12 assumes. ADR 0003 makes the real frame a card in its own right, so the real frame comes
+// later and its layout replaces this one.
 import { TAPPED_PATCHES } from "./colorchecker"
 import type { Four, GridPoint } from "./grid"
 

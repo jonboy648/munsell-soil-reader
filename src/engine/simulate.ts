@@ -5,7 +5,7 @@
 import * as munsell from "munsell"
 import { encode, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
-import { paintGlare, paintShadow, type Glare, type Shadow } from "./simulateFaults"
+import { paintGlare, paintJpeg, paintShadow, type Glare, type Shadow } from "./simulateFaults"
 import type { Corners, Pixels, XY } from "./types"
 
 /** What the camera does to the light before and after the sensor. */
@@ -112,6 +112,10 @@ export interface SimScene {
   glare?: Glare[]
   /** A shadow edge painted over the finished Photo. */
   shadow?: Shadow
+  /** Sensor noise, as a multiple of the usual amount. Default 1. */
+  noise?: number
+  /** JPEG quality, 1 to 100, applied last. Absent: the Photo is not compressed. */
+  jpeg?: number
 }
 
 export function simulatePhoto({
@@ -122,6 +126,8 @@ export function simulatePhoto({
   cardScale = 1,
   glare = [],
   shadow,
+  noise: noiseScale = 1,
+  jpeg,
 }: SimScene): SimPhoto {
   const rand = mulberry32(seed)
   const layout = cardLayout(cardScale)
@@ -154,12 +160,13 @@ export function simulatePhoto({
         noise = 5
       }
       const i = (y * SIM_WIDTH + x) * 4
-      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise)
+      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise * noiseScale)
       data[i + 3] = 255
     }
   }
   if (shadow) paintShadow(data, SIM_WIDTH, SIM_HEIGHT, shadow)
   paintGlare(data, SIM_WIDTH, SIM_HEIGHT, glare)
+  if (jpeg !== undefined) paintJpeg(data, SIM_WIDTH, SIM_HEIGHT, jpeg)
   return { pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data }, corners: layout.corners, spot: SIM_SPOT }
 }
 

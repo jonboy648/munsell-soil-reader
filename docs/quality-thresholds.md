@@ -2,83 +2,163 @@
 
 How the engine decides a Photo has glare, clipping, uneven light, or a Card that is too small, and
 why each limit is where it is. For the method page (#13). The code is `src/engine/quality.ts`; the
-limits are exported constants there, and `src/engine/quality.test.ts` pins them with one simulated
-Photo per problem.
+limits are exported constants there (the ColorChecker's own two are in `src/engine/readPhoto.ts`),
+and `src/engine/quality.test.ts` pins them with simulated Photos on each side of each limit.
 
-These limits come from simulated Photos only (960 x 600, a ColorChecker, soil of `10YR 4/3`, the
-phone-like tone curve of strength 0.3, noise of a few levels). Real Photos have blur, JPEG blocks
-and HDR, so Jon's real Photos should confirm or move them. The two least certain are marked.
+These limits come from simulated Photos only: 960 x 600, a ColorChecker, soil of `10YR 4/3`, a
+tone curve (0 to 0.7), sensor noise (up to 3 times the usual) and JPEG compression (quality 50 to
+90, with 4:2:0 color). Real Photos have more blur and HDR, so Jon's real Photos should confirm or
+move them. The least certain are marked **least certain**.
 
 ## What each check measures
 
-All checks read the Card's references: each one a position, a read radius and the luminance it
-has in even light. The grays are the Card's tonal ladder. A Page of the soil book will supply its
-own list, so nothing here is ColorChecker-specific.
-
 | Problem | Measure | Limit |
 |---|---|---|
-| Glare | Share of an area's pixels that are blown (every channel at least 250) | A reference or Spot with 5 percentage points more blown pixels than the Card's white has |
-| Clipped, highlights | Share of the Card's white (brightest gray) that is blown | 50% or more. On a Spot: blown pixels that the Card's white explains |
-| Clipped, shadows | Share of the Card's black (darkest gray) that is crushed (every channel at most 5) | 50% or more. On a Spot: 50% or more of it crushed |
-| Uneven light | Spread, in stops, of measured / expected luminance across the readable grays | More than 0.8 stops, with at least 3 readable grays |
-| Card too small | Closest pair of reference centers, in Photo pixels | Under 24 px |
-| Card not found | Card check, mean CIEDE2000 | 20 or more: the Card checks are skipped |
+| Blown pixel | Channels at 253 or more (8-bit) | 2 of 3 channels |
+| Crushed pixel | Channels at 5 or less | all 3 |
+| Glare on the Card | Blown pixels in a reference, against the Card's white | 5 points more than the white |
+| Clipped, highlights | Blown share of the Card's white | 50% or more |
+| Clipped, shadows | Crushed share of the Card's black | 50% or more |
+| Glare or clipped, on a Spot | Blown share of the Spot, and the Spot's own level | 5% blown; own level 245 or more is clipped |
+| Uneven light | Spread, in stops, of the Card's black frame at 15 places | over 0.2 stops, up to 2 |
+| Card too small | Spacing between patches the tapped corners give | under 24 px |
+| Corners off the Card | Pairs of readable grays measured in the wrong order | 3 or more |
 
 A Photo is at most 1600 px on its longest side (`MAX_SIDE` in `src/lib/photo.ts`), so pixels
 here are of that.
 
+## Two comparison sets, each with its own limit
+
+The checks read the Card through two lists the caller supplies, so a Page of the soil book (#8)
+can reuse them without ColorChecker code in the engine.
+
+- **`references`**: where the Card's patches are, each with a read radius and the luminance it has
+  in even light. They carry glare, clipping and the placement test. References marked `neutral`
+  are the tonal ladder: the brightest is the white and the darkest the black.
+- **`evenness`**: places on the Card that should come out equally bright in even light, with the
+  limit that suits them. The ColorChecker supplies its black frame, limit 0.2 stops. A Page will
+  supply its white paper, whose limit should be much tighter, since a flat white is easy to
+  measure and a shadow on it is easy to see. A limit belongs to its comparison set and is not a
+  property of the check: do not reuse 0.2 for paper.
+
 ## Reasoning
 
-**Glare versus clipping.** Both are blown pixels, so the Card says which one it is. White is the
-brightest thing on the Card in every channel, so under any exposure it is blown at least as much
-as any other patch. A reference with more blown pixels than the white is a reflection, not the
-exposure. If the white itself is blown, the exposure is the cause and the Card is flagged
-clipped. With no Card there is nothing to compare, so a Spot that is mostly blown (50% or more)
-is clipped and a partly blown one is glare. Five percent keeps a stray bright speck from
-counting. The simulated glare is a soft blob whose core is pure white; a Photo with it over part of a
-Spot, or over one Card patch, raises glare and nothing else.
+**What is blown.** A white that touches the top in one channel is normal: warm light puts the
+ColorChecker's white at 254/236/188, and the camera color shift puts it at 244/248/255 (247/250/255
+through the stronger tone curve of 0.5). Counting one channel at 250 or more flags both, though
+the Card check is good (1.8 and 1.4) and the Reading is right. So a pixel is blown when two
+channels are at 253 or more: both examples pass. The shift example flags at 5% more light, and
+the warm one at 30% more, when a second channel reaches the top. Crushed uses every channel: dark
+soil has almost no blue, so one channel at 0 is not a lost Spot. The one-channel rule (even at 253)
+makes 29 of the 46 quality tests fail.
 
-**Clipped.** A white that is blown, or a black that is crushed, is outside what the camera can
-record, and no correction recovers it. Exposure scenes: the light scaled by 1.3 already blows the
-white; 0.1 (3.5 stops under) does not crush the black, 0.05 does. Blown and crushed
-grays are left out of the uneven-light check, since they say nothing about the light.
+**Glare against exposure.** Both are blown pixels, so the Card says which. White is the brightest
+thing on the Card in every channel, so under any exposure it is blown at least as much as any
+other patch. A reference with 5 points more blown pixels than the white is a reflection. If the
+white itself is 50% blown, the exposure is the cause. A crushed black works the same way. Five
+points keeps a stray speck from counting: a speck too small to blow 5% of a patch or a Spot is
+not flagged. Glare is flagged with the Card check failing, at every size tried: two adjacent patches, a
+row, the gray patches, six patches, and a broad sheen over the whole Card.
 
-**Uneven light.** In even light every gray is off by the same factor, so the spread is small. A
-shadow pulls some down more than others. Spread of the six grays, in stops:
+**Glare against exposure on a Spot.** The Spot's own level says which: the strongest channel
+of the darker quarter of its unblown pixels. Soil at normal exposure reads 220 to 234 for the
+lightest chips (`10YR 8/1` and `5Y 8/3`, under any of the three lights) and 56 to 194 for the
+others. Blown
+pixels on a Spot below 245 are glare, since the soil itself is well short of the top. At 245 or more
+the Spot is at the top of the range, so they are exposure. This does not look at the Card, so a
+`10YR 4/3` Spot with a reflection is glare even when the exposure has clipped the Card's white,
+and a `10YR 8/1` Spot at 1.64 times the light, part blown, is clipped whether or not a Card is
+there. A Spot blown right through has no level of its own, and the Card's white decides: with no
+Card, exposure. **Least certain:** a very light soil under warm light with a reflection on it
+can read above 245 without any clipping, and is then called clipped.
 
-| Simulated Photo | Spread |
+**Uneven light.** The first design measured the six grays on the Card's bottom row, in stops off
+from what they should be. It measured the tone curve: the grays run from white to black along the
+row, and a tone curve darkens the dark end, just as a shadow would.
+
+| Photo | Gray spread, stops |
 |---|---|
-| Clean, phone curve 0.3, four lights (neutral, shift, warm, dim) | 0.51 to 0.64 |
-| Shadow ramp across the Card, light at 0.8 / 0.7 / 0.5 / 0.35 | 0.75 / 0.92 / 1.27 / 1.68 |
-| Shadow edge across the middle of the Card, 0.7 / 0.5 / 0.35 | 1.09 / 1.55 / 2.09 |
-| Clean, stronger tone curve 0.5 / 0.7 | 0.90 to 1.09 / 1.30 to 1.57 |
+| Clean, tone curve 0.3 | 0.51 to 0.64 |
+| Clean, tone curve 0.5 | 0.90 to 1.09 |
+| Clean, tone curve 0.7 | 1.30 to 1.57 |
+| Shadow along the gray row | as clean: the grays darken alike, so it cannot be seen |
 
-The limit of 0.8 sits above the clean phone Photos and below a shadow of about half a stop
-(light at 0.7). **Least certain:** the grays run white to black along the Card's bottom row, so a
-tone curve and a left-to-right shadow both darken the dark end more, and the two cannot be told
-apart from the grays alone. A very contrasty real phone (curve 0.5 or more) would be flagged
-without a shadow. Its Card check would be near failing anyway (2.1 to 3.7), but a check on real
-Photos may call for a higher limit.
+So it flagged clean Photos at curve 0.5 and above and missed any shadow along the row. The
+black frame has none of that: it is one black surface, equally bright everywhere in even light
+whatever the curve does. The engine reads it where four patches meet (15 places, the midpoints of
+diagonal neighbors), in a circle a quarter of the way across that diagonal, as the brightness of
+the darkest 15% of pixels in it, so a tap that is a few pixels off, which puts bright patch in the
+circle, does not move the reading. The spread is the gap between the second darkest and second
+brightest place, in stops.
+
+| Simulated Photo | Spread, stops |
+|---|---|
+| Clean, 4 lights x tone curve 0, 0.3, 0.5, 0.7 (worst of 16) | 0.01 |
+| Warm, noise x2, JPEG 75 | 0.10 |
+| Warm, noise x3, JPEG 50 | 0.15 |
+| Dim, curve 0.5, noise x3, JPEG 75 | 0.08 |
+
+| Shadow, light left in the shade | 0.9 | 0.8 | 0.7 | 0.5 | 0.3 |
+|---|---|---|---|---|---|
+| Ramp across the Card, left to right | 0.11 | 0.24 | 0.33 | 0.67 | 1.08 |
+| Edge down the middle | 0.16 | 0.33 | 0.55 | 1.03 | 1.77 |
+| Ramp top to bottom | 0.10 | 0.15 | 0.28 | 0.51 | 0.86 |
+| Over the top two rows | 0.16 | 0.33 | 0.55 | 1.03 | 1.77 |
+| Over the gray row | 0.11 | 0.21 | 0.40 | 0.85 | 1.59 |
+| Over the white end (left column) | 0.07 | 0.15 | 0.28 | 0.56 | 0.89 |
+
+The limit of 0.2 sits above everything clean, with the harshest compression and noise at 0.15,
+and below a shadow of about a third of a stop in most layouts and half a stop in all. Corners
+tapped up to 12 px off (a pitch of 74) left every clean Photo clear and missed no shadow, in 30
+trials each. Above 2 stops the spread is not the light. Of the 23 wrong corner orders, 12 read 2.5 to 5.9 stops
+because the sampling places land on patches, so those are left alone and the failed Card check
+explains them. The other 11 (flips and half turns of the grid) put the places on the frame again
+and read near 0, so they raise nothing. A real shadow deeper than 2 stops is lost the same way as
+the first 12.
+**Least certain:** the simulated frame is 16% of the patch pitch wide, and the real card's is
+narrower. The darkest-15% reading needs the frame to be a good share of the circle (about half at
+16%, a third at 10%), and a shadow only on the outer ring of patches (the white end alone) does not
+reach the 15 places inside the Card, so it shows only as a failed Card check.
+
+Glare on the Card also lights the frame near it. Places within one patch spacing of a glared
+reference, or that are themselves blown or crushed, are left out, and the check needs 6 of the 15
+to be left. Without that rule glare would raise uneven light as well. With it, glare and a shadow
+are each flagged: tested with reflections on three patches and a shadow over the top rows.
 
 **Card too small.** Patches are read in a circle of 20% of their pitch, from corners the user
-tapped, so a tap that is off puts the circle over a gap or a neighbor. In the simulated camera
-(no blur, flat patches) the Card check stayed good in 100 of 100 trials with tap errors of up to
+tapped, so a tap that is off puts the circle on a gap or a neighbor. In the simulated camera (no
+blur, flat patches) the Card check stayed good in 100 of 100 trials with tap errors of up to
 8 px at a pitch of 24.4 px, in 97 of 100 at 20.7 px, and in 66 of 100 at 17.8 px. With errors up to
 6 px it held to 17.8 px and fell to 87 of 100 at 14.8 px. So a pitch of about three times the tap
 error is safe, and 24 px allows 8 px of error (about 2 screen pixels on a phone, where a 1600 px
-Photo is shown 4 times smaller). **Least certain:** real blur and JPEG blocks eat into this, so
-24 px may need to rise.
+Photo is shown 4 times smaller). The spacing comes from the tapped corners (the smallest of
+the four sides over its patch count), not from the patch positions they imply: with the corners in
+the wrong order those bunch together and would call a good Card small. **Least certain:** real
+blur and JPEG blocks eat into this, so 24 px may need to rise.
 
-**Card not found.** With corners tapped in the wrong order every one of the 23 other orders gave
-a Card check of 23 to 37, because the references are not on the Card. The worst Card problem
-simulated (glare over a patch) gave 14.7. At 20 or more the references say nothing about the
-Photo, so the Card checks are skipped and the Card check failure alone explains it.
+**Corners off the Card.** With the corners tapped in the wrong order the references are not on
+the Card and nothing they show says much. The test: sort the readable grays (not blown or crushed)
+white to black and count pairs measured in the wrong order. Light, shadows and tone curves squeeze
+the order but keep it. Over 51 right-order Photos (every light, tone curve, exposure, shadow
+direction and depth, and glare) it counted 0, except 1 to 3 for shadows of a stop or more that
+darken the white end or fall from right to left. The 23 wrong orders counted 4 or more, except
+three that count 0, 1 and 1 and so pass as the Card (one is the two top corners swapped, which
+leaves the gray row alone). Uneven light stays quiet for those three anyway (the frame spread is
+over 2 stops or near 0), Card too small does not depend on this test, and the Card check fails.
+Off the Card, uneven light and Card too small are skipped. With fewer than 3 readable grays the
+references are taken as placed. Glare and clipping
+are not: with no white to compare to, a reference that is partly blown is glare and one that
+is mostly blown is exposure. So a white blown by 30% extra light is still `clipped` in the three wrong orders
+tried. With the exposure much further off and the corners also wrong, glare may be reported in
+its place.
 
 ## Known limits
 
-- Glare that covers the whole white patch is reported as clipped: a reflection on the white is
-  the same to the engine as a white that is too bright.
-- Blown means every channel at least 250. A single clipped channel (a red-heavy light blowing red
-  only) is not flagged.
+- Glare that covers the whole white patch is reported as clipped: a reflection on the white is the
+  same to the engine as a white that is too bright.
+- A single clipped channel (a red-heavy light blowing only red) is not flagged.
+- A very light soil under warm light can read near the top without clipping; glare on it is called
+  clipped.
+- A shadow confined to the outer ring of patches does not reach the black frame inside.
 - One warning per kind per place. When the light is both blown and crushed the Card gets one
   clipped warning that says both.

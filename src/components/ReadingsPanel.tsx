@@ -3,7 +3,7 @@
 import { ChevronUp } from "lucide-react"
 import type { ChipReading, ReadPhotoResult, RgbTriple } from "@/engine"
 import { CardCheckBadge } from "@/components/CardCheckBadge"
-import { QualityFlag, QualityWarnings, warningsFor } from "@/components/QualityWarnings"
+import { QualityFlag, QualityWarnings, cardWarnings, warningsFor } from "@/components/QualityWarnings"
 import {
   Drawer,
   DrawerContent,
@@ -52,7 +52,7 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
 
 function SpotReading({ result, index }: { result: ReadPhotoResult; index: number }) {
   const reading = result.readings[index]
-  const { verdict, main, why } = shownReading(reading, result.cardCheck)
+  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality))
   return (
     <section aria-label={`Spot ${index + 1}`} className="grid gap-3 border-t border-border py-4 first:border-t-0">
       <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -110,7 +110,7 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
 export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
-  const { verdict, main } = shownReading(result.readings[last], result.cardCheck)
+  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality))
   return (
     <Drawer>
       <DrawerTrigger asChild>

@@ -22,6 +22,10 @@ const ICON = {
 export const placeOf = (where: QualityWarning["where"]): string =>
   where === "card" ? "Card" : `Spot ${where + 1}`
 
+/** The warnings that concern the Card. */
+export const cardWarnings = (quality: QualityWarning[]): QualityWarning[] =>
+  quality.filter((w) => w.where === "card")
+
 /** The warnings that concern the Card and one Spot, the Card's first. */
 export const warningsFor = (quality: QualityWarning[], spotIndex: number): QualityWarning[] =>
   quality.filter((w) => w.where === "card" || w.where === spotIndex)
@@ -58,7 +62,7 @@ export function QualityWarnings({ warnings }: { warnings: QualityWarning[] }) {
             <p className="flex items-center gap-2 text-sm font-bold">
               <Icon className="size-4 shrink-0" aria-hidden="true" />
               {TITLE[w.kind]}
-              <span className="font-medium text-muted-foreground">{placeOf(w.where)}</span>
+              <span data-testid="quality-place" className="font-medium text-muted-foreground">{placeOf(w.where)}</span>
             </p>
             <p className="text-sm">{w.advice}</p>
           </li>

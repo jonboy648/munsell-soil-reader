@@ -33,13 +33,18 @@ test("glare on the Card and on the soil is flagged where it is, with advice", as
   const sheet = page.getByRole("dialog")
   const onCard = sheet.getByTestId("quality-warning").and(sheet.locator('[data-where="card"]'))
   await expect(onCard).toHaveAttribute("data-kind", "glare")
-  await expect(onCard).toContainText("Card")
+  await expect(onCard.getByTestId("quality-place")).toHaveText("Card")
   await expect(onCard).toContainText("Tilt the Card or move into shade to lose the reflection")
 
   const onSpot = sheet.getByTestId("quality-warning").and(sheet.locator('[data-where="0"]'))
   await expect(onSpot).toHaveAttribute("data-kind", "glare")
-  await expect(onSpot).toContainText("Spot 1")
+  await expect(onSpot.getByTestId("quality-place")).toHaveText("Spot 1")
   await expect(onSpot).toContainText("lose the reflection")
+
+  // The Card check fails here because of the glare, so the text points at it and does not
+  // send the user back to the corners.
+  await expect(sheet).toContainText("The problem flagged below is the likely cause")
+  await expect(sheet).not.toContainText("Start over")
 })
 
 test("a Photo with nothing wrong shows no warning", async ({ page }) => {

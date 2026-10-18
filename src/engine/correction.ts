@@ -1,67 +1,156 @@
-// Color correction fitted on the Card: white balance, then a 3x3 least-squares matrix.
-import { deltaE2000, linearToLab, mul, type Mat3, type Vec3 } from "./color"
-import { NEUTRAL_PATCHES, PATCH_LINEAR } from "./colorchecker"
+// Color correction fitted on the Card: linearize each channel along a ladder of grays, then
+// fit a 3x3 matrix by least squares.
+//
+// A phone's tone curve bends every channel, and a matrix cannot undo a bend. The ladder is a
+// run of references whose true color is known in each channel, from dark to light. It gives
+// the curve the camera applied, and inverting it first leaves the matrix a linear problem.
+//
+// Nothing here knows which Card it is. A Card is a list of references (what the camera
+// measured and what the color really is), so the ColorChecker's patches and a Page's Chips
+// go through the same fit and the same Card check.
+import { decode, deltaE2000, encode, linearToLab, type Vec3 } from "./color"
+import { leastSquares } from "./leastSquares"
 
 export type Correction = (lin: Vec3) => Vec3
 
-/** White balance: one gain per channel, fitted on the six gray patches. */
-export function fitWhiteBalance(measured: Vec3[]): Correction {
-  const gains = [0, 1, 2].map((ch) => {
-    let num = 0
-    let den = 0
-    for (const i of NEUTRAL_PATCHES) {
-      num += measured[i][ch] * PATCH_LINEAR[i][ch]
-      den += measured[i][ch] ** 2
-    }
-    return den > 0 ? num / den : 1
-  })
-  return (lin) => [lin[0] * gains[0], lin[1] * gains[1], lin[2] * gains[2]]
+/** One place on the Card: the linear color the camera measured there, and its true color. */
+export interface Reference {
+  measured: Vec3
+  truth: Vec3
+  /**
+   * Part of the tone ladder: a gray, or close to one, whose true color is known in each
+   * channel. The ladder is what each channel's curve is drawn through, so it needs at least
+   * two references of different brightness (with fewer, the channels are left as they are).
+   */
+  ladder?: boolean
 }
 
-const det3 = (m: Mat3): number =>
-  m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-  m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
-  m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+/** Fits a correction to a Card's references. */
+export type Fit = (references: Reference[]) => Correction
 
-/** Solve A x = b for 3x3 A by Cramer's rule. */
-function solve3(A: Mat3, b: Vec3): Vec3 {
-  const D = det3(A)
-  const col = (k: number) =>
-    det3(A.map((row, i) => row.map((v, j) => (j === k ? b[i] : v)) as Vec3) as Mat3) / D
-  return [col(0), col(1), col(2)]
+// ---- the curve through the ladder ----
+export interface Point {
+  x: number
+  y: number
+}
+export type Curve = (x: number) => number
+/** Draws a curve through points. Past the first and last point the curve carries on straight. */
+export type CurveFit = (points: Point[]) => Curve
+
+/** Sorted by x, with points of the same x merged (their y averaged). */
+function distinct(points: Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a.x - b.x)
+  const merged: Point[] = []
+  let run: Point[] = []
+  const flush = () => {
+    if (run.length) merged.push({ x: run[0].x, y: run.reduce((s, p) => s + p.y, 0) / run.length })
+    run = []
+  }
+  for (const p of sorted) {
+    if (run.length && p.x - run[0].x > 1e-9) flush()
+    run.push(p)
+  }
+  flush()
+  return merged
 }
 
-/** Full Card: a 3x3 matrix fitted to all 24 patches by least squares. */
-export function fitMatrix(measured: Vec3[]): Correction {
-  const idx = [0, 1, 2] as const
-  const AtA = idx.map((i) =>
-    idx.map((j) => measured.reduce((s, m) => s + m[i] * m[j], 0)) as Vec3,
-  ) as Mat3
-  const rows = idx.map((ch) => {
-    const Atb = idx.map((i) =>
-      measured.reduce((s, m, p) => s + m[i] * PATCH_LINEAR[p][ch], 0),
-    ) as Vec3
-    return solve3(AtA, Atb)
-  }) as Mat3
-  return (lin) => mul(rows, lin)
+/** Slope at an end of the curve (Fritsch-Carlson as in SciPy's PchipInterpolator). */
+function endSlope(h0: number, h1: number, d0: number, d1: number): number {
+  const d = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
+  if (Math.sign(d) !== Math.sign(d0)) return 0
+  if (Math.sign(d0) !== Math.sign(d1) && Math.abs(d) > 3 * Math.abs(d0)) return 3 * d0
+  return d
 }
 
 /**
- * The correction the engine applies: white balance first, then the 3x3 fitted on the
- * white-balanced patches. (For a plain 3x3 the two steps compose to the same matrix as
- * fitting the raw patches directly; the order matters once the fit is not linear.)
+ * Monotone cubic through the points (Fritsch and Carlson 1980): smooth, and it never
+ * overshoots between two ladder steps the way an ordinary cubic can.
  */
-export function fitCardCorrection(measured: Vec3[]): Correction {
-  const wb = fitWhiteBalance(measured)
-  const matrix = fitMatrix(measured.map(wb))
-  return (lin) => matrix(wb(lin))
+export const pchip: CurveFit = (points) => {
+  const p = distinct(points)
+  const n = p.length
+  if (n < 2) return (x) => x
+  const h = p.slice(1).map((q, k) => q.x - p[k].x)
+  const delta = p.slice(1).map((q, k) => (q.y - p[k].y) / h[k])
+  const d: number[] = Array.from({ length: n }, () => 0)
+  if (n === 2) {
+    d[0] = d[1] = delta[0]
+  } else {
+    for (let k = 1; k < n - 1; k++) {
+      if (delta[k - 1] * delta[k] <= 0) continue
+      const w1 = 2 * h[k] + h[k - 1]
+      const w2 = h[k] + 2 * h[k - 1]
+      d[k] = (w1 + w2) / (w1 / delta[k - 1] + w2 / delta[k])
+    }
+    d[0] = endSlope(h[0], h[1], delta[0], delta[1])
+    d[n - 1] = endSlope(h[n - 2], h[n - 3], delta[n - 2], delta[n - 3])
+  }
+  return (x) => {
+    if (x <= p[0].x) return p[0].y + d[0] * (x - p[0].x)
+    if (x >= p[n - 1].x) return p[n - 1].y + d[n - 1] * (x - p[n - 1].x)
+    let k = 0
+    while (x >= p[k + 1].x) k++
+    const t = (x - p[k].x) / h[k]
+    return (
+      (2 * t ** 3 - 3 * t ** 2 + 1) * p[k].y +
+      (t ** 3 - 2 * t ** 2 + t) * h[k] * d[k] +
+      (-2 * t ** 3 + 3 * t ** 2) * p[k + 1].y +
+      (t ** 3 - t ** 2) * h[k] * d[k + 1]
+    )
+  }
 }
 
-/** How well a correction reproduces the Card itself: mean CIEDE2000 over the 24 patches. */
-export function cardFitError(measured: Vec3[], correct: Correction): number {
-  const total = measured.reduce(
-    (s, m, i) => s + deltaE2000(linearToLab(correct(m)), linearToLab(PATCH_LINEAR[i])),
-    0,
+// ---- the fits ----
+// The curve is drawn in sRGB-encoded values, where a phone's tone curve is smooth and the
+// ladder steps are spread evenly. Encoding is extended to negative values as an odd function.
+const enc = (v: number): number => (v < 0 ? -encode(-v) : encode(v))
+const dec = (v: number): number => (v < 0 ? -decode(-v) : decode(v))
+
+/** A 3x3 matrix fitted to all the references by least squares. */
+export const fitMatrix: Fit = (references) => {
+  const X = leastSquares(
+    references.map((r) => r.measured),
+    references.map((r) => r.truth),
   )
-  return total / measured.length
+  return (lin) => [0, 1, 2].map((c) => lin[0] * X[0][c] + lin[1] * X[1][c] + lin[2] * X[2][c]) as Vec3
+}
+
+/**
+ * Linearize each channel along the ladder, then fit `then` (a 3x3 matrix unless told
+ * otherwise) on the linearized references. The curves are fitted inside this fit, so the
+ * Card check refits them without the reference it holds out.
+ */
+export const linearizeThen =
+  (curveFit: CurveFit, then: Fit = fitMatrix): Fit =>
+  (references) => {
+    const ladder = references.filter((r) => r.ladder)
+    const curves = [0, 1, 2].map((c) =>
+      curveFit(ladder.map((r) => ({ x: enc(r.measured[c]), y: enc(r.truth[c]) }))),
+    )
+    const linearize = (lin: Vec3): Vec3 => [0, 1, 2].map((c) => dec(curves[c](enc(lin[c])))) as Vec3
+    const matrix = then(references.map((r) => ({ ...r, measured: linearize(r.measured) })))
+    return (lin) => matrix(linearize(lin))
+  }
+
+/** The fit the engine uses. */
+export const fitCorrection: Fit = linearizeThen(pchip)
+
+// ---- the Card check ----
+const colorDifference = (a: Vec3, b: Vec3): number => deltaE2000(linearToLab(a), linearToLab(b))
+
+/**
+ * The Card check: how well the correction predicts references it was not fitted to. Each
+ * reference in turn is left out, the correction is fitted on the rest, and the left-out
+ * reference is corrected and compared with its true color. The mean CIEDE2000 over all of
+ * them is the result. Judged on the references it was fitted to, a more flexible fit would
+ * look better just by memorising the Card.
+ *
+ * To leave a dirty reference out of the check altogether, drop it from `references` first.
+ */
+export function heldOutError(references: Reference[], fit: Fit): number {
+  const total = references.reduce((sum, held, i) => {
+    const rest = references.filter((_, j) => j !== i)
+    return sum + colorDifference(fit(rest)(held.measured), held.truth)
+  }, 0)
+  return total / references.length
 }

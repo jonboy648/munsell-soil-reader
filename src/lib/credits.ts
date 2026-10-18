@@ -105,8 +105,15 @@ export const CREDITS: Credit[] = [
     name: "ENG Form 6116-8, Wetland Determination Data Form (Northcentral and Northeast)",
     license: "US government work, public domain",
     by: "U.S. Army Corps of Engineers",
-    used: "The official Soil page (September 2024), unchanged, that a sampling point's profile is drawn onto for the PDF and the preview.",
+    used: "The official Page 1, Soil, Vegetation and Vegetation Continued pages (September 2024), unchanged, that a sampling point's values are drawn onto for the PDF and the preview.",
     links: [{ label: "Regulatory Program", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/" }],
+  },
+  {
+    name: "Regional Supplement, Northcentral and Northeast Region (ERDC/EL TR-12-1)",
+    license: "US government work, public domain",
+    by: "U.S. Army Corps of Engineers",
+    used: "The definitions of the wetland hydrology indicators, quoted word for word with their pages, and the rule that one primary or two secondary indicators show wetland hydrology.",
+    links: [{ label: "Regional supplements", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/reg_supp/" }],
   },
   {
     name: "2022 National Wetland Plant List and USDA PLANTS checklist",

@@ -8,14 +8,25 @@
 // `veg.samplingPoint` and `veg.remarks`. Every value is already text the PDF's font can print.
 import { regionOf } from "./regions"
 import { PROFILE_COLUMNS, type ProfileColumn, type SoilPage } from "./regions/types"
-import { printable, truncate, widthOf, wrap } from "./text"
+import { hydrologyFor } from "./hydrology"
+import { printable, truncate, widthOf, wrap, written } from "./text"
 import { topToBottom, type LayerColor, type Project, type SamplingPoint } from "./model"
 import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
-export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint" | VegFieldId
+export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint" | `page1.hydrology.${string}` | VegFieldId
 
 export interface FormWarning {
-  kind: "no-matrix" | "bad-depth" | "overlap" | "gap" | "too-many-rows" | "remarks-cut" | "text-changed" | VegWarning["kind"]
+  kind:
+    | "no-matrix"
+    | "bad-depth"
+    | "overlap"
+    | "gap"
+    | "too-many-rows"
+    | "remarks-cut"
+    | "text-changed"
+    | "hydrology-observation"
+    | "hydrology-answer"
+    | VegWarning["kind"]
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
   text: string
@@ -24,11 +35,25 @@ export interface FormWarning {
 export interface Form {
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
-  /** Indicators the data satisfies, for the user to confirm. None yet. */
-  suggestions: readonly never[]
-  /** The yes or no conclusions of the form. None yet. */
-  conclusions: readonly never[]
+  /** What the recorded data suggests, with the rule it used, for the user to confirm. */
+  suggestions: readonly Suggestion[]
+  /** The answers the user has confirmed. */
+  conclusions: readonly Conclusion[]
   warnings: FormWarning[]
+}
+
+/** A suggested answer, shown with the rule behind it. It is not printed until the user confirms it. */
+export interface Suggestion {
+  id: "hydrology.present"
+  answer: boolean
+  text: string
+  citation: string
+}
+
+/** A yes or no answer the user confirmed. */
+export interface Conclusion {
+  id: "hydrology.present"
+  answer: boolean
 }
 
 export const fieldId = (row: number, column: ProfileColumn): FieldId => `soil.profile.${row}.${column}`
@@ -38,9 +63,6 @@ export const columnRoom = (soil: SoilPage, column: ProfileColumn): number => {
   const [left, right] = soil.columns[column]
   return right - left - 2 * soil.inset
 }
-
-/** A number as it is written on a form: 20, 2.5, not 20.0. */
-const written = (n: number): string => String(Math.round(n * 100) / 100)
 
 type Row = Partial<Record<ProfileColumn, string>>
 
@@ -137,5 +159,17 @@ export function formFor(project: Project, point: SamplingPoint): Form {
   for (let r = 0; r < rowCount; r++) {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }
-  return { fields, suggestions: [], conclusions: [], warnings: [...warnings, ...vegetation.warnings] }
+
+  const hydrology = hydrologyFor(regionOf(project.region), point.hydrology)
+  Object.assign(fields, hydrology.fields)
+  warnings.push(...hydrology.warnings, ...vegetation.warnings)
+  const present = point.hydrology?.present
+  return {
+    fields,
+    suggestions: hydrology.suggestion
+      ? [{ id: "hydrology.present", answer: hydrology.suggestion.answer, text: hydrology.suggestion.text, citation: hydrology.suggestion.citation }]
+      : [],
+    conclusions: typeof present === "boolean" ? [{ id: "hydrology.present", answer: present }] : [],
+    warnings,
+  }
 }

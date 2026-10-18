@@ -70,7 +70,10 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   table, suggestions, conclusions and warnings. The region package (`regions/ncne/`) is data: the
   official ENG Form 6116-8 page, as a PDF and an image, and where each field sits on it, measured
   from the PDF. The PDF is the official page with the values drawn on it (pdf-lib, on the device),
-  and the on-screen preview draws the same list of placed values. The Vegetation pages (and the
+  and the on-screen preview draws the same list of placed values. Page 1's Hydrology section (the 29
+  indicators with the supplement's definitions and pages, `regions/ncne/hydrology-rules.md`, the
+  one-primary-or-two-secondary rule, depths and notes) is drawn on the same pages the same way.
+  The Vegetation pages (and the
   Vegetation Continued page when a stratum overflows) are filled from the plants a point holds:
   a plant is typed by common name, scientific name or abbreviation and resolved against the 2022
   National Wetland Plant List for the region, a chunk that loads when the entry opens and works offline.

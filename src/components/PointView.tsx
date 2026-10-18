@@ -2,8 +2,9 @@
 import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
+import { HydrologyForm } from "@/components/HydrologyForm"
 import { LayerForm } from "@/components/LayerForm"
-import { SoilPagePreview } from "@/components/SoilPagePreview"
+import { PagePreview } from "@/components/PagePreview"
 import { VegetationEntry } from "@/components/VegetationEntry"
 import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
@@ -115,7 +116,10 @@ export function PointView({ project, point, change, onBack }: Props) {
       )}
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
-      <SoilPagePreview project={project} point={point} form={form} />
+      <PagePreview page="soil" project={project} point={point} form={form} />
+
+      <HydrologyForm key={point.id} project={project} point={point} change={change} />
+      <PagePreview page="page1" project={project} point={point} form={form} />
 
       <VegetationEntry key={point.id} project={project} point={point} onChange={changeVegetation} />
       <VegetationPreview project={project} point={point} form={form} />

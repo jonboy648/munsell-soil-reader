@@ -1,14 +1,5 @@
 // The X-Rite ColorChecker Classic 24: reference colors and patch geometry.
-import {
-  BRADFORD_D50_TO_D65,
-  M_RGB_XYZ,
-  M_XYZ_RGB,
-  WHITE_D50,
-  labToXyz,
-  mul,
-  xyzToLab,
-  type Vec3,
-} from "./color"
+import { M_RGB_XYZ, labD50ToLinear, mul, xyzToLab, type Vec3 } from "./color"
 import { gridMap, gridSites, type Four, type GridPoint, type Site } from "./grid"
 import type { Corners } from "./types"
 
@@ -33,9 +24,7 @@ const PATCH_LAB_D50: Vec3[] = [
 ]
 
 /** Reference patch colors as linear sRGB (D65), via Bradford D50 -> D65. */
-export const PATCH_LINEAR: Vec3[] = PATCH_LAB_D50.map((lab) =>
-  mul(M_XYZ_RGB, mul(BRADFORD_D50_TO_D65, labToXyz(lab, WHITE_D50))),
-)
+export const PATCH_LINEAR: Vec3[] = PATCH_LAB_D50.map(labD50ToLinear)
 
 /** The six gray patches along the bottom row, used for white balance. */
 export const NEUTRAL_PATCHES = [18, 19, 20, 21, 22, 23]

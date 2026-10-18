@@ -11,6 +11,7 @@ import { Credits } from "./Credits"
 import { DecidesSection } from "./DecidesSection"
 import { LeavesPhoneSection } from "./LeavesPhoneSection"
 import { LimitsSection } from "./LimitsSection"
+import { MeasuringSection } from "./MeasuringSection"
 import { PhotoWarnings } from "./PhotoWarnings"
 import { ReadingSteps } from "./ReadingSteps"
 import { ResultsSection } from "./ResultsSection"
@@ -21,6 +22,7 @@ const CONTENTS: { id: string; label: string }[] = [
   { id: "warnings", label: "Photo warnings" },
   { id: "correction", label: "Which correction, and why" },
   { id: "cards", label: "ColorChecker or a Page" },
+  { id: "measuring", label: "Measuring the frame's colors" },
   { id: "limits", label: "Limits" },
   { id: "decides", label: "What the app decides" },
   { id: "privacy", label: "What leaves your phone" },
@@ -89,6 +91,7 @@ export function MethodPage() {
         <PhotoWarnings />
         <CorrectionSection />
         <CardsSection />
+        <MeasuringSection />
         <LimitsSection />
         <DecidesSection />
         <LeavesPhoneSection />

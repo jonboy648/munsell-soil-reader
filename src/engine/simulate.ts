@@ -3,7 +3,7 @@
 // Ported from the prototype's paintExample, plus a non-linear tone curve (the prototype's
 // camera was linear, which flatters the results).
 import * as munsell from "munsell"
-import { encode, mul, type Mat3, type Vec3 } from "./color"
+import { encode, labD50ToLinear, linearToLabD50, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
 import { BOARD, MARKER_CELLS, MARKER_ORIGINS, MARKER_SIZE, markerCellIsWhite } from "./frameLayout"
 import { pageModel, type PageChip, type PageHue } from "./page"
@@ -72,6 +72,28 @@ export const simPatchCenter = (row: number, column: number): XY => cardLayout(1)
 export const SIM_SPOT: XY = { x: SOIL_BOX.x + SOIL_BOX.w / 2, y: SOIL_BOX.y + SOIL_BOX.h / 2 }
 /** The Chip the simulated soil really is. */
 export const SIM_SOIL = "10YR 4/3"
+
+// ---- the swatch card (measurement mode) ----
+// Eighteen 20 mm swatches in six rows of three on a black board, beside the ColorChecker. A
+// ColorChecker patch is about 40 mm, so a swatch is half the size of one (62 px). The board is
+// tall and narrow so it stays in the Photo when the scene is turned away to the right.
+const SWATCH = { x: 660, y: 170, side: 31, pitch: 42, columns: 3, rows: 6, margin: 10 }
+
+/** The middle of swatch `index` (0 is swatch_01), in the straight-on scene. */
+const swatchCenter = (index: number): XY => ({
+  x: SWATCH.x + (index % SWATCH.columns) * SWATCH.pitch + SWATCH.side / 2,
+  y: SWATCH.y + Math.floor(index / SWATCH.columns) * SWATCH.pitch + SWATCH.side / 2,
+})
+
+/** The grays and soil colors the simulated swatch card carries: CIELAB under D50, swatch_01 first. */
+export function simSwatchLabs(): Vec3[] {
+  const grays = [95, 80, 65, 50, 35, 20].map((L): Vec3 => [L, 0, 0])
+  const soils = [
+    "10YR 3/2", "10YR 4/3", "10YR 5/4", "10YR 6/4", "7.5YR 3/3", "7.5YR 4/4",
+    "7.5YR 5/6", "5YR 3/2", "5YR 4/4", "2.5YR 3/4", "2.5Y 4/3", "2.5Y 6/3",
+  ].map((chip) => linearToLabD50(munsell.munsellToLinearRgb(chip) as Vec3))
+  return [...grays, ...soils]
+}
 
 // ---- the camera's angle on the scene ----
 /**
@@ -193,6 +215,8 @@ export interface SimPhoto {
   patches: XY[]
   /** The middle of the soil patch. */
   spot: XY
+  /** The middle of each swatch, swatch_01 first. Empty when the scene has no swatch card. */
+  swatches: XY[]
   /** A Page scene: the center of each hole, with soil behind it. Empty otherwise. */
   holes: XY[]
 }
@@ -203,6 +227,11 @@ export interface SimScene {
   card?: boolean
   /** The soil's true Chip, as Munsell notation. Default SIM_SOIL. */
   soil?: string
+  /**
+   * A swatch card beside the Card, in place of the soil patch: the true CIELAB (D50) color of
+   * each swatch, swatch_01 first, up to eighteen.
+   */
+  swatches?: Vec3[]
   /** Noise seed. Default 7. */
   seed?: number
   /** How big the Card is, 1 being the usual size. Its top left corner stays put. */
@@ -249,6 +278,7 @@ function simulateCardPhoto({
   camera,
   card = true,
   soil = SIM_SOIL,
+  swatches = [],
   seed = 7,
   cardScale = 1,
   frameGap,
@@ -267,6 +297,7 @@ function simulateCardPhoto({
   const frame = shoot(camera, [0.012, 0.012, 0.012])
   const board = shoot(camera, [0.6, 0.6, 0.6])
   const patches = PATCH_LINEAR.map((lin) => shoot(camera, lin))
+  const swatchRgb = swatches.map((lab) => shoot(camera, labD50ToLinear(lab)))
   const data = new Uint8ClampedArray(SIM_WIDTH * SIM_HEIGHT * 4)
   const fx0 = CARD.x - layout.frame
   const fx1 = CARD.x + 6 * layout.pitch - layout.gap + layout.frame
@@ -311,7 +342,19 @@ function simulateCardPhoto({
           rgb = patches[r * 6 + c]
         }
       }
-      if (u >= SOIL_BOX.x && u < SOIL_BOX.x + SOIL_BOX.w && v >= SOIL_BOX.y && v < SOIL_BOX.y + SOIL_BOX.h) {
+      if (swatchRgb.length > 0) {
+        const { x, y, side, pitch, columns, rows, margin } = SWATCH
+        if (u >= x - margin && u < x + (columns - 1) * pitch + side + margin && v >= y - margin && v < y + (rows - 1) * pitch + side + margin) {
+          rgb = frame
+          noise = 2
+          const c = Math.floor((u - x) / pitch)
+          const r = Math.floor((v - y) / pitch)
+          if (u >= x && v >= y && (u - x) % pitch < side && (v - y) % pitch < side && c < columns && r < rows && r * columns + c < swatchRgb.length) {
+            rgb = swatchRgb[r * columns + c]
+            noise = 3
+          }
+        }
+      } else if (u >= SOIL_BOX.x && u < SOIL_BOX.x + SOIL_BOX.w && v >= SOIL_BOX.y && v < SOIL_BOX.y + SOIL_BOX.h) {
         rgb = soilRgb
         noise = 5
       }
@@ -327,6 +370,7 @@ function simulateCardPhoto({
     corners: layout.corners.map(at) as Corners,
     patches: Array.from({ length: 24 }, (_, i) => at(layout.center(Math.floor(i / 6), i % 6))),
     spot: at(SIM_SPOT),
+    swatches: swatches.map((_, i) => at(swatchCenter(i))),
     holes: [],
   }
 }
@@ -431,12 +475,15 @@ function simulatePagePhoto({
     corners: taps.map((c) => at(pageCenter(c.col, c.row))) as Corners,
     patches: chips.map((c) => at(pageCenter(c.col, c.row))),
     spot: at(SIM_SPOT),
+    swatches: [],
     holes,
   }
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "page" | "smudge"
+export type ExampleId =
+  | "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "glare" | "page" | "smudge"
+  | "swatches-warm" | "swatches-angled"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -523,5 +570,25 @@ export const EXAMPLES: ExamplePhoto[] = [
     name: "Smudged black patch",
     note: "The Card's black patch has gone gray with handling, and the soil is dark. The Card check names the patch, leaves it out and still reads the soil.",
     scene: { camera: phone(hazyBlack(LIGHTS.warm)), soil: "10YR 3/2" },
+  },
+]
+
+/**
+ * Example Photos for measurement mode: the same swatch card, shot twice the way a maker would,
+ * in a different light and from a different place. Made on call, not at load, because the
+ * swatch colors take a Munsell conversion each.
+ */
+export const measureExamples = (): ExamplePhoto[] => [
+  {
+    id: "swatches-warm",
+    name: "Swatch card, warm light",
+    note: "The 18 swatches beside the Card, straight on.",
+    scene: { camera: phone(LIGHTS.warm), swatches: simSwatchLabs() },
+  },
+  {
+    id: "swatches-angled",
+    name: "Swatch card, tilted, camera color shift",
+    note: "The same swatches from a different place: tilted, in another light, with other noise.",
+    scene: { camera: phone(LIGHTS.shift), swatches: simSwatchLabs(), tilt: { yaw: 25, pitch: 10 }, seed: 11 },
   },
 ]

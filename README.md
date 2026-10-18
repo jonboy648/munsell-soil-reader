@@ -136,7 +136,7 @@ twice. The user confirms the outline, and can press-drag a corner onto its marke
 magnifier. The outline fixes a homography from the frame's layout in millimetres
 (`src/engine/frameLayout.json`, agent-fab's prototype 1) to the Photo, which places every patch,
 the window and the black base used for the evenness check. The grays are the tone ladder. The
-Spots go in the window; a Spot outside it is read, with a note.
+first Spot goes in the middle of the window when the frame is ready (outline confirmed, batch measured), since that is where the soil is; Undo takes it back, and more Spots are tapped as usual. A Spot outside the window is read, with a note.
 
 The patches' true colors come from the frame's batch: a CSV per print batch, found by the batch
 code printed on the frame ([docs/frame-batches.md](docs/frame-batches.md)). No batch has been

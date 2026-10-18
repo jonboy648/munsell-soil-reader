@@ -2,9 +2,9 @@
 import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
-import { patchCenters } from "./colorchecker"
+import { patchSites } from "./colorchecker"
 import { cardFitError, fitCardCorrection } from "./correction"
-import { medianLinear, patchRadius, spotRadius } from "./sampling"
+import { medianLinear, spotRadius } from "./sampling"
 import type {
   CardCheck,
   ChipReading,
@@ -57,8 +57,7 @@ function readColor(lin: Vec3): ChipReading {
 }
 
 function fitCard(pixels: Pixels, corners: Corners) {
-  const radius = patchRadius(corners)
-  const measured = patchCenters(corners).map((p) => medianLinear(pixels, p, radius))
+  const measured = patchSites(corners).map(({ center, radius }) => medianLinear(pixels, center, radius))
   const correct = fitCardCorrection(measured)
   const meanDE = cardFitError(measured, correct)
   const check: CardCheck = { meanDE, ok: meanDE < CARD_CHECK_GOOD }

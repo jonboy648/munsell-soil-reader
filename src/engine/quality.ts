@@ -165,6 +165,12 @@ function evennessSpread(
   return stops[stops.length - 1 - trim] - stops[trim]
 }
 
+export interface QualityResult {
+  warnings: QualityWarning[]
+  /** The grays on the Card came out in the wrong order: the corners are probably not on the Card. */
+  offCard: boolean
+}
+
 const ADVICE = {
   cardGlare: "Glare on the Card. Tilt the Card or move into shade to lose the reflection, then take the Photo again.",
   spotGlare: "Glare on this Spot. Tilt the sample or move into shade to lose the reflection, or tap a Spot away from the shine.",
@@ -177,7 +183,7 @@ const ADVICE = {
   small: "The Card is small in the Photo. Move closer so the Card fills more of the Photo, then take it again.",
 }
 
-export function checkQuality({ pixels, spots, spotRadius, references, spacing, evenness }: QualityInput): QualityWarning[] {
+export function checkQuality({ pixels, spots, spotRadius, references, spacing, evenness }: QualityInput): QualityResult {
   const out: QualityWarning[] = []
   const warn = (kind: QualityWarning["kind"], where: QualityWarning["where"], advice: string) =>
     out.push({ kind, where, advice })
@@ -246,5 +252,5 @@ export function checkQuality({ pixels, spots, spotRadius, references, spacing, e
       warn("clipped", i, ADVICE.spotCrushed)
     }
   })
-  return out
+  return { warnings: out, offCard }
 }

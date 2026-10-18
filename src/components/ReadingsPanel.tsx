@@ -52,7 +52,7 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
 
 function SpotReading({ result, index }: { result: ReadPhotoResult; index: number }) {
   const reading = result.readings[index]
-  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality))
+  const { verdict, main, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard)
   return (
     <section aria-label={`Spot ${index + 1}`} className="grid gap-3 border-t border-border py-4 first:border-t-0">
       <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -111,7 +111,7 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
 export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
-  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality))
+  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, cardWarnings(result.quality), result.offCard)
   return (
     <Drawer>
       <DrawerTrigger asChild>

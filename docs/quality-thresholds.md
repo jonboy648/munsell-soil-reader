@@ -50,7 +50,7 @@ the Card check is good (0.68 and 0.76, through the example tone curve of 0.5) an
 channels are at 253 or more: both examples pass. The shift example flags at 5% more light, and
 the warm one at 30% more, when a second channel reaches the top. Crushed uses every channel: dark
 soil has almost no blue, so one channel at 0 is not a lost Spot. The one-channel rule (even at 253)
-makes 29 of the 46 quality tests fail.
+makes 31 of the 49 quality tests fail.
 
 **Glare against exposure.** Both are blown pixels, so the Card says which. White is the brightest
 thing on the Card in every channel, so under any exposure it is blown at least as much as any
@@ -149,7 +149,9 @@ Card turned or flipped, and all 7 count 3 or more (3, 4, 7, 8, 11, 12 and 15). T
 the taps over, so the Card's map puts every patch at the middle of the taps: the references read
 one pixel, the grays are all equal (0 inversions), the frame places are all one spot (spread 0)
 and nothing is flagged, and the Card check fails. Off the Card, uneven light and Card too small
-are skipped. With fewer than 3 readable grays the references are taken as placed. Glare and
+are skipped, and the result carries `offCard`, which makes the failed-check text blame the corner
+order rather than the Card warnings (they were read from the wrong places). With fewer than 3
+readable grays the references are taken as placed. Glare and
 clipping are not skipped: with no white to compare to, a reference that is partly blown is glare
 and one that is mostly blown is exposure, and mostly blown wins.
 

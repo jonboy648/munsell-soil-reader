@@ -114,6 +114,6 @@ export function readPhoto({
     return reading
   })
   const cardParts = card.kind === "colorchecker" ? cardQuality(card.corners) : { references: [] }
-  const quality = checkQuality({ pixels, spots, spotRadius: radius, ...cardParts })
-  return { ...(fit ? { cardCheck: fit.check } : {}), quality, readings }
+  const { warnings: quality, offCard } = checkQuality({ pixels, spots, spotRadius: radius, ...cardParts })
+  return { ...(fit ? { cardCheck: fit.check } : {}), ...(offCard ? { offCard } : {}), quality, readings }
 }

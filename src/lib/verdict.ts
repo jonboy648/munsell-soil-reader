@@ -20,6 +20,7 @@ export function shownReading(
   reading: Reading,
   cardCheck: CardCheck | undefined,
   cardWarnings: QualityWarning[] = [],
+  offCard = false,
 ): Shown {
   if (reading.corrected && cardCheck?.ok) {
     return {
@@ -28,8 +29,10 @@ export function shownReading(
       why: `Each of the 24 Card patches, corrected by a fit that left it out, is off by ${fmt(cardCheck.meanDE)} on average, so the correction can be trusted.`,
     }
   }
-  if (reading.corrected && cardCheck && cardWarnings.length > 0) {
-    // A problem with the Card is flagged, and it explains the failure better than a guess.
+  if (reading.corrected && cardCheck && cardWarnings.length > 0 && !offCard) {
+    // A problem with the Card is flagged, and it explains the failure better than a guess,
+    // unless the grays say the corners are off the Card: then the warnings were read from the
+    // wrong places, and the corner order is the likelier cause.
     return {
       verdict: "failed",
       main: reading.raw,

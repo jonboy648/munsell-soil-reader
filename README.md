@@ -21,9 +21,12 @@ npm run typecheck        # tsc -b over the app, the config files and the browser
 npm test                 # engine tests (Vitest)
 npx playwright install chromium   # once, for the browser tests
 npm run test:e2e         # browser tests (Playwright): builds, serves, drives Chromium on a phone viewport
+npx playwright install webkit firefox   # once, to run the other engines too
+npm run test:e2e -- --project=webkit    # one engine: chromium, webkit or firefox
 ```
 
-CI runs typecheck, `npm test` and `npm run test:e2e` on every pull request.
+CI runs typecheck and `npm test` once, and the browser tests on Chromium, Firefox and WebKit, on
+every pull request. See Tests below.
 
 ## Deploys
 
@@ -133,13 +136,46 @@ Two seams, and nothing else:
 - **Engine** (`src/engine/*.test.ts`): a simulated camera (`src/engine/simulate.ts`) renders
   a Card and soil of a known Chip under a chosen light, exposure, color shift, tone curve and
   tilt, then calls `readPhoto`. The same simulated camera makes the example Photos in the app.
-- **Browser** (`e2e/*.spec.ts`): the production build in Chromium at a phone viewport. It
-  picks an example, taps corners and Spots by coordinates and reads the text on screen.
+- **Browser** (`e2e/*.spec.ts`): the production build at a phone viewport. It picks an example,
+  taps corners and Spots by coordinates and reads the text on screen.
   `e2e/offline.spec.ts` covers install and offline: the manifest, Chromium's installability
   check, a Reading with the network off, and the notices for the first install and for each kind
   of new deploy (served through a small proxy that publishes new versions of the app). The
   browser tests run with service workers blocked (`playwright.config.ts`), so other specs never
   see these notices; the offline spec turns them back on.
+
+The browser tests run on three engines, one Playwright project each (`playwright.config.ts`):
+
+| Project | Engine | Screen | CI runner |
+| --- | --- | --- | --- |
+| `chromium` | Chromium | Pixel 7 (emulated phone) | ubuntu-latest |
+| `firefox` | Firefox | 412 x 839 with touch; Firefox cannot emulate a phone | ubuntu-latest |
+| `webkit` | WebKit, the engine of Safari | iPhone 15 (emulated phone) | macos-latest |
+
+`npm run test:e2e` runs Chromium only, so one `npx playwright install chromium` is enough and
+`deploy.yml` is unchanged. Naming a project runs just that engine, and naming several runs
+those: `npm run test:e2e -- --project=webkit --project=firefox`. CI (`ci.yml`) runs every spec in
+`e2e/` on each engine as its own job, so a new spec joins all three by being added. All three
+jobs run to the end and the workflow fails if any one fails. A test that passes only on its
+retry counts as a failure in CI: it is fixed or ticketed, not retried away. Each job's summary
+page lists passed, skipped, flaky and failed (`scripts/e2e-summary.mjs`).
+
+A test that only one engine can run is skipped on the others, with the reason, so it shows as
+skipped and is counted rather than passing without running. A test that drives touch through the
+Chrome DevTools Protocol (CDP), or asks Chromium whether the app is installable, is Chromium only:
+
+```ts
+test("...", async ({ browserName }) => {
+  test.skip(browserName !== "chromium", "needs the Chrome DevTools Protocol, which only Chromium has")
+  ...
+})
+```
+
+`fingers()` in `e2e/magnifier.spec.ts` does this for every test that sends raw touch events.
+
+Taps: a click lands on a whole CSS pixel, and engines get there differently (Chromium rounds,
+WebKit and Firefox cut off the fraction). A test that measures where a tap landed must round the
+tap itself (see `tapPhoto` in `e2e/angled.spec.ts`) and allow for half a CSS pixel.
 
 ## Limits
 

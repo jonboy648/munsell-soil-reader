@@ -5,12 +5,39 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { XY } from "../src/engine"
 import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
 
-/** Where a place on the Photo, given in Photo pixels, is on screen. */
+/**
+ * Where a place on the Photo, given in Photo pixels, is in the coordinates fingers and the mouse
+ * use: CSS pixels from the top left of what is on screen. That is the page's own coordinates
+ * unless the page is pinch-zoomed in.
+ */
 async function onScreen(page: Page, point: XY): Promise<XY> {
-  const box = await page.getByTestId("photo").boundingBox()
-  if (!box) throw new Error("The Photo is not on screen")
-  return { x: box.x + (point.x * box.width) / SIM_WIDTH, y: box.y + (point.y * box.height) / SIM_HEIGHT }
+  const at = await page.getByTestId("photo").evaluate((photo) => {
+    const r = photo.getBoundingClientRect()
+    return { x: r.left - visualViewport!.offsetLeft, y: r.top - visualViewport!.offsetTop, w: r.width, h: r.height }
+  })
+  return { x: at.x + (point.x * at.w) / SIM_WIDTH, y: at.y + (point.y * at.h) / SIM_HEIGHT }
 }
+
+/** Where an element is on the glass, in screen pixels (CSS pixels times the pinch-zoom scale). */
+const onGlass = (element: Locator) =>
+  element.evaluate((node) => {
+    const vv = visualViewport!
+    const r = node.getBoundingClientRect()
+    return {
+      left: (r.left - vv.offsetLeft) * vv.scale,
+      top: (r.top - vv.offsetTop) * vv.scale,
+      width: r.width * vv.scale,
+      height: r.height * vv.scale,
+    }
+  })
+
+/** How big the screen is, in screen pixels, and how far the page is pinch-zoomed in. */
+const glassOf = (page: Page) =>
+  page.evaluate(() => ({
+    width: visualViewport!.width * visualViewport!.scale,
+    height: visualViewport!.height * visualViewport!.scale,
+    scale: visualViewport!.scale,
+  }))
 
 type TouchType = "touchStart" | "touchMove" | "touchEnd" | "touchCancel"
 
@@ -59,6 +86,80 @@ async function expectNothingPlaced(page: Page, lens: Locator) {
   await expect(page.getByTestId("corner-prompt")).toContainText(FIRST_CORNER)
 }
 
+type Fingers = Awaited<ReturnType<typeof fingers>>
+
+/** Two fingers on the middle of the Photo, `from` then `to` CSS pixels either side of the middle. */
+async function pinch(page: Page, touch: Fingers, from: number, to: number) {
+  const x = page.viewportSize()!.width / 2
+  const { y } = await onScreen(page, { x: SIM_WIDTH / 2, y: SIM_HEIGHT / 2 })
+  const apart = (half: number): [XY, XY] => [{ x: x - half, y }, { x: x + half, y }]
+  await touch.send("touchStart", apart(from)[0])
+  await touch.send("touchStart", ...apart(from))
+  for (let i = 1; i <= 12; i++) await touch.send("touchMove", ...apart(from + ((to - from) * i) / 12))
+  await touch.send("touchEnd", { ...apart(to)[1], id: 1 })
+  await touch.send("touchEnd")
+}
+
+const LENS = 136 // the magnifier's size on screen, in pixels, when there is room
+
+/** Presses the part of the Photo that is on screen, from its corners to its middle, and checks the lens. */
+async function expectLensClearOfFinger(page: Page, touch: Fingers, smallest: number) {
+  const glass = await glassOf(page)
+  const photo = await onGlass(page.getByTestId("photo"))
+  const left = Math.max(photo.left, 0) + 4
+  const right = Math.min(photo.left + photo.width, glass.width) - 4
+  const top = Math.max(photo.top, 0) + 4
+  const bottom = Math.min(photo.top + photo.height, glass.height) - 4
+
+  for (const y of [top, (top + bottom) / 2, bottom]) {
+    for (const x of [left, (left + right) / 2, right]) {
+      await touch.send("touchStart", { x: x / glass.scale, y: y / glass.scale })
+      await expect(touch.lens).toBeVisible()
+      const l = await onGlass(touch.lens)
+      const where = `finger at ${x},${y}, lens at ${l.left},${l.top}, ${l.width} wide, on a ${glass.width}x${glass.height} screen`
+      expect(l.left >= -0.5 && l.top >= -0.5, where).toBe(true)
+      expect(l.left + l.width <= glass.width + 0.5 && l.top + l.height <= glass.height + 0.5, where).toBe(true)
+      // Its size on the glass does not depend on the zoom: full size unless the screen is too narrow.
+      expect(l.width, where).toBeGreaterThanOrEqual(smallest)
+      expect(l.width, where).toBeLessThanOrEqual(LENS + 0.5)
+      // A fingertip and thumb: about 50 wide, reaching 90 below the touch point.
+      const underThumb = l.left < x + 25 && l.left + l.width > x - 25 && l.top < y + 90 && l.top + l.height > y
+      expect(underThumb, where).toBe(false)
+      await touch.send("touchCancel")
+      await expect(touch.lens).toHaveCount(0)
+    }
+  }
+}
+
+// The right edge of the magenta patch, with the dark frame past it, and the row through its middle.
+const MAGENTA_EDGE: XY = { x: 418, y: 299 }
+
+/**
+ * Presses just left of that edge, near enough that a 4x lens has it 30 screen pixels from its
+ * middle at any pinch-zoom (the lens only shows a few Photo pixels when the page is zoomed in).
+ * Returns how many Photo pixels left of the edge that is.
+ */
+async function pressNearEdge(page: Page, touch: Fingers) {
+  const photo = await onGlass(page.getByTestId("photo"))
+  const away = 30 / (4 * (photo.width / SIM_WIDTH))
+  await touch.send("touchStart", await onScreen(page, { x: MAGENTA_EDGE.x - away, y: MAGENTA_EDGE.y }))
+  return away
+}
+
+/** How many times bigger than it looks on screen the lens shows the Photo, from where that edge falls. */
+async function lensMagnification(page: Page, lens: Locator, away: number) {
+  const photo = await onGlass(page.getByTestId("photo"))
+  const edge = await lens.evaluate((canvas: HTMLCanvasElement) => {
+    // A row clear of the crosshair, walking right from the middle to the first dark pixel.
+    const row = canvas.getContext("2d")!.getImageData(0, canvas.height / 2 + canvas.height / 5, canvas.width, 1).data
+    let x = Math.floor(canvas.width / 2)
+    while (x < canvas.width && row[x * 4] >= 128) x++
+    const glassPerPixel = (canvas.clientWidth * visualViewport!.scale) / canvas.width
+    return (x - canvas.width / 2) * glassPerPixel
+  })
+  return edge / (away * (photo.width / SIM_WIDTH))
+}
+
 test("holding then dragging places each corner and the Spot where the finger lifts", async ({ page }) => {
   await pickExample(page, "Warm shop light")
   const touch = await fingers(page)
@@ -79,27 +180,14 @@ test("the magnifier shows under a held finger, magnified, and goes when it lifts
   const touch = await fingers(page)
   await expect(touch.lens).toHaveCount(0)
 
-  // 20 Photo pixels right of the left edge of the white patch.
-  const press: XY = { x: 80, y: 360 }
-  await touch.send("touchStart", await onScreen(page, press))
+  const away = await pressNearEdge(page, touch)
   await expect(touch.lens).toBeVisible()
   const box = (await touch.lens.boundingBox())!
-  expect(box.y + box.height).toBeLessThan((await onScreen(page, press)).y) // above the finger
-
-  // Where the white patch's left edge falls in the lens says how much it is magnified.
-  const photoBox = (await page.getByTestId("photo").boundingBox())!
-  const edge = await touch.lens.evaluate((canvas: HTMLCanvasElement) => {
-    const row = canvas.getContext("2d")!.getImageData(0, canvas.height / 2 + canvas.height / 5, canvas.width, 1).data
-    let x = Math.floor(canvas.width / 2) // in the white patch; walk left to the first dark pixel
-    while (x > 0 && row[x * 4] >= 128) x--
-    return { fromCenter: x - canvas.width / 2, perCssPixel: canvas.width / canvas.clientWidth }
-  })
-  const photoPixelsOnScreen = photoBox.width / SIM_WIDTH
-  const zoom = -edge.fromCenter / edge.perCssPixel / (20 * photoPixelsOnScreen)
-  expect(zoom).toBeGreaterThanOrEqual(3)
+  expect(box.y + box.height).toBeLessThan((await onScreen(page, MAGENTA_EDGE)).y) // above the finger
+  expect(await lensMagnification(page, touch.lens, away)).toBeGreaterThanOrEqual(3)
 
   // It follows the finger, centered on it once clear of the screen's edge.
-  const moved = await onScreen(page, { x: 230, y: press.y })
+  const moved = await onScreen(page, { x: 230, y: MAGENTA_EDGE.y })
   await touch.send("touchMove", moved)
   await expect
     .poll(async () => {
@@ -151,26 +239,58 @@ test("the crosshair is on the exact point that will be placed", async ({ page })
 
 test("the magnifier stays on screen and clear of the finger wherever the Photo is pressed", async ({ page }) => {
   await pickExample(page, "Warm shop light")
-  const touch = await fingers(page)
-  const view = page.viewportSize()!
-  const photo = (await page.getByTestId("photo").boundingBox())!
-  const xs = [4, view.width / 2, view.width - 4]
-  const ys = [photo.y + 4, photo.y + photo.height / 2, photo.y + photo.height - 4]
+  await expectLensClearOfFinger(page, await fingers(page), LENS - 1)
+})
 
-  for (const y of ys) {
-    for (const x of xs) {
-      await touch.send("touchStart", { x, y })
-      await expect(touch.lens).toBeVisible()
-      const b = (await touch.lens.boundingBox())!
-      const where = `press at ${x},${y}, lens at ${b.x},${b.y}`
-      expect(b.x >= 0 && b.y >= 0 && b.x + b.width <= view.width && b.y + b.height <= view.height, where).toBe(true)
-      // A fingertip and thumb: about 50 wide, reaching 90 below the touch point.
-      const underThumb = b.x < x + 25 && b.x + b.width > x - 25 && b.y < y + 90 && b.y + b.height > y
-      expect(underThumb, where).toBe(false)
-      await touch.send("touchCancel")
-      await expect(touch.lens).toHaveCount(0)
-    }
-  }
+// Pinch-zoomed in, the magnifier keeps its size on the glass, still shows 4x what is on screen,
+// and still stays clear of the finger. 1.6x is where an unscaled lens used to cover the finger;
+// the most the browser zooms is 5x.
+for (const [name, from, to, least, most] of [
+  ["about 1.6x", 100, 138, 1.4, 1.9],
+  ["the most it goes", 16, 160, 4.5, 5.1],
+] as const) {
+  test(`the magnifier keeps its size and place when the page is zoomed in ${name}`, async ({ page }) => {
+    await pickExample(page, "Warm shop light")
+    const touch = await fingers(page)
+    await pinch(page, touch, from, to)
+    await expect.poll(async () => (await glassOf(page)).scale).toBeGreaterThan(least)
+    expect((await glassOf(page)).scale).toBeLessThan(most)
+    await expectLensClearOfFinger(page, touch, LENS - 1)
+
+    const away = await pressNearEdge(page, touch)
+    await expect(touch.lens).toBeVisible()
+    const zoom = await lensMagnification(page, touch.lens, away)
+    expect(zoom).toBeGreaterThan(3.5)
+    expect(zoom).toBeLessThan(4.5)
+    await touch.send("touchCancel")
+  })
+}
+
+test("the magnifier moves back on screen if the screen gets shorter while it is held", async ({ page }) => {
+  await pickExample(page, "Warm shop light")
+  const touch = await fingers(page)
+  const photo = (await page.getByTestId("photo").boundingBox())!
+  // Near the top of the screen, so the lens is beside the finger, part way down.
+  await touch.send("touchStart", { x: 206, y: photo.y + 4 })
+  await expect(touch.lens).toBeVisible()
+
+  await page.setViewportSize({ width: 412, height: 150 })
+  await expect
+    .poll(async () => {
+      const l = await onGlass(touch.lens)
+      return l.top + l.height <= 150
+    })
+    .toBe(true)
+  await touch.send("touchCancel")
+})
+
+test.describe("on a narrow phone", () => {
+  test.use({ viewport: { width: 320, height: 658 } })
+
+  test("the magnifier shrinks beside the finger rather than cover it", async ({ page }) => {
+    await pickExample(page, "Warm shop light")
+    await expectLensClearOfFinger(page, await fingers(page), 80)
+  })
 })
 
 test("a swipe on the Photo scrolls the page and places nothing", async ({ page }) => {
@@ -230,24 +350,11 @@ test("a pinch places nothing, whether the second finger comes down early or afte
 test("the page can still be pinch-zoomed and zoomed back out with two fingers on the Photo", async ({ page }) => {
   await pickExample(page, "Warm shop light")
   const touch = await fingers(page)
-  const photo = (await page.getByTestId("photo").boundingBox())!
-  const x = page.viewportSize()!.width / 2
-  const y = photo.y + photo.height / 2
-  const zoom = () => page.evaluate(() => visualViewport!.scale)
+  const zoom = async () => (await glassOf(page)).scale
 
-  // Two fingers, `from` then `to` CSS pixels either side of the middle of the Photo.
-  const pinch = async (from: number, to: number) => {
-    const apart = (half: number): [XY, XY] => [{ x: x - half, y }, { x: x + half, y }]
-    await touch.send("touchStart", apart(from)[0])
-    await touch.send("touchStart", ...apart(from))
-    for (let i = 1; i <= 12; i++) await touch.send("touchMove", ...apart(from + ((to - from) * i) / 12))
-    await touch.send("touchEnd", { ...apart(to)[1], id: 1 })
-    await touch.send("touchEnd")
-  }
-
-  await pinch(16, 160)
+  await pinch(page, touch, 16, 160)
   await expect.poll(zoom).toBeGreaterThan(1.5)
-  await pinch(160, 16)
+  await pinch(page, touch, 160, 16)
   await expect.poll(zoom).toBeLessThan(1.1)
   await expectNothingPlaced(page, touch.lens)
 })

@@ -1,56 +1,14 @@
 // Seam 2: the wetland form's first page from the Log. A project, a sampling point and its layers
 // are typed in, the Soil page is previewed and downloaded as a PDF, and the PDF is read back.
 import { readFileSync } from "node:fs"
-import { expect, test, type Locator, type Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import type { XY } from "../src/engine"
 import { JF1_ROWS } from "../src/delineation/fixtures/jf1"
 import { pdfText } from "../src/delineation/testing/pdfText"
 import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
+import { addLayer, createPoint, openProjects } from "./projects"
 
 const JF1_VALUES = JF1_ROWS.flatMap((row) => row.filter((text) => text !== ""))
-
-const projects = (page: Page) => page.getByRole("dialog", { name: "Projects", exact: true })
-
-async function openProjects(page: Page) {
-  await page.getByRole("button", { name: "Projects", exact: true }).click()
-  return projects(page)
-}
-
-interface LayerFields {
-  top: string
-  bottom: string
-  matrix?: string
-  matrixPercent?: string
-  redox?: [string, string][]
-  remarks?: string
-}
-
-async function addLayer(sheet: Locator, layer: LayerFields) {
-  await sheet.getByRole("button", { name: "Add layer" }).click()
-  await sheet.getByLabel("Top (in)").fill(layer.top)
-  await sheet.getByLabel("Bottom (in)").fill(layer.bottom)
-  if (layer.matrix) await sheet.getByLabel("Matrix color").fill(layer.matrix)
-  if (layer.matrixPercent) await sheet.getByLabel("Matrix %").fill(layer.matrixPercent)
-  for (const [i, [color, percent]] of (layer.redox ?? []).entries()) {
-    await sheet.getByRole("button", { name: "Add a redox color" }).click()
-    await sheet.getByLabel(`Redox color ${i + 1}`).fill(color)
-    await sheet.getByLabel(`Redox % ${i + 1}`).fill(percent)
-  }
-  if (layer.remarks) await sheet.getByLabel("Remarks").fill(layer.remarks)
-  await sheet.getByRole("button", { name: "Save layer" }).click()
-}
-
-/** A project and a sampling point, with the point open. */
-async function createPoint(page: Page, projectName: string, pointName: string) {
-  const sheet = await openProjects(page)
-  await sheet.getByLabel("Project name").fill(projectName)
-  await sheet.getByRole("button", { name: "Create project" }).click()
-  await sheet.getByRole("button", { name: "Open project" }).click()
-  await sheet.getByLabel("Sampling point name").fill(pointName)
-  await sheet.getByRole("button", { name: "Add sampling point" }).click()
-  await sheet.getByRole("button", { name: "Open point" }).click()
-  return sheet
-}
 
 test("JF-1 is typed in, previewed and exported as a PDF whose text reads back as transcribed", async ({ page }) => {
   await page.goto("/")

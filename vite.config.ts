@@ -13,9 +13,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      // A new service worker waits until the user taps Reload (see UpdateNotice), so a Reading in
+      // A new service worker waits until the user taps Reload (see src/components/UpdateNotice.tsx), so a Reading in
       // progress is never swapped out from under them.
       registerType: "prompt",
+      // The app registers the worker itself (src/lib/serviceWorker.ts).
+      injectRegister: false,
       manifest: {
         id: "/",
         name: "Munsell Soil Reader",

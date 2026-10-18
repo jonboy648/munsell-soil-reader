@@ -81,12 +81,15 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   A layer also takes a texture from the NRCS Field Book's classes (`texture.ts`: the 21 classes, the
   mucky modifier, muck, mucky peat and peat), the form's redox type and location codes, and colors typed
   by hand, which are checked against the Chip list (`colorCheck.ts`).
-  Location is off for every Project until its switch is turned on (`Project.location`). Then a Sampling
+  Location is off for every Project until its switch is turned on (`Project.location`); the Log's own
+  "Save my location with this Sample" switch is separate. Then a Sampling
   point gets "Use my location" (the phone's position into Lat, Long and Datum) and, with a signal, the
   position is sent to two public keyless services (`lookup/`): NRCS Soil Data Access for the Soil Map
   Unit Name and the US Fish and Wildlife Service NWI map service for the NWI classification. The
   answers fill the point's own two lines (they win over the header's), and a value the user typed is
-  never replaced. With the setting off nothing reads the position and no request is made; browser tests
+  never replaced, and one an earlier look-up wrote is removed when the position moves to a place with
+  none. Turning the setting off, or leaving the point, aborts a look-up under way and writes nothing.
+  With the setting off nothing in a project reads the position and no request is made; browser tests
   hold that with spies. The NWI fixtures were recorded live; the Soil Data Access fixture
   (`lookup/fixtures/sda-hit.from-docs.json`) has its shape from the service's documentation and is not
   yet recorded live, and whether that service answers a browser on the app's origin is unconfirmed.

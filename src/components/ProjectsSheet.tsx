@@ -183,7 +183,8 @@ function HeaderCard({ project, change }: { project: Project; change: Change }) {
     <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Form header, page 1</h4>
       <p data-testid="header-summary" className="text-sm">
-        {filled} of {PROJECT_FIELDS.length} lines filled. They print on every sampling point's form.
+        {filled} of {PROJECT_FIELDS.length} lines filled. They print on every sampling point's form, except that a point's own Soil Map Unit Name and
+        NWI classification print instead of these two.
       </p>
       <Button variant="outline" className="h-11 text-base" onClick={() => setEditing(true)}>
         Edit header
@@ -216,9 +217,10 @@ function LocationCard({ project, change }: { project: Project; change: Change })
         Use this phone's location in this project
       </label>
       <p className="text-sm text-muted-foreground">
-        Off unless you turn it on. While it is off the app never reads the phone's position and sends nothing. On, each sampling point gets a button
-        that fills its latitude and longitude and, with a signal, sends that position to NRCS Soil Data Access and the US Fish and Wildlife Service
-        wetlands map to fill the Soil Map Unit Name and the NWI classification. You can edit what comes back.
+        Off unless you turn it on. While it is off, this project's sampling points never read the phone's position and send nothing. On, each
+        sampling point gets a button that fills its latitude and longitude and, with a signal, sends that position to NRCS Soil Data Access and the
+        US Fish and Wildlife Service wetlands map to fill the Soil Map Unit Name and the NWI classification. You can edit what comes back. Saving a
+        position with a Sample in the Log is a separate switch, on the save sheet.
       </p>
       {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
     </div>

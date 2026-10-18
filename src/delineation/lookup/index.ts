@@ -18,27 +18,49 @@ export interface Lookups {
 /** How long a service gets to answer before the field is left for the user to type. */
 const WAIT_MS = 10_000
 
-async function json(doFetch: typeof fetch, url: string, init?: RequestInit): Promise<unknown> {
-  const response = await doFetch(url, { ...init, signal: AbortSignal.timeout(WAIT_MS) })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const text = await response.text()
-  return text.trim() === "" ? null : JSON.parse(text)
+export interface Ask {
+  /** For a test; the browser's own `fetch` otherwise. */
+  fetch?: typeof fetch
+  /** Aborting it cancels every request still under way. */
+  signal?: AbortSignal
+  /** Milliseconds a service gets. */
+  wait?: number
+}
+
+/** One request that ends when the service answers, when `wait` runs out, or when `signal` aborts. */
+async function json(url: string, ask: Ask, init?: RequestInit): Promise<unknown> {
+  const { signal, wait = WAIT_MS, fetch: doFetch = (...args: Parameters<typeof fetch>) => fetch(...args) } = ask
+  if (signal?.aborted) throw new Error("stopped")
+  // One controller for both reasons to stop, so nothing newer than AbortController is needed.
+  const request = new AbortController()
+  const stop = () => request.abort()
+  const timer = setTimeout(stop, wait)
+  signal?.addEventListener("abort", stop, { once: true })
+  try {
+    const response = await doFetch(url, { ...init, signal: request.signal })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const text = await response.text()
+    return text.trim() === "" ? null : JSON.parse(text)
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener("abort", stop)
+  }
 }
 
 const unavailable = (): Outcome => ({ state: "unavailable" })
 
-async function soilMapUnit(where: Position, doFetch: typeof fetch): Promise<Outcome> {
+async function soilMapUnit(where: Position, ask: Ask): Promise<Outcome> {
   try {
-    const name = parseSda(await json(doFetch, SDA_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: sdaBody(where) }))
+    const name = parseSda(await json(SDA_URL, ask, { method: "POST", headers: { "Content-Type": "application/json" }, body: sdaBody(where) }))
     return name ? { state: "found", value: name } : { state: "none" }
   } catch {
     return unavailable()
   }
 }
 
-async function nwi(where: Position, doFetch: typeof fetch): Promise<Outcome> {
+async function nwi(where: Position, ask: Ask): Promise<Outcome> {
   try {
-    const hit = parseNwi(await json(doFetch, nwiUrl(where)))
+    const hit = parseNwi(await json(nwiUrl(where), ask))
     return hit ? { state: "found", value: hit.code, detail: hit.type } : { state: "none" }
   } catch {
     return unavailable()
@@ -46,48 +68,99 @@ async function nwi(where: Position, doFetch: typeof fetch): Promise<Outcome> {
 }
 
 /** Asks both services about the position. Sends it nowhere else. */
-export async function lookUp(where: Position, doFetch: typeof fetch = (...args) => fetch(...args)): Promise<Lookups> {
-  const [soil, wetland] = await Promise.all([soilMapUnit(where, doFetch), nwi(where, doFetch)])
+export async function lookUp(where: Position, ask: Ask = {}): Promise<Lookups> {
+  const [soil, wetland] = await Promise.all([soilMapUnit(where, ask), nwi(where, ask)])
   return { soilMapUnit: soil, nwi: wetland }
 }
 
+export type LookupKey = "soilMapUnit" | "nwi"
+const KEYS: readonly LookupKey[] = ["soilMapUnit", "nwi"]
+const WHAT: Record<LookupKey, string> = { soilMapUnit: "soil map unit", nwi: "NWI class" }
+
+interface Notable {
+  /** Found answers left out because the user's own value is there. */
+  kept?: readonly LookupKey[]
+  /** Values an earlier look-up wrote that were removed because the position changed. */
+  cleared?: readonly LookupKey[]
+}
+
 /** What to tell the user about a look-up, in plain words. `null` is a look-up that was not tried because there is no signal. */
-export function describeLookups(lookups: Lookups | null, kept: readonly LookupKey[] = []): string[] {
-  if (lookups === null || (lookups.soilMapUnit.state === "unavailable" && lookups.nwi.state === "unavailable")) {
-    return ["Lookup unavailable: the services could not be reached. Type the soil map unit and the NWI class yourself, or look them up when you have a signal."]
-  }
+export function describeLookups(lookups: Lookups | null, { kept = [], cleared = [] }: Notable = {}): string[] {
   const notes: string[] = []
-  const found: string[] = []
-  const lines: [LookupKey, string, Outcome][] = [
-    ["soilMapUnit", "soil map unit", lookups.soilMapUnit],
-    ["nwi", "NWI class", lookups.nwi],
-  ]
-  for (const [key, what, outcome] of lines) {
-    if (outcome.state === "found") (kept.includes(key) ? notes : found).push(kept.includes(key) ? `Kept what you typed for the ${what}.` : what)
-    if (outcome.state === "none") notes.push(what === "NWI class" ? "No NWI wetland is mapped at this position." : "No soil map unit is mapped at this position.")
-    if (outcome.state === "unavailable") notes.push(`Lookup unavailable for the ${what}: type it, or try again.`)
+  if (lookups === null || (lookups.soilMapUnit.state === "unavailable" && lookups.nwi.state === "unavailable")) {
+    notes.push("Lookup unavailable: the services could not be reached. Type the soil map unit and the NWI class yourself, or look them up when you have a signal.")
+  } else {
+    const filled: string[] = []
+    for (const key of KEYS) {
+      const outcome = lookups[key]
+      if (outcome.state === "found") {
+        if (kept.includes(key)) notes.push(`Kept what you typed for the ${WHAT[key]}.`)
+        else filled.push(WHAT[key])
+      }
+      if (outcome.state === "none") notes.push(key === "nwi" ? "No NWI wetland is mapped at this position." : "No soil map unit is mapped at this position.")
+      if (outcome.state === "unavailable") notes.push(`Lookup unavailable for the ${WHAT[key]}: type it, or try again.`)
+    }
+    if (filled.length > 0) {
+      const one = filled.length === 1
+      notes.unshift(`Filled in the ${filled.join(" and the ")} from this position. Edit ${one ? "it" : "them"} if ${one ? "it is" : "they are"} wrong.`)
+    }
   }
-  if (found.length > 0) notes.unshift(`Filled in the ${found.join(" and the ")} from this position. Edit ${found.length === 1 ? "it" : "them"} if ${found.length === 1 ? "it is" : "they are"} wrong.`)
+  // A value an earlier look-up wrote belongs to the old position, so it goes unless this one wrote it again.
+  for (const key of cleared) {
+    if (lookups?.[key].state !== "found") notes.push(`Cleared the ${WHAT[key]} that came from the earlier position.`)
+  }
   return notes
 }
 
-export type LookupKey = "soilMapUnit" | "nwi"
+/** A point after something was written into it, and what was left alone or removed on the way. */
+export interface Applied {
+  point: SamplingPoint
+  /** Found answers left out because the user's own value is there. */
+  kept: LookupKey[]
+  /** Values an earlier look-up wrote that were removed. */
+  cleared: LookupKey[]
+}
+
+/** True while a line is still exactly what the last look-up wrote, so the user has not made it their own. */
+const writtenByLookup = (point: SamplingPoint, key: LookupKey): boolean => {
+  const current = (point[key] ?? "").trim()
+  return current !== "" && current === point.lookedUp?.[key]
+}
+
+const without = (point: SamplingPoint, key: LookupKey): SamplingPoint => {
+  const { [key]: _gone, ...rest } = point
+  const { [key]: _mark, ...marks } = point.lookedUp ?? {}
+  return { ...rest, lookedUp: marks }
+}
 
 /**
- * The point with a look-up's answers written in, and which found answers were left out because the
- * user's own value is there. What the user typed stays: a value is replaced only while it is blank or
- * is still exactly what the last look-up wrote.
+ * The point with a look-up's answers written in. What the user typed stays: a value is replaced only
+ * while it is blank or is still exactly what the last look-up wrote. Where the position has no map
+ * unit or no wetland, a value the last look-up wrote is removed, since it was for another place.
  */
-export function withLookups(point: SamplingPoint, lookups: Lookups): { point: SamplingPoint; kept: LookupKey[] } {
-  const out: SamplingPoint = { ...point }
-  const lookedUp = { ...point.lookedUp }
+export function withLookups(point: SamplingPoint, lookups: Lookups): Applied {
+  let out = point
   const kept: LookupKey[] = []
-  for (const key of ["soilMapUnit", "nwi"] as const) {
+  const cleared: LookupKey[] = []
+  for (const key of KEYS) {
     const outcome = lookups[key]
-    if (outcome.state !== "found") continue
     const current = (point[key] ?? "").trim()
-    if (current !== "" && current !== point.lookedUp?.[key]) kept.push(key)
-    else out[key] = lookedUp[key] = outcome.value
+    if (outcome.state === "found") {
+      if (current !== "" && !writtenByLookup(point, key)) kept.push(key)
+      else out = { ...out, [key]: outcome.value, lookedUp: { ...out.lookedUp, [key]: outcome.value } }
+    } else if (outcome.state === "none" && writtenByLookup(point, key)) {
+      out = without(out, key)
+      cleared.push(key)
+    }
   }
-  return { point: { ...out, lookedUp }, kept }
+  return { point: out, kept, cleared }
+}
+
+/**
+ * The point with the values an earlier look-up wrote removed, for the moment its position changes:
+ * they describe the old place. What the user typed stays.
+ */
+export function withoutStaleLookups(point: SamplingPoint): Applied {
+  const cleared = KEYS.filter((key) => writtenByLookup(point, key))
+  return { point: cleared.reduce(without, point), kept: [], cleared }
 }

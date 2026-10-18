@@ -19,14 +19,16 @@ export function LeavesPhoneSection() {
       <Sub>Only when you turn on location for a project</Sub>
       <div data-testid="leaves-lookups" className="grid gap-2">
         <p>
-          Location is off for every project until you turn it on in that project. While it is off the
-          app never asks the phone for its position and sends no request but the one above. Once it
-          is on, nothing happens until you tap a button on a sampling point:
+          Location is off for every project until you turn it on in that project. While it is off,
+          that project's sampling points never ask the phone for its position and send no request but
+          the one above. Once it is on, nothing happens until you tap a button on a sampling point:
         </p>
         <ul className="grid list-disc gap-1 pl-5">
           <li>
             <b>Use my location</b> reads the phone's position (latitude and longitude, WGS84) and
-            writes it on the point. The position does not leave the phone for this.
+            writes it on the point. With a signal, the same tap then sends that position to the two
+            services below; with no signal nothing is sent. <b>Look up this position</b> does the
+            same look-ups for the position already on the point, without reading the phone again.
           </li>
           <li>
             <b>Look-ups by location.</b> With a signal, the point's position is sent to two public
@@ -39,8 +41,17 @@ export function LeavesPhoneSection() {
         </ul>
         <p>
           What comes back is yours to edit, and what you type is never replaced by a later look-up.
+          A value an earlier look-up wrote is removed when the position changes and the new place
+          has none.
         </p>
       </div>
+      <Sub>The Log's own location switch</Sub>
+      <p data-testid="leaves-log-location">
+        Separate from projects: in the Log, the save sheet has "Save my location with this
+        Sample", off until you switch it on. When it is on, each save reads the phone's position
+        and keeps it with that Sample in the Log on your phone. It is sent nowhere, and it is in a
+        file only if you export the Log.
+      </p>
       <NotYet testId="leaves-stub">
         <p>
           One more thing is planned that would send data off the phone. It will happen only when you

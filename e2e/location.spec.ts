@@ -15,33 +15,55 @@ interface Asked {
   body: string | null
 }
 
-/** Counts every call to the Geolocation API (on the prototype, which every engine keeps), and grants it. */
-async function watchPosition(context: BrowserContext) {
-  await context.addInitScript(() => {
-    const w = window as unknown as { __geolocationCalls: number }
+/**
+ * Counts every call to the Geolocation API (on the prototype, which every engine keeps), and grants it.
+ * `delay` holds the answer back that many milliseconds, as a slow GPS fix would.
+ */
+async function watchPosition(context: BrowserContext, { delay = 0 }: { delay?: number } = {}) {
+  await context.addInitScript((wait) => {
+    const w = window as unknown as { __geolocationCalls: number; __geolocationDelivered: number }
     w.__geolocationCalls = 0
-    for (const method of ["getCurrentPosition", "watchPosition"] as const) {
-      const original = Geolocation.prototype[method]
-      Geolocation.prototype[method] = function (this: Geolocation, ...args: never[]) {
-        w.__geolocationCalls++
-        return (original as (...a: never[]) => unknown).apply(this, args) as never
-      } as never
+    w.__geolocationDelivered = 0
+    const current = Geolocation.prototype.getCurrentPosition
+    Geolocation.prototype.getCurrentPosition = function (this: Geolocation, ok, fail, options) {
+      w.__geolocationCalls++
+      return current.call(this, (position) => setTimeout(() => { w.__geolocationDelivered++; ok(position) }, wait), fail, options)
     }
-  })
+    const watch = Geolocation.prototype.watchPosition
+    Geolocation.prototype.watchPosition = function (this: Geolocation, ...args: Parameters<Geolocation["watchPosition"]>) {
+      w.__geolocationCalls++
+      return watch.apply(this, args)
+    }
+  }, delay)
   await context.grantPermissions(["geolocation"])
   await context.setGeolocation(POSITION)
 }
 const geolocationCalls = (page: Page) => page.evaluate(() => (window as unknown as { __geolocationCalls: number }).__geolocationCalls)
 
-/** The two services, answering with the recorded fixtures. `sda: "down"` makes the soil survey unreachable. */
-async function mockServices(context: BrowserContext, { sda = "up" }: { sda?: "up" | "down" } = {}) {
+/** The position near Nowhere, NE, where the wetlands map has no wetland and the soil survey no map unit. */
+const BARE = { latitude: 40, longitude: -95 }
+
+/**
+ * The two services, answering with the recorded fixtures. `sda: "down"` makes the soil survey
+ * unreachable, `delay` holds both answers back, and a position at BARE has no wetland and no map unit.
+ */
+async function mockServices(context: BrowserContext, { sda = "up", delay = 0 }: { sda?: "up" | "down"; delay?: number } = {}) {
   const asked: Asked[] = []
-  await context.route(SERVICES, (route) => {
+  await context.route(SERVICES, async (route) => {
     const request = route.request()
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
     asked.push({ method: request.method(), url: request.url(), body: request.postData() })
-    if (request.url().includes("wetlandsmapservice")) return route.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: fixture("nwi-hit.json") })
-    return sda === "down" ? route.abort() : route.fulfill({ status: 200, contentType: "application/json", headers: CORS, body: fixture("sda-hit.from-docs.json") })
+    if (delay) await new Promise((r) => setTimeout(r, delay))
+    const isNwi = request.url().includes("wetlandsmapservice")
+    const bare = isNwi ? new URL(request.url()).searchParams.get("geometry") === `${BARE.longitude},${BARE.latitude}` : (request.postData() ?? "").includes(`point (${BARE.longitude} ${BARE.latitude})`)
+    const body = isNwi ? fixture(bare ? "nwi-none.json" : "nwi-hit.json") : bare ? "{}" : fixture("sda-hit.from-docs.json")
+    try {
+      // The page may have given up on the request while it was held back.
+      if (!isNwi && sda === "down") await route.abort()
+      else await route.fulfill({ status: 200, contentType: "application/json", headers: CORS, body })
+    } catch {
+      /* cancelled by the page */
+    }
   })
   return asked
 }
@@ -174,7 +196,8 @@ test("without a signal the position still comes from the phone, the lookups say 
   await expect(sheet.getByTestId("point-details")).toContainText("Lat 41.500000, Long -93.600000, WGS84")
   await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
 
-  await editDetails(sheet, { "Soil Map Unit Name": "Webster clay loam", "NWI classification": "PEM1C" })
+  // The position is typed over with one unlike the phone's, so what is looked up can only be the point's own.
+  await editDetails(sheet, { Lat: "42.1234", Long: "-92.4321", "Soil Map Unit Name": "Webster clay loam", "NWI classification": "PEM1C" })
   await expect(sheet.getByTestId("point-lookups")).toHaveText("Soil map unit: Webster clay loam. NWI: PEM1C")
 
   // Back on, "Look up this position" asks about the position already on the point, and keeps what was typed.
@@ -187,6 +210,112 @@ test("without a signal the position still comes from the phone, the lookups say 
   await expect(sheet.getByTestId("point-lookups")).toHaveText("Soil map unit: Webster clay loam. NWI: PEM1C")
   expect(asked.length).toBe(2)
   expect(await geolocationCalls(page)).toBe(reads) // that button does not read the position again
+  const nwi = asked.find((a) => a.url.includes("wetlandsmapservice"))!
+  expect(new URL(nwi.url).searchParams.get("geometry")).toBe("-92.4321,42.1234")
+  expect(JSON.parse(asked.find((a) => a.url.includes("sdmdataaccess"))!.body ?? "{}").query).toContain("point (-92.4321 42.1234)")
+})
+
+test("a point moved to a place with no wetland and no map unit loses the values the first look-up wrote, and keeps the ones typed", async ({ page, context }) => {
+  await watchPosition(context)
+  await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toHaveText("Soil map unit: Clarion loam, 2 to 5 percent slopes. NWI: PEM1A")
+  await editDetails(sheet, { "NWI classification": "PFO1C" }) // typed over
+
+  await context.setGeolocation(BARE)
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("point-details")).toContainText("Lat 40.000000, Long -95.000000")
+  await expect(sheet.getByTestId("location-note")).toContainText("No soil map unit is mapped at this position.")
+  await expect(sheet.getByTestId("location-note")).toContainText("Cleared the soil map unit that came from the earlier position.")
+  // The form no longer prints the old place's map unit beside the new Lat and Long; the typed NWI class stays.
+  await expect(sheet.getByTestId("point-lookups")).toHaveText("NWI: PFO1C")
+  await expect(sheet.getByTestId("page1-preview-text").filter({ hasText: "Clarion" })).toHaveCount(0)
+  await expect(printed(sheet, "nwi")).toHaveText("PFO1C")
+
+  // Without a signal the services cannot say, so a new position clears the old place's values too.
+  await context.setGeolocation(POSITION)
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toHaveText("Soil map unit: Clarion loam, 2 to 5 percent slopes. NWI: PFO1C")
+  await context.unroute(SERVICES)
+  await context.route(SERVICES, (route) => route.abort("internetdisconnected"))
+  await context.setOffline(true)
+  await context.setGeolocation(BARE)
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("location-note")).toContainText("Lookup unavailable")
+  await expect(sheet.getByTestId("location-note")).toContainText("Cleared the soil map unit that came from the earlier position.")
+  await expect(sheet.getByTestId("point-lookups")).toHaveText("NWI: PFO1C")
+})
+
+test("looking up a typed position that has no wetland and no map unit clears what the last look-up wrote", async ({ page, context }) => {
+  await watchPosition(context)
+  await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toContainText("NWI: PEM1A")
+
+  await editDetails(sheet, { Lat: String(BARE.latitude), Long: String(BARE.longitude) })
+  await sheet.getByRole("button", { name: "Look up this position" }).click()
+  await expect(sheet.getByTestId("location-note")).toContainText("Cleared the NWI class that came from the earlier position.")
+  await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
+})
+
+test("turning location off while the position is being found stops everything: nothing is requested and nothing is written", async ({ page, context }) => {
+  await watchPosition(context, { delay: 1500 })
+  const asked = await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  // The details form saves a snapshot of the point, so it waits for the look-up that writes into it.
+  await expect(sheet.getByRole("button", { name: "Edit location and pair" })).toBeDisabled()
+  // Back to the project and the switch off, before the phone has its position.
+  await sheet.getByRole("button", { name: "Cedar Creek" }).click()
+  await sheet.getByLabel(LOCATION).uncheck()
+  await page.waitForFunction(() => (window as unknown as { __geolocationDelivered: number }).__geolocationDelivered === 1)
+  await page.waitForTimeout(600) // long enough for a request to go out, had one been going to
+  expect(asked).toEqual([])
+  await sheet.getByRole("button", { name: "Open point" }).click()
+  await expect(sheet.getByTestId("point-details")).toContainText("No latitude or longitude yet.")
+  await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
+})
+
+test("turning location off while the services are being asked drops their answers", async ({ page, context }) => {
+  await watchPosition(context)
+  const asked = await mockServices(context, { delay: 1500 })
+  const sheet = await openPoint(page, { locationOn: true })
+
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect.poll(() => asked.length).toBe(2) // both requests are out, and held back
+  await sheet.getByRole("button", { name: "Cedar Creek" }).click()
+  await sheet.getByLabel(LOCATION).uncheck()
+  await page.waitForTimeout(2200) // past the held-back answers
+  await sheet.getByRole("button", { name: "Open point" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
+  await expect(sheet.getByTestId("location-off")).toBeVisible()
+})
+
+test("a longitude typed without its minus is caught and nothing is sent; the Long box can type a minus", async ({ page, context }) => {
+  await watchPosition(context)
+  const asked = await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+
+  await sheet.getByRole("button", { name: "Edit location and pair" }).click()
+  // The iPhone's decimal keypad has no minus key, so the Long box asks for the full keyboard.
+  await expect(sheet.getByLabel("Long", { exact: true })).toHaveAttribute("inputmode", "text")
+  await sheet.getByRole("button", { name: "Cancel" }).click()
+
+  await editDetails(sheet, { Lat: "41.5", Long: "93.6" })
+  await expect(sheet.getByTestId("position-problem")).toContainText("West longitudes are negative")
+  await expect(sheet.getByRole("button", { name: "Look up this position" })).toHaveCount(0)
+  await editDetails(sheet, { Lat: "41.5", Long: "abc" })
+  await expect(sheet.getByTestId("position-problem")).toContainText("Nothing to look up yet")
+  expect(asked).toEqual([])
+
+  await editDetails(sheet, { Lat: "41.5", Long: "-93.6" })
+  await expect(sheet.getByTestId("position-problem")).toHaveCount(0)
+  await sheet.getByRole("button", { name: "Look up this position" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toContainText("NWI: PEM1A")
+  expect(await geolocationCalls(page)).toBe(0)
 })
 
 test("when only the soil survey cannot be reached, the wetland class still fills and the soil map unit is left to type", async ({ page, context }) => {

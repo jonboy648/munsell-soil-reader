@@ -62,8 +62,10 @@ export function PointDetails({ project, point, onSave, onCancel }: Props) {
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="point-long">Long</Label>
-          <Input id="point-long" className={INPUT} inputMode="decimal" autoComplete="off" value={long} onChange={(e) => setLong(e.target.value)} />
+          {/* Text, not decimal: the iPhone's decimal keypad has no minus key, and a west longitude is negative. */}
+          <Input id="point-long" className={INPUT} inputMode="text" autoComplete="off" autoCapitalize="off" value={long} onChange={(e) => setLong(e.target.value)} />
         </div>
+        <p className="col-span-2 text-xs text-muted-foreground">West longitudes are negative, like -93.6.</p>
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="point-datum">Datum</Label>

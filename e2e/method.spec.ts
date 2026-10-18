@@ -205,6 +205,9 @@ test("says the 20-soil test has not been run, and marks what is not in this vers
   await expect(lookups).toContainText("Look-ups by location")
   await expect(lookups).toContainText("USDA NRCS Soil Data Access")
   await expect(lookups).toContainText("National Wetlands Inventory")
+  // The tap that reads the position also sends it, with a signal; the Log's own switch is a separate thing.
+  await expect(lookups).toContainText("With a signal, the same tap then sends that position to the two services below")
+  await expect(page.getByTestId("leaves-log-location")).toContainText("Save my location with this Sample")
   await expect(page.locator("#privacy")).toContainText("Your Photos and Readings never leave it.")
   await expect(page.locator("#privacy")).toContainText("soil.joncackler.com")
   await expect(page.locator("#privacy")).toContainText("carries no Photo and no Reading")

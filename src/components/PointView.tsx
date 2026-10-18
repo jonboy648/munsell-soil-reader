@@ -93,6 +93,8 @@ export function PointView({ project, point, change, onBack }: Props) {
   // "new" while adding a Layer, a Layer's id while editing it.
   const [editing, setEditing] = React.useState<string | null>(null)
   const [editingDetails, setEditingDetails] = React.useState(false)
+  // The details form saves a whole snapshot of the point, so it waits for a look-up that is writing into it.
+  const [lookingUp, setLookingUp] = React.useState(false)
   const form = React.useMemo(() => formFor(project, point), [project, point])
   const layers = topToBottom(point.layers)
 
@@ -142,8 +144,8 @@ export function PointView({ project, point, change, onBack }: Props) {
       ) : (
         <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
           <DetailsSummary project={project} point={point} />
-          <LocationLookup project={project} point={point} change={change} />
-          <Button variant="outline" className="h-11 text-base" onClick={() => setEditingDetails(true)}>
+          <LocationLookup project={project} point={point} change={change} onBusy={setLookingUp} />
+          <Button variant="outline" className="h-11 text-base" disabled={lookingUp} onClick={() => setEditingDetails(true)}>
             Edit location and pair
           </Button>
         </div>

@@ -67,7 +67,7 @@ export default defineConfig({
       workbox: {
         // Everything the app needs, matched by type so data files and example Photos added
         // later are cached without touching this list. Fonts are the bundled woff2 files.
-        globPatterns: ["**/*.{html,js,css,woff2,png,svg,jpg,jpeg,webp,json,csv,webmanifest}"],
+        globPatterns: ["**/*.{html,js,css,woff2,png,svg,jpg,jpeg,webp,json,csv,webmanifest,pdf}"],
       },
     }),
   ],

@@ -4,6 +4,7 @@
 import * as React from "react"
 import type { Card, ReadPhotoResult, XY } from "@/engine"
 import { LogScreen } from "@/components/LogScreen"
+import { ProjectsSheet } from "@/components/ProjectsSheet"
 import { SaveToLogSheet, type SaveTarget } from "@/components/SaveToLogSheet"
 import { Button } from "@/components/ui/button"
 import { currentLocation, savedReadings, type Sample } from "@/lib/log"
@@ -13,6 +14,7 @@ import {
   askToKeepLog,
   deleteSample,
   listSamples,
+  logIsReadOnly,
   removeLocation,
   removeReading,
   updateFields,
@@ -35,6 +37,9 @@ interface Attempt {
   writing: boolean
 }
 
+const READ_ONLY_NOTE =
+  "The update of the Log could not finish, so it is shown as it was. You can still read it and export a CSV, but nothing can be saved or changed until the update goes through. Reload to try again."
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 // The Reading written for each saved Spot. A Spot counts as saved while that Reading is still in
@@ -48,6 +53,7 @@ export function LogPanel({ result, card, spots }: Props) {
   const [samples, setSamples] = React.useState<Sample[]>([]) // oldest first
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
+  const [projectsOpen, setProjectsOpen] = React.useState(false)
   // Spots a save is working on right now, so that nothing can save them a second time meanwhile.
   const [inFlight, setInFlight] = React.useState<XY[]>([])
   const saving = React.useRef<Attempt | null>(null)
@@ -55,6 +61,8 @@ export function LogPanel({ result, card, spots }: Props) {
   // Readings are still in the Log.
   const [status, setStatus] = React.useState<{ text: string; spots: XY[]; readingIds: string[] } | null>(null)
   const [problem, setProblem] = React.useState<string | null>(null)
+  // The update of the Log did not finish: it can be read and exported, not changed.
+  const [readOnly, setReadOnly] = React.useState(false)
 
   // Closing the Save sheet while it is still saving (Cancel, Back, Esc, the corner X) means
   // cancel: the save is dropped before it writes, and its Spots are free again at once.
@@ -68,10 +76,12 @@ export function LogPanel({ result, card, spots }: Props) {
   }, [])
   useBackClosesSheet(saveOpen, setSaveSheet)
   useBackClosesSheet(logOpen, setLogOpen)
+  useBackClosesSheet(projectsOpen, setProjectsOpen)
 
   const refresh = React.useCallback(async () => {
     try {
       setSamples((await listSamples()).sort((a, b) => a.createdAt - b.createdAt))
+      setReadOnly(logIsReadOnly())
       setProblem(null)
     } catch {
       setProblem("The Log can't be opened on this device, so nothing can be saved.")
@@ -143,7 +153,7 @@ export function LogPanel({ result, card, spots }: Props) {
   }
 
   const readingCount = samples.reduce((n, s) => n + s.readings.length, 0)
-  const canSave = !!result && !!card && newSpots.length > 0
+  const canSave = !!result && !!card && newSpots.length > 0 && !readOnly
   const pending =
     spots.length === 0
       ? "Tap a Spot to get a Reading you can save."
@@ -163,6 +173,9 @@ export function LogPanel({ result, card, spots }: Props) {
           Open Log
         </Button>
       </div>
+      <Button variant="outline" size="lg" className="h-12 text-base" onClick={() => setProjectsOpen(true)}>
+        Projects
+      </Button>
       <p className="text-sm" data-testid="log-pending">
         {pending}
       </p>
@@ -171,6 +184,11 @@ export function LogPanel({ result, card, spots }: Props) {
           ? "Nothing in the Log yet."
           : `${plural(samples.length, "Sample")}, ${plural(readingCount, "Reading")} in the Log on this device.`}
       </p>
+      {readOnly && (
+        <p role="alert" data-testid="log-read-only" className="rounded-md border-2 border-foreground p-3 text-sm font-medium">
+          {READ_ONLY_NOTE}
+        </p>
+      )}
       {status?.spots === spots && status.readingIds.some((id) => inLog.has(id)) && (
         <p role="status" className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
           {status.text}
@@ -189,6 +207,7 @@ export function LogPanel({ result, card, spots }: Props) {
         samples={samples}
         onSave={save}
       />
+      <ProjectsSheet open={projectsOpen} onOpenChange={setProjectsOpen} />
       <LogScreen
         open={logOpen}
         onOpenChange={setLogOpen}

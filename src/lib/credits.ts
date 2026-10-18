@@ -101,6 +101,13 @@ export const CREDITS: Credit[] = [
     links: [{ label: "Source", href: "https://github.com/damianofalcioni/js-aruco2" }],
     notice: "js-aruco2 (MIT)",
   },
+  {
+    name: "ENG Form 6116-8, Wetland Determination Data Form (Northcentral and Northeast)",
+    license: "US government work, public domain",
+    by: "U.S. Army Corps of Engineers",
+    used: "The official Soil page (September 2024), unchanged, that a sampling point's profile is drawn onto for the PDF and the preview.",
+    links: [{ label: "Regulatory Program", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/" }],
+  },
 ]
 
 /** The sections of THIRD_PARTY_NOTICES.md, by heading. */

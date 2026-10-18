@@ -1,6 +1,7 @@
 import * as React from "react"
 import { readPhoto, type XY } from "@/engine"
 import type { ExamplePhoto } from "@/engine/simulate"
+import { AssignSheet } from "@/components/AssignSheet"
 import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
@@ -36,6 +37,8 @@ export function App() {
   const serviceWorker = useServiceWorker()
   const [session, dispatch] = React.useReducer(sessionReducer, initialSession)
   const [problem, setProblem] = React.useState<string | null>(null)
+  // The Spot whose Reading is being assigned to a layer, while the assign sheet is open.
+  const [assigning, setAssigning] = React.useState<number | null>(null)
   const step = stepOf(session)
 
   // One engine call per change of Photo, Card or Spots.
@@ -195,7 +198,8 @@ export function App() {
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-xl">
-        <ReadingsPanel result={result} card={cardInfo} />
+        <ReadingsPanel result={result} card={cardInfo} onAssign={setAssigning} />
+        <AssignSheet index={assigning} result={result} card={cardOf(session)} onClose={() => setAssigning(null)} />
         <BottomBar
           onFile={pickFile}
           onUndo={() => dispatch({ type: "undo" })}

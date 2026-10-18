@@ -10,7 +10,7 @@ const [TL, TR, BR, BL] = SIM_CORNERS
 const GROUND: XY = { x: 300, y: 560 }
 
 const CSV_HEADER =
-  "Sample,Depth top (cm),Depth bottom (cm),Condition,Notes,Latitude,Longitude,Location accuracy (m)," +
+  "Sample,Depth top (in),Depth bottom (in),Condition,Notes,Latitude,Longitude,Location accuracy (m)," +
   "Sample created,Saved,UTC offset,Spot x,Spot y,Chip,Chip name,Exact,Top 3,Card,Page hue,Card check,Card check mean DE,Warnings"
 const COLUMNS = CSV_HEADER.split(",")
 
@@ -52,8 +52,8 @@ async function saveToNewSample(page: Page, sample: SampleFields) {
   await page.getByRole("button", { name: "Save to Log" }).click()
   const sheet = saveSheet(page)
   await sheet.getByLabel("Sample name or number").fill(sample.name)
-  if (sample.top) await sheet.getByLabel("Depth top (cm)").fill(sample.top)
-  if (sample.bottom) await sheet.getByLabel("Depth bottom (cm)").fill(sample.bottom)
+  if (sample.top) await sheet.getByLabel("Depth top (in)").fill(sample.top)
+  if (sample.bottom) await sheet.getByLabel("Depth bottom (in)").fill(sample.bottom)
   await sheet.getByRole("radio", { name: sample.condition }).click()
   if (sample.notes) await sheet.getByLabel("Notes").fill(sample.notes)
   await saveButton(sheet).click()
@@ -175,7 +175,7 @@ test("a saved Reading is still in the Log after a reload, and the Log says it li
   await expect(log).toContainText("export a CSV after each trip")
   await expect(log).toContainText("Excel shows a leading '")
   const sample = log.getByRole("region", { name: "Sample A1" })
-  await expect(sample).toContainText("0-15 cm · moist")
+  await expect(sample).toContainText("0-15 in · moist")
   await expect(sample).toContainText("dark topsoil")
   await expect(sample.getByTestId("log-notation")).toHaveText("10YR 4/3")
   await expect(sample).toContainText("Card check good")
@@ -202,8 +202,8 @@ test("the CSV has the header and one row per Reading, with the Sample repeated a
 
   for (const r of [first, second]) {
     expect(r["Sample"]).toBe("Pit 3, north")
-    expect(r["Depth top (cm)"]).toBe("0")
-    expect(r["Depth bottom (cm)"]).toBe("15")
+    expect(r["Depth top (in)"]).toBe("0")
+    expect(r["Depth bottom (in)"]).toBe("15")
     expect(r["Condition"]).toBe("moist")
     expect(r["Notes"]).toBe(notes)
     expect(r["Latitude"]).toBe("")
@@ -408,8 +408,8 @@ test("a Sample needs a name and a Condition before it is saved", async ({ page }
   await save.click()
   await expect(sheet.getByRole("alert")).toHaveText("Pick moist or dry.")
   await sheet.getByRole("radio", { name: "moist" }).click()
-  await sheet.getByLabel("Depth top (cm)").fill("20")
-  await sheet.getByLabel("Depth bottom (cm)").fill("10")
+  await sheet.getByLabel("Depth top (in)").fill("20")
+  await sheet.getByLabel("Depth bottom (in)").fill("10")
   await save.click()
   await expect(sheet.getByRole("alert")).toHaveText("The bottom depth must be below the top.")
   await sheet.getByRole("button", { name: "Cancel" }).click()
@@ -425,17 +425,17 @@ test("Sample fields can be edited and the edit survives a reload", async ({ page
   const log = await openLog(page)
   await log.getByRole("button", { name: "Edit Sample" }).click()
   await log.getByLabel("Sample name or number").fill("A1 (north pit)")
-  await log.getByLabel("Depth top (cm)").fill("30")
-  await log.getByLabel("Depth bottom (cm)").fill("45")
+  await log.getByLabel("Depth top (in)").fill("30")
+  await log.getByLabel("Depth bottom (in)").fill("45")
   await log.getByRole("radio", { name: "dry" }).click()
   await log.getByLabel("Notes").fill("clay loam")
   await log.getByRole("button", { name: "Save changes" }).click()
-  await expect(log.getByRole("region", { name: "Sample A1 (north pit)" })).toContainText("30-45 cm · dry")
+  await expect(log.getByRole("region", { name: "Sample A1 (north pit)" })).toContainText("30-45 in · dry")
 
   await page.reload()
   const again = await openLog(page)
   const sample = again.getByRole("region", { name: "Sample A1 (north pit)" })
-  await expect(sample).toContainText("30-45 cm · dry")
+  await expect(sample).toContainText("30-45 in · dry")
   await expect(sample).toContainText("clay loam")
 })
 

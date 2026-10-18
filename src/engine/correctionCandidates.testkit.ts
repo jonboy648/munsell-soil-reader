@@ -1,10 +1,12 @@
-// Root-polynomial color correction (Finlayson, MacKiewicz and Hurlbert 2015).
+// Corrections the engine does not ship, kept to compare the shipped one against. Only the
+// tests import this file, so none of it reaches the built app.
 //
-// Ported to TypeScript from colour-science's `colour/characterisation/correction.py`
+// `fitRootPolynomial` is root-polynomial color correction (Finlayson, MacKiewicz and Hurlbert
+// 2015), ported to TypeScript from colour-science's `colour/characterisation/correction.py`
 // (`polynomial_expansion_Finlayson2015`, `matrix_colour_correction_Finlayson2015`) and
-// `colour/algebra` (`spow`, `least_square_mapping_MoorePenrose`). The terms and their order
-// are colour-science's. The least-squares solve is Householder QR here, where colour-science
-// uses the Moore-Penrose pseudo-inverse; the two agree for a full-rank fit.
+// `colour/algebra` (`spow`). The terms and their order are colour-science's. The least-squares
+// solve is ours (leastSquares.ts); colour-science uses the Moore-Penrose pseudo-inverse, and
+// the two agree for a full-rank fit. rootPolynomialGolden.json pins the port to colour-science.
 //
 // Copyright 2013 Colour Developers
 //
@@ -32,6 +34,8 @@
 // TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import type { Vec3 } from "./color"
+import type { CurveFit, Fit } from "./correction"
+import { leastSquares } from "./leastSquares"
 
 /** Root-polynomial degrees colour-science defines. Degree 1 is the plain RGB (3x3) set. */
 export type RootPolynomialDegree = 1 | 2 | 3 | 4
@@ -41,8 +45,7 @@ const spow = (a: number, p: number): number => Math.sign(a) * Math.abs(a) ** p
 
 /**
  * The root-polynomial terms of an RGB color, in colour-science's order. Every term is
- * homogeneous of degree 1 (scale the color and every term scales with it), which is why
- * the fit does not care about exposure.
+ * homogeneous of degree 1 (scale the color and every term scales with it).
  */
 export function expandRootPolynomial([R, G, B]: Vec3, degree: RootPolynomialDegree): number[] {
   const terms = [R, G, B]
@@ -64,57 +67,30 @@ export function expandRootPolynomial([R, G, B]: Vec3, degree: RootPolynomialDegr
   return terms
 }
 
-/**
- * Least squares by Householder QR: the n x 3 coefficients that map each row of `A` (m x n,
- * m >= n) onto the matching row of `B`. A column that carries no information gets a zero
- * coefficient.
- */
-function leastSquares(A: number[][], B: Vec3[]): number[][] {
-  const m = A.length
-  const n = A[0].length
-  if (m < n) throw new Error(`Need at least ${n} references for this correction, got ${m}.`)
-  const W = A.map((row, i) => [...row, ...B[i]]) // [A | B], reduced in place
-  for (let k = 0; k < n; k++) {
-    let norm = 0
-    for (let i = k; i < m; i++) norm += W[i][k] ** 2
-    norm = Math.sqrt(norm)
-    if (norm === 0) continue
-    const v = W.slice(k).map((row) => row[k])
-    v[0] -= W[k][k] > 0 ? -norm : norm
-    const vv = v.reduce((s, x) => s + x * x, 0)
-    if (vv === 0) continue
-    for (let j = k; j < n + 3; j++) {
-      let dot = 0
-      for (let i = 0; i < v.length; i++) dot += v[i] * W[k + i][j]
-      const scale = (2 * dot) / vv
-      for (let i = 0; i < v.length; i++) W[k + i][j] -= scale * v[i]
+/** Root-polynomial correction of the given degree, fitted on all the references. */
+export const fitRootPolynomial =
+  (degree: RootPolynomialDegree): Fit =>
+  (references) => {
+    const X = leastSquares(
+      references.map((r) => expandRootPolynomial(r.measured, degree)),
+      references.map((r) => r.truth),
+    )
+    return (lin) => {
+      const terms = expandRootPolynomial(lin, degree)
+      const out = [0, 0, 0]
+      for (let c = 0; c < 3; c++) for (let i = 0; i < terms.length; i++) out[c] += terms[i] * X[i][c]
+      return out as Vec3
     }
   }
-  const X: number[][] = Array.from({ length: n }, () => [0, 0, 0])
-  for (let c = 0; c < 3; c++) {
-    for (let i = n - 1; i >= 0; i--) {
-      let rest = W[i][n + c]
-      for (let j = i + 1; j < n; j++) rest -= W[i][j] * X[j][c]
-      X[i][c] = Math.abs(W[i][i]) > 1e-12 ? rest / W[i][i] : 0
-    }
-  }
-  return X
-}
 
-/** Fit a root-polynomial correction of the given degree mapping `measured` onto `target`. */
-export function fitRootPolynomial(
-  measured: Vec3[],
-  target: Vec3[],
-  degree: RootPolynomialDegree,
-): (lin: Vec3) => Vec3 {
-  const X = leastSquares(
-    measured.map((m) => expandRootPolynomial(m, degree)),
-    target,
-  )
-  return (lin) => {
-    const terms = expandRootPolynomial(lin, degree)
-    const out = [0, 0, 0]
-    for (let c = 0; c < 3; c++) for (let i = 0; i < terms.length; i++) out[c] += terms[i] * X[i][c]
-    return out as Vec3
+/** Straight lines between the points, and straight on past the ends. */
+export const piecewiseLinear: CurveFit = (points) => {
+  const p = [...points].sort((a, b) => a.x - b.x).filter((q, i, all) => i === 0 || q.x > all[i - 1].x)
+  if (p.length < 2) return (x) => x
+  return (x) => {
+    let k = 0
+    while (k < p.length - 2 && x >= p[k + 1].x) k++
+    const slope = (p[k + 1].y - p[k].y) / (p[k + 1].x - p[k].x)
+    return p[k].y + slope * (x - p[k].x)
   }
 }

@@ -395,14 +395,16 @@ X-Rite's published data, taken from the `colour-science/colour` dataset
 
 ## Root-polynomial correction (BSD-3-Clause)
 
-`src/engine/rootPolynomial.ts` is a TypeScript port of the root-polynomial color correction in
-[colour-science](https://github.com/colour-science/colour), from
+`src/engine/correctionCandidates.testkit.ts` is a TypeScript port of the root-polynomial color
+correction in [colour-science](https://github.com/colour-science/colour), from
 `colour/characterisation/correction.py` (`polynomial_expansion_Finlayson2015`,
-`matrix_colour_correction_Finlayson2015`) and `colour/algebra` (`spow`,
-`least_square_mapping_MoorePenrose`). It implements the method of Finlayson, MacKiewicz and
-Hurlbert, "Color Correction Using Root-Polynomial Regression", IEEE Transactions on Image
-Processing 24(5), 2015. The port keeps colour-science's notice in the file. The license, as
-shipped:
+`matrix_colour_correction_Finlayson2015`) and `colour/algebra` (`spow`). It implements the
+method of Finlayson, MacKiewicz and Hurlbert, "Color Correction Using Root-Polynomial
+Regression", IEEE Transactions on Image Processing 24(5), 2015. The port is used only by the
+tests, to compare the correction the app ships against root-polynomial; it is not in the built
+app. The port keeps colour-science's notice in the file, and
+`src/engine/golden/make_root_polynomial_golden.py` regenerates the colour-science numbers it is
+checked against. The license, as shipped:
 
 ```text
 Copyright 2013 Colour Developers

@@ -43,7 +43,7 @@ One color in the soil book, named by its notation (`10YR 4/3`) and its color nam
 _Avoid_: swatch, patch (patches belong to the card)
 
 **Card check**:
-How well the correction reproduces the card's own patches; either good or failed.
+How well the correction predicts each of the card's references when it is fitted without that reference (leave one out); either good or failed.
 _Avoid_: calibration score, fit quality
 
 **Neighbouring chip**:

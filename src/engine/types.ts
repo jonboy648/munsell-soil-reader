@@ -1,6 +1,6 @@
 // Public shapes of the reading engine. No DOM, no React: the engine is plain numbers in,
 // plain numbers out. The shapes come from the prototype's `readSample`.
-import type { RootPolynomialDegree } from "./rootPolynomial"
+import type { Fit } from "./correction"
 
 /** A point in Photo pixels, origin at the top left. */
 export type XY = { x: number; y: number }
@@ -63,8 +63,8 @@ export interface ReadPhotoInput {
   pixels: Pixels
   card: Card
   spots: XY[]
-  /** Degree of the root-polynomial correction; 1 is the plain 3x3. Default CORRECTION_DEGREE. */
-  correctionDegree?: RootPolynomialDegree
+  /** The fit used to correct against the Card. For comparing corrections in tests; the app leaves it out. */
+  correction?: Fit
 }
 
 export interface ReadPhotoResult {

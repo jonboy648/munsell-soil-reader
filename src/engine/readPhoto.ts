@@ -3,8 +3,7 @@ import * as munsell from "munsell"
 import { linearToLab, linearToRgb255, type Vec3 } from "./color"
 import { nearestChips } from "./chips"
 import { NEUTRAL_PATCHES, PATCH_LINEAR, patchCenters } from "./colorchecker"
-import { fitCorrection, heldOutError, type Reference } from "./correction"
-import type { RootPolynomialDegree } from "./rootPolynomial"
+import { fitCorrection, heldOutError, type Fit, type Reference } from "./correction"
 import { medianLinear, patchRadius, spotRadius } from "./sampling"
 import type {
   CardCheck,
@@ -17,10 +16,7 @@ import type {
 } from "./types"
 
 /** The Card check is good when the mean held-out CIEDE2000 of the Card is below this. */
-export const CARD_CHECK_GOOD = 3
-
-/** The degree of the root-polynomial correction the engine applies. */
-export const CORRECTION_DEGREE: RootPolynomialDegree = 1
+export const CARD_CHECK_GOOD = 2
 
 export class UnsupportedCardError extends Error {
   constructor(kind: string) {
@@ -60,14 +56,13 @@ function readColor(lin: Vec3): ChipReading {
   }
 }
 
-function fitCard(pixels: Pixels, corners: Corners, degree: RootPolynomialDegree) {
+function fitCard(pixels: Pixels, corners: Corners, fit: Fit) {
   const radius = patchRadius(corners)
   const references: Reference[] = patchCenters(corners).map((p, i) => ({
     measured: medianLinear(pixels, p, radius),
     truth: PATCH_LINEAR[i],
-    neutral: NEUTRAL_PATCHES.includes(i),
+    ladder: NEUTRAL_PATCHES.includes(i),
   }))
-  const fit = fitCorrection(degree)
   const meanDE = heldOutError(references, fit)
   const check: CardCheck = { meanDE, ok: meanDE < CARD_CHECK_GOOD }
   return { correct: fit(references), check }
@@ -77,10 +72,10 @@ export function readPhoto({
   pixels,
   card,
   spots,
-  correctionDegree = CORRECTION_DEGREE,
+  correction = fitCorrection,
 }: ReadPhotoInput): ReadPhotoResult {
   if (card.kind === "page") throw new UnsupportedCardError("Page")
-  const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners, correctionDegree) : null
+  const fit = card.kind === "colorchecker" ? fitCard(pixels, card.corners, correction) : null
   const radius = spotRadius(pixels)
   const readings = spots.map((spot): Reading => {
     const lin = medianLinear(pixels, spot, radius)

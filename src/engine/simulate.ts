@@ -41,7 +41,7 @@ export const LIGHTS = {
  * several do. Root-polynomial correction does not fix that on this simulated camera (see
  * docs/correction-comparison.md), so the standard stays 0.3.
  */
-export const PHONE_TONE_CURVE = 0.3
+export const PHONE_TONE_CURVE = 0.5
 
 // ---- the scene ----
 export const SIM_WIDTH = 960

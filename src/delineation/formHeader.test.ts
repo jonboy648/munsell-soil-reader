@@ -2,6 +2,7 @@
 // the lines each point fills for itself, the Y, N and tick blanks, and the pair.
 import { describe, expect, test } from "vitest"
 import { formFor, ruleRoom } from "./formFor"
+import { subregionText } from "./headerFields"
 import { JF1_POINT, JF1_PROJECT } from "./fixtures/jf1"
 import { emptyHeader, newPoint, newProject, normalizeProject, pairOf, type Project, type SamplingPoint } from "./model"
 import { page1Placements } from "./page1"
@@ -25,13 +26,14 @@ const project: Project = {
     landform: "terrace",
     localRelief: "concave",
     slope: "2",
-    subregion: "MLRA 103",
     soilMapUnit: "Clarion loam, 2 to 5 percent slopes",
     nwi: "PEM1C",
     normalCircumstances: "yes",
     disturbed: { vegetation: "no", soil: "no", hydrology: "yes" },
     problematic: { vegetation: "", soil: "no", hydrology: "no" },
   },
+  // Picked once for the project, where it also decides which hydric soil indicators apply.
+  subregion: { lrr: "R", mlra: "144A" },
   points: [jf1, jf2],
 }
 
@@ -53,7 +55,7 @@ describe("the header of page 1", () => {
       "page1.landform": "terrace",
       "page1.localRelief": "concave",
       "page1.slope": "2",
-      "page1.subregion": "MLRA 103",
+      "page1.subregion": "LRR R, MLRA 144A",
       "page1.soilMapUnit": "Clarion loam, 2 to 5 percent slopes",
       "page1.nwi": "PEM1C",
       "page1.samplingPoint": "JF-1",
@@ -89,6 +91,14 @@ describe("the header of page 1", () => {
     const normal = normalizeProject(old)
     expect(normal.header).toEqual(emptyHeader())
     expect(normal.points[0]).toMatchObject({ lat: "", long: "", datum: "" })
+  })
+
+  test("the Subregion line is the one the project picked, and blank until it is picked", () => {
+    expect(subregionText({ lrr: "M" })).toBe("LRR M")
+    expect(subregionText({ lrr: "R", mlra: "145" })).toBe("LRR R, MLRA 145")
+    expect(subregionText({ lrr: "R", mlra: "other" })).toBe("LRR R")
+    expect(subregionText(undefined)).toBe("")
+    expect(printed(jf1, { ...project, subregion: undefined })["page1.subregion"]).toBeUndefined()
   })
 
   test("not-answered Yes and No stay blank, and No ticks the other blank", () => {

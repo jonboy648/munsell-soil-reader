@@ -3,6 +3,11 @@
 import type { SavedReading } from "@/lib/log"
 import type { RegionId } from "./regions"
 
+/** The form's own codes for a redox feature: Concentration, Depletion, Reduced Matrix, Masked Sand grains. */
+export type RedoxType = "C" | "D" | "RM" | "MS"
+/** Where it is: Pore Lining or Matrix. */
+export type RedoxLocation = "PL" | "M"
+
 /** A color on a Layer: the Munsell notation, and how much of the Layer it covers. */
 export interface LayerColor {
   /** `10YR 4/2`, as it prints on the form. */
@@ -11,6 +16,9 @@ export interface LayerColor {
   percent: number
   /** The saved Reading it came from. Absent when the color was typed in. */
   reading?: SavedReading
+  /** A redox feature's type and location, when recorded. The indicator rules infer the type when it is not. */
+  type?: RedoxType
+  location?: RedoxLocation
 }
 
 export interface Layer {
@@ -22,6 +30,17 @@ export interface Layer {
   matrix: LayerColor | null
   redox: LayerColor[]
   remarks: string
+  /** The texture term from the Field Book's classes ("silt loam", "mucky sand", "muck"), when recorded. */
+  texture?: string
+}
+
+/** What the user decided about one indicator of the form. */
+export interface IndicatorChoice {
+  state: "confirmed" | "rejected"
+  /** The user's own words. A tick the app did not suggest carries the reason. */
+  remark?: string
+  /** True when the user ticked an indicator the app did not suggest. */
+  manual?: boolean
 }
 
 /** The two halves of a pair of Sampling points: the one in the wetland and the one in the upland. */
@@ -79,6 +98,10 @@ export interface SamplingPoint {
   datum: string
   /** Set on one point of a pair; the other one's form shows it too. */
   pair?: Pair
+  /** The user's decisions, by the indicator's id on the form. An indicator not in here is undecided. */
+  indicators?: Record<string, IndicatorChoice>
+  /** The user's answer to "Hydric Soil Present?". Unset until they confirm it. */
+  hydricSoilPresent?: "yes" | "no"
   /** Absent until something is recorded for the Hydrology section. */
   hydrology?: Hydrology
 }
@@ -107,8 +130,6 @@ export interface ProjectHeader {
   landform: string
   localRelief: string
   slope: string
-  /** The LRR or MLRA. */
-  subregion: string
   soilMapUnit: string
   /** The NWI classification. */
   nwi: string
@@ -120,6 +141,12 @@ export interface ProjectHeader {
   problematic: Conditions
 }
 
+/** The Land Resource Region (and MLRA, when it matters) a project lies in. Decides which indicators apply. */
+export interface Subregion {
+  lrr: string
+  mlra?: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -128,6 +155,8 @@ export interface Project {
   createdAt: number
   header: ProjectHeader
   points: SamplingPoint[]
+  /** Picked once for the project. Until it is, an indicator that is limited to some subregions is not suggested. */
+  subregion?: Subregion
 }
 
 const NO_CONDITIONS: Conditions = { vegetation: "", soil: "", hydrology: "" }
@@ -143,7 +172,6 @@ export const emptyHeader = (site = ""): ProjectHeader => ({
   landform: "",
   localRelief: "",
   slope: "",
-  subregion: "",
   soilMapUnit: "",
   nwi: "",
   normalCircumstances: "",

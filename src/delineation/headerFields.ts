@@ -1,7 +1,7 @@
 // The header of page 1 in the form's own words: what each line is called, which Project or Sampling
 // point value fills it, and how that value is written on the form. Shared by the form engine and the
 // screens that collect the values, so a line is called the same thing everywhere.
-import type { ProjectHeader, SamplingPoint } from "./model"
+import type { ProjectHeader, SamplingPoint, Subregion } from "./model"
 import type { Page1TextField } from "./regions/types"
 
 export interface HeaderField {
@@ -24,7 +24,6 @@ export const PROJECT_FIELDS: readonly (HeaderField & { key: keyof ProjectHeader 
   { key: "landform", field: "landform", label: "Landform", hint: "hillside, terrace, etc." },
   { key: "localRelief", field: "localRelief", label: "Local relief", hint: "concave, convex, none" },
   { key: "slope", field: "slope", label: "Slope %" },
-  { key: "subregion", field: "subregion", label: "Subregion", hint: "LRR or MLRA" },
   { key: "soilMapUnit", field: "soilMapUnit", label: "Soil Map Unit Name" },
   { key: "nwi", field: "nwi", label: "NWI classification" },
 ]
@@ -36,6 +35,13 @@ export const POINT_FIELDS: readonly (HeaderField & { key: keyof SamplingPoint })
   { key: "long", field: "long", label: "Long" },
   { key: "datum", field: "datum", label: "Datum" },
 ]
+
+/**
+ * The Subregion line of page 1, from the one the project picked (it also decides which hydric soil
+ * indicators apply): `LRR M`, or `LRR R, MLRA 144A` where an MLRA was picked. Blank until it is picked.
+ */
+export const subregionText = (sub: Subregion | undefined): string =>
+  sub ? `LRR ${sub.lrr}${sub.mlra && sub.mlra !== "other" ? `, MLRA ${sub.mlra}` : ""}` : ""
 
 /** A `yyyy-mm-dd` date as the form is written in the United States, `mm/dd/yyyy`; anything else as typed. */
 export function writtenDate(date: string): string {

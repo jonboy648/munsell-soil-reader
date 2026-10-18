@@ -1,4 +1,6 @@
 // The forms as one PDF: every Sampling point's pages in order, drawn on the official pages, read back.
+// A point's form is page 1 and the Soil page (and the cover note after it, when something is not ticked
+// there); the Privacy Act page is printed once, at the end of the whole PDF.
 import { readFileSync } from "node:fs"
 import { describe, expect, test } from "vitest"
 import { formFor } from "./formFor"
@@ -17,6 +19,7 @@ const second: SamplingPoint = { ...newPoint("JF-2"), id: "jf-2" }
 const project: Project = {
   ...JF1_PROJECT,
   header: { ...JF1_PROJECT.header, site: "Cedar Creek crossing", county: "Story", state: "IA", date: "2026-10-18" },
+  subregion: { lrr: "R", mlra: "144A" },
   points: [{ ...JF1_POINT, pair: { with: "jf-2", role: "wetland" } }, second],
 }
 
@@ -24,6 +27,15 @@ const pageCount = async (bytes: Uint8Array) => {
   const { PDFDocument } = await import("pdf-lib")
   return (await PDFDocument.load(bytes)).getPageCount()
 }
+/** The text of every page of the PDF. */
+const allPages = async (bytes: Uint8Array) =>
+  Promise.all(Array.from({ length: await pageCount(bytes) }, async (_, i) => (await pdfText(bytes, i + 1)).map((d) => d.text)))
+/** How many cover note pages a point's form has: the engine's own say on whether there is anything for one. */
+const covers = (p: Project, points: readonly SamplingPoint[]) =>
+  points.filter((pt) => {
+    const { cover } = formFor(p, pt).hydric
+    return cover.unconfirmed.length > 0 || cover.ticked.length > 0
+  }).length
 
 describe("the official page 1 and the measured header", () => {
   test("every line of the header is a rule on the official page, where the region package says", async () => {
@@ -37,20 +49,35 @@ describe("the official page 1 and the measured header", () => {
 })
 
 describe("a project's PDF", () => {
-  test("has every point's pages in order: page 1, the Soil page and the Privacy Act page, then the next point's", async () => {
+  test("has every point's page 1 and Soil page in order, and the Privacy Act page once, at the end", async () => {
     const bytes = await formsPdf(blanks, project, project.points)
-    expect(await pageCount(bytes)).toBe(6)
-    const names = async (page: number) => (await pdfText(bytes, page)).map((d) => d.text)
+    const pages = await allPages(bytes)
+    // JF-1's page 1 and Soil page, JF-2's page 1 and Soil page, the cover notes there are, and the Privacy Act page.
+    expect(pages).toHaveLength(4 + covers(project, project.points) + 1)
 
-    expect(await names(1)).toContain("Cedar Creek crossing")
-    expect(await names(1)).toContain("JF-1")
-    expect(await names(2)).toContain("0-20") // the Soil page, with JF-1's layers
-    expect((await names(3)).join(" ")).toContain("AGENCY DISCLOSURE NOTIFICATION")
-    expect(await names(4)).toContain("Cedar Creek crossing") // the header is copied to every point
-    expect(await names(4)).toContain("JF-2")
-    expect(await names(4)).not.toContain("JF-1")
-    expect(await names(5)).not.toContain("0-20") // JF-2 has no layers
-    expect((await names(6)).join(" ")).toContain("PRIVACY ACT STATEMENT")
+    expect(pages[0]).toContain("Cedar Creek crossing")
+    expect(pages[0]).toContain("JF-1")
+    expect(pages[0]).not.toContain("JF-2")
+    expect(pages[1]).toContain("0-20") // the Soil page, with JF-1's layers
+    expect(pages[2].join(" ")).toContain("Cover note: hydric soil indicators") // JF-1 has a suggestion not ticked
+    const secondPage1 = pages.findIndex((texts, i) => i > 1 && texts.includes("JF-2") && texts.includes("Cedar Creek crossing"))
+    expect(secondPage1).toBeGreaterThan(1) // the header is copied to every point
+    expect(pages[secondPage1]).not.toContain("JF-1")
+    expect(pages[secondPage1 + 1]).not.toContain("0-20") // JF-2 has no layers
+
+    const privacy = pages.flatMap((texts, i) => (texts.join(" ").includes("PRIVACY ACT STATEMENT") ? [i] : []))
+    expect(privacy).toEqual([pages.length - 1])
+    expect(pages.filter((texts) => texts.join(" ").includes("AGENCY DISCLOSURE NOTIFICATION"))).toHaveLength(1)
+  })
+
+  test("one point's PDF is its page 1 and Soil page, then the Privacy Act page", async () => {
+    const bytes = await formsPdf(blanks, project, [project.points[1]])
+    const pages = await allPages(bytes)
+    expect(pages).toHaveLength(2 + covers(project, [project.points[1]]) + 1)
+    expect(pages[0]).toContain("JF-2")
+    expect(pages[0]).toContain("Cedar Creek crossing")
+    expect(pages.at(-1)!.join(" ")).toContain("PRIVACY ACT STATEMENT")
+    expect(pages.flat()).not.toContain("JF-1")
   })
 
   test("draws each header value at the place it was given, on the official page", async () => {
@@ -66,18 +93,21 @@ describe("a project's PDF", () => {
     const all = (await pdfText(bytes, 1)).map((d) => d.text).join(" ")
     expect(all).toContain("Project/Site:") // the official page is still there
     expect(all).toContain("Wetland point, paired with the upland point JF-2.")
+    expect(all).toContain("LRR R, MLRA 144A") // the subregion the project picked
   })
 
   test("the pair is printed on both forms", async () => {
-    const bytes = await formsPdf(blanks, project, project.points)
-    expect((await pdfText(bytes, 1)).map((d) => d.text)).toContain("Wetland point, paired with the upland point JF-2.")
-    expect((await pdfText(bytes, 4)).map((d) => d.text)).toContain("Upland point, paired with the wetland point JF-1.")
+    const pages = await allPages(await formsPdf(blanks, project, project.points))
+    expect(pages[0]).toContain("Wetland point, paired with the upland point JF-2.")
+    const secondPage1 = pages.findIndex((texts, i) => i > 1 && texts.includes("JF-2"))
+    expect(pages[secondPage1]).toContain("Upland point, paired with the wetland point JF-1.")
   })
 
   test("the official pages are embedded once, so ten points are not ten forms", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({ ...second, id: `p${i}`, name: `P-${i}` }))
     const one = await formsPdf(blanks, project, [project.points[0]])
-    const many = await formsPdf(blanks, project, Array.from({ length: 10 }, (_, i) => ({ ...second, id: `p${i}`, name: `P-${i}` })))
-    expect(await pageCount(many)).toBe(30)
+    const many = await formsPdf(blanks, project, ten)
+    expect(await pageCount(many)).toBe(20 + covers(project, ten) + 1)
     expect(many.length).toBeLessThan(one.length * 2)
   })
 

@@ -28,7 +28,6 @@ const HEADER: [label: string, value: string][] = [
   ["Landform", "terrace"],
   ["Local relief", "concave"],
   ["Slope %", "2"],
-  ["Subregion", "MLRA 103"],
   ["Soil Map Unit Name", "Clarion loam"],
   ["NWI classification", "PEM1C"],
 ]
@@ -82,9 +81,13 @@ test("the header is filled once, two points are added, and the project's PDF rea
   await createProject(sheet, "Cedar Creek")
 
   // The site starts as the project's name; the header fills every line once.
-  await expect(sheet.getByTestId("header-summary")).toContainText("1 of 13 lines filled")
+  await expect(sheet.getByTestId("header-summary")).toContainText("1 of 12 lines filled")
   await fillHeader(sheet)
-  await expect(sheet.getByTestId("header-summary")).toContainText("13 of 13 lines filled")
+  await expect(sheet.getByTestId("header-summary")).toContainText("12 of 12 lines filled")
+
+  // The subregion is picked once on the project; page 1's Subregion line is that pick.
+  await sheet.getByLabel("Subregion (LRR)").selectOption({ label: "LRR R" })
+  await sheet.getByLabel("MLRA", { exact: true }).selectOption({ label: "MLRA 144A" })
 
   await addPoint(sheet, "JF-1")
   await addPoint(sheet, "JF-2")
@@ -95,7 +98,7 @@ test("the header is filled once, two points are added, and the project's PDF rea
   // Page 1's preview shows the project's lines and this point's own, as the PDF will draw them.
   await expect(page1Text(sheet)).toHaveText([
     "Cedar Creek crossing", "Story", "10/18/2026", "County Roads Dept", "IA", "JF-1", "J. Fixture", "S14 T83N R24W",
-    "terrace", "concave", "2", "MLRA 103", "42.5009", "-93.2204", "WGS84", "Clarion loam", "PEM1C",
+    "terrace", "concave", "2", "LRR R, MLRA 144A", "42.5009", "-93.2204", "WGS84", "Clarion loam", "PEM1C",
     "X", "N", "N", "Y", "N", "Wetland point, paired with the upland point JF-2.",
   ])
 
@@ -108,12 +111,12 @@ test("the header is filled once, two points are added, and the project's PDF rea
   await expect(page1Text(sheet).filter({ hasText: "Cedar Creek crossing" })).toHaveCount(1)
   await expect(page1Text(sheet).filter({ hasText: /^JF-2$/ })).toHaveCount(1)
 
-  // The project's PDF: for each point, page 1, the Soil page and the Privacy Act page, in the order listed.
+  // The project's PDF: for each point, page 1 and the Soil page, in the order listed, then the Privacy Act page once.
   await sheet.getByRole("button", { name: "Cedar Creek" }).click()
   const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download project PDF" }).click()])
   expect(download.suggestedFilename()).toBe("wetland-forms-Cedar-Creek.pdf")
   const first = await textOf(download, 1)
-  const second = await textOf(download, 4)
+  const second = await textOf(download, 3)
   expect(first).toContain("JF-1")
   expect(first).not.toContain("JF-2")
   expect(second).toContain("JF-2")
@@ -126,8 +129,12 @@ test("the header is filled once, two points are added, and the project's PDF rea
   expect(second).toContain("42.5012")
   expect(first).toContain("Wetland point, paired with the upland point JF-2.")
   expect(second).toContain("Upland point, paired with the wetland point JF-1.")
-  expect((await textOf(download, 3)).join(" ")).toContain("AGENCY DISCLOSURE NOTIFICATION")
-  expect((await textOf(download, 6)).join(" ")).toContain("PRIVACY ACT STATEMENT")
+  expect(await textOf(download, 2)).toContain("JF-1") // the Soil page names its point
+  expect(await textOf(download, 4)).toContain("JF-2")
+  const privacy = (await textOf(download, 5)).join(" ")
+  expect(privacy).toContain("AGENCY DISCLOSURE NOTIFICATION")
+  expect(privacy).toContain("PRIVACY ACT STATEMENT")
+  await expect(textOf(download, 6)).rejects.toThrow() // once, at the end: two points, five pages
 })
 
 test("the header and the pair are still there after a reload, and a point's own PDF holds only its pages", async ({ page }) => {
@@ -143,7 +150,7 @@ test("the header and the pair are still there after a reload, and a point's own 
   await page.reload()
   sheet = await openProjects(page)
   await sheet.getByRole("button", { name: "Open project" }).click()
-  await expect(sheet.getByTestId("header-summary")).toContainText("2 of 13 lines filled")
+  await expect(sheet.getByTestId("header-summary")).toContainText("2 of 12 lines filled")
   await openPoint(sheet, "SP-2")
   await expect(sheet.getByTestId("point-details")).toContainText("Wetland point, paired with the upland point SP-1.")
 
@@ -197,7 +204,7 @@ test("a project saved before the header existed opens with a blank header and st
   await page.reload()
   const sheet = await openProjects(page)
   await sheet.getByRole("button", { name: "Open project" }).click()
-  await expect(sheet.getByTestId("header-summary")).toContainText("0 of 13 lines filled")
+  await expect(sheet.getByTestId("header-summary")).toContainText("0 of 12 lines filled")
   const [download] = await Promise.all([page.waitForEvent("download"), sheet.getByRole("button", { name: "Download project PDF" }).click()])
   expect(await textOf(download, 1)).toContain("OP-1")
 })

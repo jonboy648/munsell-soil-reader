@@ -111,6 +111,58 @@ function PointRow({ project, point, change, onOpen }: { project: Project; point:
   )
 }
 
+const SELECT =
+  "h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+
+/** The project's LRR, and its MLRA where the region's indicators name some in that LRR. Decides which indicators apply. */
+function SubregionPicker({ project, change }: { project: Project; change: Change }) {
+  const { subregions } = regionOf(project.region)
+  const sub = project.subregion
+  const lrr = subregions.find((l) => l.id === sub?.lrr)
+  const [problem, setProblem] = React.useState<string | null>(null)
+  const set = async (subregion: Project["subregion"]) => {
+    try {
+      await change(project.id, ({ subregion: _old, ...p }) => (subregion ? { ...p, subregion } : p))
+      setProblem(null)
+    } catch {
+      setProblem(WRITE_PROBLEM)
+    }
+  }
+  return (
+    <div className="grid gap-2 rounded-lg border border-border bg-card p-3" data-testid="subregion">
+      <p className="text-sm text-muted-foreground">
+        The subregion decides which hydric soil indicators apply: an indicator limited to other subregions is not suggested.
+      </p>
+      <div className="grid gap-1.5">
+        <Label htmlFor="project-lrr">Subregion (LRR)</Label>
+        <select id="project-lrr" className={SELECT} value={sub?.lrr ?? ""} onChange={(e) => void set(e.target.value ? { lrr: e.target.value } : undefined)}>
+          <option value="">Not picked</option>
+          {subregions.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {lrr && lrr.mlras.length > 0 && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="project-mlra">MLRA</Label>
+          <select id="project-mlra" className={SELECT} value={sub?.mlra ?? ""} onChange={(e) => void set({ lrr: lrr.id, ...(e.target.value ? { mlra: e.target.value } : {}) })}>
+            <option value="">Not picked</option>
+            {lrr.mlras.map((m) => (
+              <option key={m} value={m}>
+                MLRA {m}
+              </option>
+            ))}
+            <option value="other">Another MLRA</option>
+          </select>
+        </div>
+      )}
+      {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
+    </div>
+  )
+}
+
 /** The header of page 1 for the whole Project: a count of the lines filled, and the form to change them. */
 function HeaderCard({ project, change }: { project: Project; change: Change }) {
   const [editing, setEditing] = React.useState(false)
@@ -148,6 +200,7 @@ function ProjectView({ project, change, onOpen, onBack }: { project: Project; ch
       </Button>
       <NameRow label="Project" name={project.name} onSave={(name) => change(project.id, (p) => ({ ...p, name }))} />
       <p className="text-sm text-muted-foreground">{regionOf(project.region).name}</p>
+      <SubregionPicker project={project} change={change} />
       <HeaderCard project={project} change={change} />
       {project.points.length === 0 && <p className="text-base">No sampling points yet.</p>}
       <ul className="grid gap-3">
@@ -162,7 +215,7 @@ function ProjectView({ project, change, onOpen, onBack }: { project: Project; ch
       />
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Project PDF</h4>
       <p className="text-sm text-muted-foreground">
-        Every sampling point's form in one file, in the order above: page 1, the Soil page and the Privacy Act page of each.
+        Every sampling point's form in one file, in the order above: page 1 and the Soil page of each, then the Privacy Act page once, at the end.
       </p>
       <FormExport
         project={project}

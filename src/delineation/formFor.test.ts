@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
-import { formFor, fieldId, columnRoom } from "./formFor"
+import { formFor, fieldId, columnRoom, indicatorFieldId, type FieldId } from "./formFor"
 import { JF1_POINT, JF1_PROJECT, JF1_ROWS } from "./fixtures/jf1"
-import { newPoint, newProject, notationOf, type Layer } from "./model"
+import { newPoint, newProject, notationOf, type Layer, type SamplingPoint } from "./model"
 import { regionOf } from "./regions"
 import { PROFILE_COLUMNS } from "./regions/types"
 import { soilPlacements } from "./soilPage"
@@ -30,7 +30,7 @@ describe("JF-1 through the form engine", () => {
     expect(form.fields["soil.samplingPoint"]).toBe("JF-1")
   })
 
-  test("every other field is blank, and there is nothing to suggest, conclude or warn about", () => {
+  test("every other field is blank, and the only things the form says are one suggestion and the question it leaves open", () => {
     const rows = soil.rowRules.length
     expect(rows).toBe(11)
     const filled = Object.entries(form.fields).filter(([id, text]) => id.startsWith("soil.") && text !== "")
@@ -41,8 +41,8 @@ describe("JF-1 through the form engine", () => {
         expect(form.fields[fieldId(row, column)], `${row} ${column}`).toBe("")
       }
     }
-    expect(form.suggestions).toEqual([])
-    expect(form.conclusions).toEqual([])
+    expect(form.hydric.suggestions.map((s) => s.indicator)).toEqual(["A12"])
+    expect(form.hydric.conclusion).toEqual({ id: "hydricSoilPresent", question: "Hydric Soil Present?", suggested: null, because: "No indicator is confirmed yet." })
     expect(form.warnings).toEqual([])
   })
 
@@ -221,5 +221,82 @@ describe("a typed-in color", () => {
 
   test.each(["", "brown", "10YR", "10YR 4", "4/2", "10XX 4/2", "10YR 4/2 moist"])("%j is not a notation", (typed) => {
     expect(notationOf(typed)).toBeNull()
+  })
+})
+
+describe("the indicators on the form", () => {
+  const withChoices = (indicators: SamplingPoint["indicators"], hydricSoilPresent?: "yes" | "no"): SamplingPoint => ({
+    ...JF1_POINT,
+    ...(indicators ? { indicators } : {}),
+    ...(hydricSoilPresent ? { hydricSoilPresent } : {}),
+  })
+  const ticks = (form: ReturnType<typeof formFor>) =>
+    Object.entries(form.fields).filter(([id, text]) => id.startsWith("soil.indicator.") && text !== "").map(([id]) => id)
+
+  test("every record of the region has a field, and so do Yes and No", () => {
+    const form = formFor(JF1_PROJECT, JF1_POINT)
+    const ids = Object.keys(form.fields).filter((id) => id.startsWith("soil.indicator."))
+    expect(ids.sort()).toEqual(regionOf("NCNE").indicators.map((i) => indicatorFieldId(i.id)).sort())
+    expect(ids).toHaveLength(34)
+    expect(form.fields["soil.hydric.yes"]).toBe("")
+    expect(form.fields["soil.hydric.no"]).toBe("")
+  })
+
+  test("a suggestion is not ticked, and goes on the cover note until the user confirms it", () => {
+    const form = formFor(JF1_PROJECT, JF1_POINT)
+    expect(ticks(form)).toEqual([])
+    expect(form.hydric.cover.unconfirmed.map((s) => s.indicator)).toEqual(["A12"])
+    expect(form.hydric.cover.unconfirmed[0].rule).toBe(regionOf("NCNE").indicators.find((i) => i.id === "A12")!.quote)
+    expect(form.hydric.cover.ticked).toEqual([])
+  })
+
+  test("a confirmed suggestion is ticked, comes off the cover note, and makes Yes the suggested answer", () => {
+    const form = formFor(JF1_PROJECT, withChoices({ A12: { state: "confirmed" } }))
+    expect(ticks(form)).toEqual([indicatorFieldId("A12")])
+    expect(form.fields[indicatorFieldId("A12")]).toBe("X")
+    expect(form.hydric.cover).toEqual({ unconfirmed: [], ticked: [] })
+    expect(form.hydric.conclusion).toMatchObject({ suggested: "yes", because: "Yes: A12 Thick Dark Surface is confirmed." })
+    expect(form.hydric.conclusion.confirmed).toBeUndefined()
+    // Suggested is not answered: nothing is printed in Yes or No.
+    expect(form.fields["soil.hydric.yes"]).toBe("")
+  })
+
+  test("a rejected suggestion is not ticked and is not on the cover note", () => {
+    const form = formFor(JF1_PROJECT, withChoices({ A12: { state: "rejected" } }))
+    expect(ticks(form)).toEqual([])
+    expect(form.hydric.cover).toEqual({ unconfirmed: [], ticked: [] })
+    expect(form.hydric.conclusion.suggested).toBeNull()
+  })
+
+  test("an indicator the user ticks that the app did not suggest is ticked and goes on the cover note with the remark", () => {
+    const form = formFor(JF1_PROJECT, withChoices({ A4: { state: "confirmed", manual: true, remark: "Rotten egg smell at 8 in" } }))
+    expect(ticks(form)).toEqual([indicatorFieldId("A4")])
+    expect(form.hydric.cover.ticked).toEqual([{ indicator: "A4", code: "A4", name: "Hydrogen Sulfide", remark: "Rotten egg smell at 8 in" }])
+    expect(form.hydric.cover.unconfirmed.map((s) => s.indicator)).toEqual(["A12"])
+    expect(form.hydric.conclusion.suggested).toBe("yes")
+  })
+
+  test("a remark with a character the font cannot print is warned about, because the cover note replaces it", () => {
+    const form = formFor(JF1_PROJECT, withChoices({ A4: { state: "confirmed", manual: true, remark: "Smell at <= 8 in ≤ or so" } }))
+    expect(form.warnings.map((w) => [w.kind, w.text])).toEqual([["text-changed", "The remark on A4 Hydrogen Sulfide has characters the form cannot print; they were replaced on the cover note."]])
+    expect(formFor(JF1_PROJECT, withChoices({ A4: { state: "confirmed", manual: true, remark: "Plain ASCII" } })).warnings).toEqual([])
+  })
+
+  test("Other is ticked like any other, with its remark", () => {
+    const form = formFor(JF1_PROJECT, withChoices({ other: { state: "confirmed", manual: true, remark: "Field-observed" } }))
+    expect(form.fields[indicatorFieldId("other")]).toBe("X")
+    expect(form.hydric.conclusion.because).toBe("Yes: Other (Explain in Remarks) is confirmed.")
+  })
+
+  test("Hydric Soil Present prints the user's answer and only that", () => {
+    expect(formFor(JF1_PROJECT, withChoices(undefined, "yes")).fields).toMatchObject({ "soil.hydric.yes": "X", "soil.hydric.no": "" })
+    expect(formFor(JF1_PROJECT, withChoices(undefined, "no")).fields).toMatchObject({ "soil.hydric.yes": "", "soil.hydric.no": "X" })
+    expect(formFor(JF1_PROJECT, withChoices(undefined, "no")).hydric.conclusion.confirmed).toBe("no")
+  })
+
+  test("the printed profile does not change with the choices", () => {
+    const plain = formFor(JF1_PROJECT, JF1_POINT).fields
+    const chosen = formFor(JF1_PROJECT, withChoices({ A12: { state: "confirmed" } }, "yes")).fields
+    for (const id of Object.keys(plain).filter((id) => id.startsWith("soil.profile."))) expect(chosen[id as FieldId], id).toBe(plain[id as FieldId])
   })
 })

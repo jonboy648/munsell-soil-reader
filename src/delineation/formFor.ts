@@ -1,11 +1,15 @@
 // The form engine: the values of every printed field of a form, for one sampling point. Pure: no
 // UI, no files. The on-screen preview and the PDF both draw from what this returns.
 //
-// Filled so far: the header of page 1 (`page1.<line>`, and `page1.summaryRemarks` for the note of a pair), the
-// Soil page's Sampling Point box (`soil.samplingPoint`) and its profile description table. The table's
-// fields are named `soil.profile.<row>.<column>`, rows from 0, and every one is in `fields`, blank when
-// unknown. Every value is already text the PDF's font can print.
-import { PROJECT_FIELDS, POINT_FIELDS, writtenDate } from "./headerFields"
+// The Soil page: the Sampling Point box (`soil.samplingPoint`), its profile description table
+// (`soil.profile.<row>.<column>`, rows from 0), a tick for each confirmed hydric soil indicator
+// (`soil.indicator.<id>`), and the answer to "Hydric Soil Present?" once the user has confirmed it
+// (`soil.hydric.yes` or `.no`). Page 1: the header (`page1.<line>`, and `page1.summaryRemarks` for the
+// note of a pair) and the Hydrology section (`page1.hydrology.*`). Every field is in `fields`, blank
+// when unknown, and every value is already text the PDF's font can print. Nothing is ticked that the
+// user has not confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left
+// unconfirmed go on the cover note.
+import { PROJECT_FIELDS, POINT_FIELDS, subregionText, writtenDate } from "./headerFields"
 import { regionOf } from "./regions"
 import {
   PAGE1_MARK_FIELDS,
@@ -19,9 +23,16 @@ import {
 import { hydrologyFor } from "./hydrology"
 import { fit, printable, truncate, widthOf, wrap, written } from "./text"
 import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
+import { indicatorLabel, suggest, type Suggestions } from "./rules/suggest"
 
 type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
-export type FieldId = `soil.profile.${number}.${ProfileColumn}` | "soil.samplingPoint" | Page1Id | `page1.hydrology.${string}`
+export type FieldId =
+  | `soil.profile.${number}.${ProfileColumn}`
+  | "soil.samplingPoint"
+  | `soil.indicator.${string}`
+  | `soil.hydric.${"yes" | "no"}`
+  | Page1Id
+  | `page1.hydrology.${string}`
 
 export interface FormWarning {
   kind:
@@ -40,13 +51,47 @@ export interface FormWarning {
   text: string
 }
 
+/** The Soil page's "Hydric Soil Present?", suggested from the indicators the user confirmed. */
+export interface HydricConclusion {
+  id: "hydricSoilPresent"
+  question: string
+  /** What the app suggests: yes when an indicator is confirmed, nothing otherwise. */
+  suggested: "yes" | null
+  /** Why, in words. */
+  because: string
+  /** What the user answered. Only a confirmed answer is printed. */
+  confirmed?: "yes" | "no"
+}
+
+/** The cover note that goes with the Soil page: what is not on the form, and why. */
+export interface CoverNote {
+  /** Indicators the app suggested that the user has not confirmed: they print blank. */
+  unconfirmed: Suggestions["suggestions"]
+  /** Indicators the user ticked that the app did not suggest, with their remarks. */
+  ticked: Suggestions["ticked"]
+}
+
+/** The hydric soil indicators of the Soil page, for one sampling point. */
+export interface HydricSoil {
+  /** The indicators the layers satisfy, for the user to confirm. */
+  suggestions: Suggestions["suggestions"]
+  /** The ones not suggested, and what each needs. */
+  needs: Suggestions["needs"]
+  /** The ones the user ticked that the app did not suggest. */
+  ticked: Suggestions["ticked"]
+  conclusion: HydricConclusion
+  cover: CoverNote
+}
+
 export interface Form {
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
-  /** What the recorded data suggests, with the rule it used, for the user to confirm. */
+  /** What the recorded data suggests for the Hydrology section, with the rule it used, for the user to confirm. */
   suggestions: readonly Suggestion[]
-  /** The answers the user has confirmed. */
+  /** The Hydrology answers the user has confirmed. */
   conclusions: readonly Conclusion[]
+  /** The hydric soil indicators of the Soil page: what the layers satisfy, and what the user decided. */
+  hydric: HydricSoil
   warnings: FormWarning[]
 }
 
@@ -65,6 +110,7 @@ export interface Conclusion {
 }
 
 export const fieldId = (row: number, column: ProfileColumn): FieldId => `soil.profile.${row}.${column}`
+export const indicatorFieldId = (id: string): FieldId => `soil.indicator.${id}`
 
 /** How wide a column's text may be: the rule less a gap at each end. */
 export const columnRoom = (soil: SoilPage, column: ProfileColumn): number => {
@@ -97,6 +143,7 @@ function page1Fields(project: Project, point: SamplingPoint, warnings: FormWarni
   for (const { key, field, label } of PROJECT_FIELDS) {
     put(field, label, key === "date" ? writtenDate(header.date) : String(header[key]))
   }
+  put("subregion", "Subregion", subregionText(project.subregion))
   for (const { key, field, label } of POINT_FIELDS) put(field, label, String(point[key]))
 
   if (header.normalCircumstances === "yes") out["page1.normalYes"] = "X"
@@ -129,7 +176,8 @@ function withNote(existing: string, note: string, room: number, size: number): s
 }
 
 export function formFor(project: Project, point: SamplingPoint): Form {
-  const { soil } = regionOf(project.region)
+  const region = regionOf(project.region)
+  const { soil } = region
   const rowCount = soil.rowRules.length
   const room = columnRoom(soil, "remarks")
   const warnings: FormWarning[] = []
@@ -214,6 +262,35 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     for (const column of PROFILE_COLUMNS) fields[fieldId(r, column)] = rows[r]?.[column] ?? ""
   }
 
+  // Hydric soil indicators: a tick for each one the user confirmed, whether the app suggested it or not.
+  const found = suggest(project, point)
+  const choices = point.indicators ?? {}
+  for (const indicator of region.indicators) fields[indicatorFieldId(indicator.id)] = choices[indicator.id]?.state === "confirmed" ? "X" : ""
+  const confirmed = region.indicators.filter((i) => choices[i.id]?.state === "confirmed")
+  for (const t of found.ticked) {
+    if (printable(t.remark).replaced) {
+      warnings.push({ kind: "text-changed", text: `The remark on ${indicatorLabel(t)} has characters the form cannot print; they were replaced on the cover note.` })
+    }
+  }
+  fields["soil.hydric.yes"] = point.hydricSoilPresent === "yes" ? "X" : ""
+  fields["soil.hydric.no"] = point.hydricSoilPresent === "no" ? "X" : ""
+  const hydric: HydricSoil = {
+    suggestions: found.suggestions,
+    needs: found.needs,
+    ticked: found.ticked,
+    conclusion: {
+      id: "hydricSoilPresent",
+      question: "Hydric Soil Present?",
+      suggested: confirmed.length > 0 ? "yes" : null,
+      because:
+        confirmed.length > 0
+          ? `Yes: ${confirmed.map(indicatorLabel).join(", ")} ${confirmed.length === 1 ? "is" : "are"} confirmed.`
+          : "No indicator is confirmed yet.",
+      ...(point.hydricSoilPresent ? { confirmed: point.hydricSoilPresent } : {}),
+    },
+    cover: { unconfirmed: found.suggestions.filter((s) => s.decision === "pending"), ticked: found.ticked },
+  }
+
   const hydrology = hydrologyFor(regionOf(project.region), point.hydrology)
   Object.assign(fields, hydrology.fields)
   warnings.push(...hydrology.warnings)
@@ -224,6 +301,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
       ? [{ id: "hydrology.present", answer: hydrology.suggestion.answer, text: hydrology.suggestion.text, citation: hydrology.suggestion.citation }]
       : [],
     conclusions: typeof present === "boolean" ? [{ id: "hydrology.present", answer: present }] : [],
+    hydric,
     warnings,
   }
 }

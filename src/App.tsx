@@ -4,11 +4,13 @@ import type { ExamplePhoto } from "@/engine/simulate"
 import { BottomBar } from "@/components/BottomBar"
 import { CardPanel } from "@/components/CardPanel"
 import { ExamplePicker } from "@/components/ExamplePicker"
+import { InstallHint } from "@/components/InstallHint"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
 import { SpotsPanel } from "@/components/SpotsPanel"
 import { StepIndicator } from "@/components/StepIndicator"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { UpdateNotice } from "@/components/UpdateNotice"
 import { examplePhoto, filePhoto } from "@/lib/photo"
 import {
   CORNER_COUNT,
@@ -54,10 +56,11 @@ export function App() {
 
   return (
     <div className="mx-auto flex min-h-svh max-w-xl flex-col">
-      <header className="px-4 pt-[env(safe-area-inset-top)]">
+      <header className="relative px-4 pt-[env(safe-area-inset-top)]">
         <h1 className="py-3 font-heading text-xl font-extrabold tracking-tight [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
+        <UpdateNotice hasPhoto={session.photo !== null} />
       </header>
 
       <main className="flex flex-1 flex-col gap-4 pb-44">
@@ -100,6 +103,7 @@ export function App() {
 
         {/* At the bottom of the page, where a thumb reaches it. */}
         <footer className="px-2">
+          <InstallHint />
           <ThemeToggle />
         </footer>
       </main>

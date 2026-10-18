@@ -24,6 +24,18 @@ npm run test:e2e         # browser tests (Playwright): builds, serves, drives Ch
 
 CI runs typecheck, `npm test` and `npm run test:e2e` on every pull request.
 
+## Deploys
+
+Every push to `main` deploys to <https://soil.joncackler.com/> through
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): typecheck, `npm test`,
+`npm run test:e2e`, `npm run build`, then GitHub Pages publishes `dist/`. If a test fails,
+nothing is deployed and the live site stays on the last good build. To redeploy without a
+commit, run the Deploy workflow from the Actions tab.
+
+The repository's Pages source is "GitHub Actions". The custom domain and enforced HTTPS are
+Pages settings, not part of the build; `public/CNAME` is copied into `dist/` and holds the
+same domain. The old `gh-pages` branch is no longer deployed from and is kept only as a backup.
+
 ## How it is built
 
 - Vite, React, TypeScript (strict), Tailwind CSS and shadcn/ui. The interface is neutral gray

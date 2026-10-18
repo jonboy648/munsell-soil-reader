@@ -1,7 +1,7 @@
 // The Readings: a peek at the latest one above the bottom bar, and every Spot's Reading in a
 // bottom sheet. Raw and corrected sit side by side, with the nearest Chip and the Card check.
 import { ChevronUp } from "lucide-react"
-import type { ChipReading, ReadPhotoResult, RgbTriple } from "@/engine"
+import { isPageHue, type ChipPage, type ChipReading, type ReadPhotoResult, type RgbTriple } from "@/engine"
 import { CardCheckBadge } from "@/components/CardCheckBadge"
 import {
   Drawer,
@@ -11,9 +11,11 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
-import { shownReading } from "@/lib/verdict"
+import { shownReading, type CardInfo } from "@/lib/verdict"
 
 const css = (rgb: RgbTriple) => `rgb(${rgb.join(",")})`
+const PAGE_NAMES: Record<string, string> = { GLEY1: "Gley 1", GLEY2: "Gley 2", WHITE: "White" }
+const pageName = (page: ChipPage) => PAGE_NAMES[page] ?? page
 const fmt = (n: number) => n.toFixed(1)
 
 /** A block of color: the one place besides the Photo where color appears on screen. */
@@ -49,9 +51,11 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
   )
 }
 
-function SpotReading({ result, index }: { result: ReadPhotoResult; index: number }) {
+function SpotReading({ result, index, card }: { result: ReadPhotoResult; index: number; card: CardInfo }) {
   const reading = result.readings[index]
-  const { verdict, main, why } = shownReading(reading, result.cardCheck)
+  const { verdict, main, why } = shownReading(reading, result.cardCheck, card)
+  const leftOut = result.cardCheck?.leftOut ?? []
+  const better = verdict === "good" && card.kind === "page" ? reading.betterPage : undefined
   return (
     <section aria-label={`Spot ${index + 1}`} className="grid gap-3 border-t border-border py-4 first:border-t-0">
       <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -74,6 +78,23 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
         <CardCheckBadge verdict={verdict} cardCheck={result.cardCheck} />
       </div>
       <p className="text-sm text-muted-foreground">{why}</p>
+      {leftOut.length > 0 && (
+        <p className="text-sm" data-testid="left-out">
+          <b className="font-semibold">Left out of the fit:</b>{" "}
+          <span className="font-mono">{leftOut.join(", ")}</span>. {leftOut.length === 1 ? "It" : "They"}{" "}
+          disagreed with the rest of the Page, as a smudged or worn Chip does.
+        </p>
+      )}
+      {better && card.kind === "page" && (
+        <p className="text-sm" data-testid="better-page">
+          <b className="font-semibold">Try the {pageName(better)} Page.</b> This soil reads on the{" "}
+          {pageName(better)} Page, not the {card.hue} Page you used, and the correction is strongest near
+          the Page's own hue.{" "}
+          {isPageHue(better)
+            ? `Retake the Photo with the ${better} Page beside the soil.`
+            : "That Page can't be the Card yet, so use the hue Page closest to it."}
+        </p>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
@@ -106,10 +127,10 @@ function SpotReading({ result, index }: { result: ReadPhotoResult; index: number
   )
 }
 
-export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
+export function ReadingsPanel({ result, card }: { result: ReadPhotoResult | null; card: CardInfo }) {
   if (!result || result.readings.length === 0) return null
   const last = result.readings.length - 1
-  const { verdict, main } = shownReading(result.readings[last], result.cardCheck)
+  const { verdict, main } = shownReading(result.readings[last], result.cardCheck, card)
   return (
     <Drawer>
       <DrawerTrigger asChild>
@@ -138,7 +159,7 @@ export function ReadingsPanel({ result }: { result: ReadPhotoResult | null }) {
         </DrawerHeader>
         <div className="overflow-y-auto px-4 pb-6">
           {result.readings.map((_, i) => (
-            <SpotReading key={i} result={result} index={i} />
+            <SpotReading key={i} result={result} index={i} card={card} />
           ))}
         </div>
       </DrawerContent>

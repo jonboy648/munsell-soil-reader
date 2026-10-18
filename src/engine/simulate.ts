@@ -5,6 +5,7 @@
 import * as munsell from "munsell"
 import { encode, mul, type Mat3, type Vec3 } from "./color"
 import { PATCH_LINEAR } from "./colorchecker"
+import { pageModel, type PageChip, type PageHue } from "./page"
 import type { Corners, Pixels, XY } from "./types"
 
 /** What the camera does to the light before and after the sensor. */
@@ -74,13 +75,29 @@ export interface SimTilt {
   pitch: number
 }
 
-/** Pinhole focal length in Photo pixels: about 70 degrees across the Photo's width. */
-const FOCAL = 700
-/** The camera is this far from the middle of the Card, close enough for strong perspective. */
-const DISTANCE = 500
-/** The scene is turned about the middle of the Card's patch grid. */
+/** Where the camera stands: its lens, and the point of the scene it turns about and looks at. */
+interface ViewGeometry {
+  width: number
+  height: number
+  /** Pinhole focal length in Photo pixels. */
+  focal: number
+  /** How far the camera is from the pivot, in scene pixels. */
+  distance: number
+  pivot: XY
+}
+
 const [FIRST, LAST] = [patchCenter(0, 0), patchCenter(3, 5)]
-const PIVOT: XY = { x: (FIRST.x + LAST.x) / 2, y: (FIRST.y + LAST.y) / 2 }
+/**
+ * The ColorChecker scene: a focal length of about 70 degrees across the Photo's width, and the
+ * camera this close to the middle of the Card's patch grid, close enough for strong perspective.
+ */
+const CARD_VIEW: ViewGeometry = {
+  width: SIM_WIDTH,
+  height: SIM_HEIGHT,
+  focal: 700,
+  distance: 500,
+  pivot: { x: (FIRST.x + LAST.x) / 2, y: (FIRST.y + LAST.y) / 2 },
+}
 
 /** The scene is a flat plane. A view maps its points to the Photo and the Photo's pixels back. */
 interface View {
@@ -89,7 +106,7 @@ interface View {
   toScene: (x: number, y: number, out: XY) => void
 }
 
-function tiltedView({ yaw, pitch }: SimTilt): View {
+function tiltedView({ yaw, pitch }: SimTilt, { width, height, focal, distance, pivot }: ViewGeometry): View {
   const rad = Math.PI / 180
   const [sy, cy] = [Math.sin(yaw * rad), Math.cos(yaw * rad)]
   const [sp, cp] = [Math.sin(pitch * rad), Math.cos(pitch * rad)]
@@ -97,30 +114,30 @@ function tiltedView({ yaw, pitch }: SimTilt): View {
   const right = [cy, -sp * sy, cp * sy]
   const down = [0, cp, sp]
   const normal = [-sy, -sp * cy, cp * cy]
-  // A pixel's ray hits the plane at t = DISTANCE * normal.z / (ray . normal), which makes the
+  // A pixel's ray hits the plane at t = distance * normal.z / (ray . normal), which makes the
   // scene point a ratio of two linear functions of the ray: the same for u (right) and v (down).
   const across = (axis: number[], k: number) => normal[2] * axis[k] - axis[2] * normal[k]
   const [ux, uy, vx, vy] = [across(right, 0), across(right, 1), across(down, 0), across(down, 1)]
   return {
     toPhoto: (u, v) => {
-      const a = u - PIVOT.x
-      const b = v - PIVOT.y
-      const z = DISTANCE + a * right[2] + b * down[2]
+      const a = u - pivot.x
+      const b = v - pivot.y
+      const z = distance + a * right[2] + b * down[2]
       return {
-        x: SIM_WIDTH / 2 + (FOCAL * (a * right[0] + b * down[0])) / z,
-        y: SIM_HEIGHT / 2 + (FOCAL * (a * right[1] + b * down[1])) / z,
+        x: width / 2 + (focal * (a * right[0] + b * down[0])) / z,
+        y: height / 2 + (focal * (a * right[1] + b * down[1])) / z,
       }
     },
     toScene: (x, y, out) => {
-      const rx = (x - SIM_WIDTH / 2) / FOCAL
-      const ry = (y - SIM_HEIGHT / 2) / FOCAL
+      const rx = (x - width / 2) / focal
+      const ry = (y - height / 2) / focal
       const facing = normal[0] * rx + normal[1] * ry + normal[2]
       if (facing <= 0) {
         out.x = out.y = -Infinity
         return
       }
-      out.x = PIVOT.x + (DISTANCE * (ux * rx + uy * ry)) / facing
-      out.y = PIVOT.y + (DISTANCE * (vx * rx + vy * ry)) / facing
+      out.x = pivot.x + (distance * (ux * rx + uy * ry)) / facing
+      out.y = pivot.y + (distance * (vx * rx + vy * ry)) / facing
     },
   }
 }
@@ -147,12 +164,17 @@ function shoot(camera: SimCamera, lin: Vec3): Vec3 {
 
 export interface SimPhoto {
   pixels: Pixels & { data: Uint8ClampedArray<ArrayBuffer> }
-  /** Corner patch centers, TL, TR, BR, BL. Meaningless when the scene has no Card. */
+  /**
+   * Corner patch centers, TL, TR, BR, BL. Meaningless when the scene has no Card. A Page scene
+   * has the four Chips the user taps instead (`pageModel(hue).taps`), in the same order.
+   */
   corners: Corners
-  /** Every ColorChecker patch's true center, row by row. Meaningless when the scene has no Card. */
+  /** Every ColorChecker patch's true center, row by row (a Page scene: every printed Chip). Meaningless when the scene has no Card. */
   patches: XY[]
   /** The middle of the soil patch. */
   spot: XY
+  /** A Page scene: the center of each hole, with soil behind it. Empty otherwise. */
+  holes: XY[]
 }
 
 export interface SimScene {
@@ -165,11 +187,17 @@ export interface SimScene {
   seed?: number
   /** Photograph the scene at an angle, so the Card is in perspective. Default: straight on. */
   tilt?: SimTilt
+  /** Put a Page of the soil book in the shot, with the soil behind its holes, instead of the ColorChecker. */
+  page?: PageHue
+  /** A Page scene: Chips with dirt on them, as notation to the share of the Chip the dirt covers (0 to 1). */
+  smudged?: Record<string, number>
 }
 
-export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7, tilt }: SimScene): SimPhoto {
+export function simulatePhoto(scene: SimScene): SimPhoto {
+  if (scene.page) return simulatePagePhoto({ ...scene, page: scene.page })
+  const { camera, card = true, soil = SIM_SOIL, seed = 7, tilt } = scene
   const rand = mulberry32(seed)
-  const view = tilt ? tiltedView(tilt) : null // null: straight on, scene point = Photo pixel
+  const view = tilt ? tiltedView(tilt, CARD_VIEW) : null // null: straight on, scene point = Photo pixel
   const looksAt: XY = { x: 0, y: 0 }
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
   const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
@@ -218,11 +246,110 @@ export function simulatePhoto({ camera, card = true, soil = SIM_SOIL, seed = 7, 
     corners: SIM_CORNERS.map(at) as Corners,
     patches: PATCH_CENTERS.map(at),
     spot: at(SIM_SPOT),
+    holes: [],
+  }
+}
+
+// ---- the Page scene ----
+// A Page lies on the soil. It is white paper with the Chips printed as rectangles in a grid, and
+// round holes punched between vertically neighbouring Chips; the soil shows through them. The
+// proportions are measured on a photo of a real 10YR Page: the Chips are four fifths of a column
+// wide and two thirds of a row tall, and a hole is as wide as a Chip, so it bites into the Chip
+// above and the Chip below and leaves a solid middle on each.
+const PAGE = { x: 110, y: 80, col: 49, row: 74 } // the center of the first Chip, and the pitch
+const PAGE_CHIP = { w: 39, h: 50 }
+const PAGE_HOLE_DIAMETER = 39
+const PAGE_PAPER = { x0: 58, x1: 395, y0: 20, y1: 584 }
+const PAGE_PAPER_LINEAR: Vec3 = [0.78, 0.78, 0.8]
+/** What a smudge is made of: soot, nearly black. */
+const SMUDGE_LINEAR: Vec3 = [0.015, 0.014, 0.012]
+/** The Page scene is turned about the middle of the Photo, with the camera farther off than for the Card. */
+const PAGE_VIEW: ViewGeometry = {
+  width: SIM_WIDTH,
+  height: SIM_HEIGHT,
+  focal: 700,
+  distance: 1000,
+  pivot: { x: SIM_WIDTH / 2, y: SIM_HEIGHT / 2 },
+}
+
+const pageCenter = (col: number, row: number): XY => ({ x: PAGE.x + col * PAGE.col, y: PAGE.y + row * PAGE.row })
+
+function simulatePagePhoto({
+  camera,
+  page,
+  soil = SIM_SOIL,
+  seed = 7,
+  tilt,
+  smudged = {},
+}: SimScene & { page: PageHue }): SimPhoto {
+  const rand = mulberry32(seed)
+  const view = tilt ? tiltedView(tilt, PAGE_VIEW) : null
+  const looksAt: XY = { x: 0, y: 0 }
+  const { chips, taps } = pageModel(page)
+  const at = ({ x, y }: XY) => (view ? view.toPhoto(x, y) : { x, y })
+  const dirty = (chip: PageChip): Vec3 => {
+    const share = smudged[chip.chip.notation] ?? 0
+    return chip.linear.map((v, k) => (1 - share) * v + share * SMUDGE_LINEAR[k]) as Vec3
+  }
+  const printed = new Map<string, Vec3>(chips.map((c) => [`${c.col},${c.row}`, shoot(camera, dirty(c))]))
+  const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)
+  const soilRgb = shoot(camera, munsell.munsellToLinearRgb(soil) as Vec3)
+  const paper = shoot(camera, PAGE_PAPER_LINEAR)
+  const data = new Uint8ClampedArray(SIM_WIDTH * SIM_HEIGHT * 4)
+  for (let y = 0; y < SIM_HEIGHT; y++) {
+    for (let x = 0; x < SIM_WIDTH; x++) {
+      let u = x
+      let v = y
+      if (view) {
+        view.toScene(x, y, looksAt)
+        u = looksAt.x
+        v = looksAt.y
+      }
+      let rgb = ground
+      let noise = 12
+      if (u >= PAGE_PAPER.x0 && u < PAGE_PAPER.x1 && v >= PAGE_PAPER.y0 && v < PAGE_PAPER.y1) {
+        rgb = paper
+        noise = 2
+        const col = Math.round((u - PAGE.x) / PAGE.col)
+        const row = Math.round((v - PAGE.y) / PAGE.row)
+        const chip = printed.get(`${col},${row}`)
+        const middle = pageCenter(col, row)
+        if (chip && Math.abs(u - middle.x) <= PAGE_CHIP.w / 2 && Math.abs(v - middle.y) <= PAGE_CHIP.h / 2) rgb = chip
+        // The hole below the nearest Chip row boundary exists when the Chips above and below it do.
+        const above = Math.floor((v - PAGE.y) / PAGE.row)
+        const hole = pageCenter(col, above + 0.5)
+        if (
+          printed.has(`${col},${above}`) &&
+          printed.has(`${col},${above + 1}`) &&
+          (u - hole.x) ** 2 + (v - hole.y) ** 2 <= (PAGE_HOLE_DIAMETER / 2) ** 2
+        ) {
+          rgb = soilRgb
+          noise = 5
+        }
+      }
+      if (u >= SOIL_BOX.x && u < SOIL_BOX.x + SOIL_BOX.w && v >= SOIL_BOX.y && v < SOIL_BOX.y + SOIL_BOX.h) {
+        rgb = soilRgb
+        noise = 5
+      }
+      const i = (y * SIM_WIDTH + x) * 4
+      for (let k = 0; k < 3; k++) data[i + k] = Math.round(rgb[k] + (rand() - 0.5) * 2 * noise)
+      data[i + 3] = 255
+    }
+  }
+  const holes: XY[] = chips
+    .filter((c) => chips.some((d) => d.col === c.col && d.row === c.row + 1))
+    .map((c) => at(pageCenter(c.col, c.row + 0.5)))
+  return {
+    pixels: { width: SIM_WIDTH, height: SIM_HEIGHT, data },
+    corners: taps.map((c) => at(pageCenter(c.col, c.row))) as Corners,
+    patches: chips.map((c) => at(pageCenter(c.col, c.row))),
+    spot: at(SIM_SPOT),
+    holes,
   }
 }
 
 // ---- the example Photos ----
-export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled"
+export type ExampleId = "shift" | "warm" | "dim" | "wrong" | "nocard" | "angled" | "page"
 
 export interface ExamplePhoto {
   id: ExampleId
@@ -235,6 +362,9 @@ const phone = (light: SimCamera["light"]): SimCamera => ({ light, toneCurve: PHO
 
 /** A strong tilt: the right side of the scene turned 40 degrees away. */
 export const ANGLED_TILT: SimTilt = { yaw: 40, pitch: 0 }
+
+/** Jon's 10YR Page has dark smudges on 8/1 and 7/1, which are steps of the ladder. */
+const WORN_CHIPS = { "10YR 8/1": 0.3, "10YR 7/1": 0.3 }
 
 export const EXAMPLES: ExamplePhoto[] = [
   {
@@ -272,5 +402,11 @@ export const EXAMPLES: ExamplePhoto[] = [
     name: "Card at an angle",
     note: "The Card is tilted away from the camera, about 40 degrees. Tap its four corner patches where they are; every patch still lands.",
     scene: { camera: phone(LIGHTS.warm), tilt: ANGLED_TILT },
+  },
+  {
+    id: "page",
+    name: "Soil-book Page, worn",
+    note: "A 10YR Page lies on the soil, and the soil shows through its holes. Pick Soil-book Page and 10YR, tap the four Chips shown, then tap inside a hole. Two Chips are smudged, as on a well-used book; the Card check leaves them out.",
+    scene: { camera: phone(LIGHTS.warm), page: "10YR", smudged: WORN_CHIPS },
   },
 ]

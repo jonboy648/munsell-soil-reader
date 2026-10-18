@@ -51,9 +51,9 @@ const CARD = { x: 60, y: 120, patch: 62, gap: 12 }
 const SOIL_BOX = { x: 650, y: 150, w: 240, h: 240 }
 
 /** The Card's layout at a size: its top left corner stays put, patches and gaps scale. */
-function cardLayout(scale: number) {
+function cardLayout(scale: number, frameGap = CARD.gap) {
   const patch = CARD.patch * scale
-  const gap = CARD.gap * scale
+  const gap = frameGap * scale
   const pitch = patch + gap
   const center = (r: number, c: number): XY => ({
     x: CARD.x + c * pitch + patch / 2,
@@ -176,6 +176,8 @@ export interface SimScene {
   glare?: Glare[]
   /** A shadow edge painted over the finished Photo. */
   shadow?: Shadow
+  /** The black frame between patches, in pixels at Card scale 1 (the patches are 62). Default 12. */
+  frameGap?: number
   /** Sensor noise, as a multiple of the usual amount. Default 1. */
   noise?: number
   /** JPEG quality, 1 to 100, applied last. Absent: the Photo is not compressed. */
@@ -190,6 +192,7 @@ export function simulatePhoto({
   soil = SIM_SOIL,
   seed = 7,
   cardScale = 1,
+  frameGap,
   glare = [],
   shadow,
   noise: noiseScale = 1,
@@ -197,7 +200,7 @@ export function simulatePhoto({
   tilt,
 }: SimScene): SimPhoto {
   const rand = mulberry32(seed)
-  const layout = cardLayout(cardScale)
+  const layout = cardLayout(cardScale, frameGap)
   const view = tilt ? tiltedView(tilt) : null // null: straight on, scene point = Photo pixel
   const looksAt: XY = { x: 0, y: 0 }
   const ground = shoot(camera, munsell.munsellToLinearRgb("7.5YR 3/2") as Vec3)

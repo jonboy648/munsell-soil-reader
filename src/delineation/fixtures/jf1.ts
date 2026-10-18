@@ -1,7 +1,7 @@
 // JF-1: a sampling point transcribed from a filled-in paper form, values only (no photo, no
 // location, no site name). Four layers with their matrix and redox colors. This is the fixture
 // the form engine, the PDF and the browser tests check against.
-import type { Layer, Project, SamplingPoint } from "../model"
+import { emptyHeader, type Layer, type Project, type SamplingPoint } from "../model"
 
 const layer = (top: number, bottom: number, matrix: string, matrixPercent: number, redox?: [string, number]): Layer => ({
   id: `jf1-${top}-${bottom}`,
@@ -15,6 +15,9 @@ const layer = (top: number, bottom: number, matrix: string, matrixPercent: numbe
 export const JF1_POINT: SamplingPoint = {
   id: "jf-1",
   name: "JF-1",
+  lat: "",
+  long: "",
+  datum: "",
   layers: [
     layer(0, 20, "10YR 2/1", 100),
     layer(20, 25, "10YR 3/1", 100),
@@ -28,6 +31,7 @@ export const JF1_PROJECT: Project = {
   name: "JF fixture",
   region: "NCNE",
   createdAt: 0,
+  header: emptyHeader(),
   points: [JF1_POINT],
 }
 

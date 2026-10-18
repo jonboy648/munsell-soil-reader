@@ -38,7 +38,8 @@ test("two secondary indicators are ticked, the rule suggests yes, the user confi
   // The second one makes it yes, as a suggestion: nothing is on the form until it is confirmed.
   await tick(sheet, "Geomorphic Position (D2)").check()
   await expect(suggestion).toContainText("Yes: 2 secondary indicators ticked (B6, D2)")
-  const printed = sheet.getByTestId("page1-preview-text")
+  // The header at the top of page 1 is drawn too; these are the values of the Hydrology section, which come last.
+  const printed = sheet.locator('[data-testid="page1-preview-text"][data-field^="page1.hydrology."]')
   await expect(printed).toHaveText(["X", "X"])
   await expect(sheet.locator('[data-testid="page1-preview-text"][data-field="page1.hydrology.present.yes"]')).toHaveCount(0)
 
@@ -108,7 +109,7 @@ test("a tick that needs a depth it does not have is warned about, and the ticks 
   await sheet.getByLabel("Water Table depth (in)").fill("8")
   await sheet.getByLabel("Water Table depth (in)").blur()
   await expect(sheet.getByTestId("form-warnings")).toHaveCount(0)
-  await expect(sheet.getByTestId("page1-preview-text")).toHaveText(["X", "X", "8"])
+  await expect(sheet.locator('[data-testid="page1-preview-text"][data-field^="page1.hydrology."]')).toHaveText(["X", "X", "8"])
 
   await page.reload()
   await page.getByRole("button", { name: "Projects", exact: true }).click()

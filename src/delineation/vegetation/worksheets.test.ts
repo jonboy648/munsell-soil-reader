@@ -6,7 +6,7 @@ import { formFor } from "../formFor"
 import { JF1_PLANTS_TYPED, JF1_POINT, JF1_PROJECT } from "../fixtures/jf1"
 import { emptyHydrology, withVegetation, type SamplingPoint } from "../model"
 import { regionOf } from "../regions"
-import { pdfRules, type Rule } from "../testing/pdfRules"
+import { pdfRules, type DrawnRule } from "../testing/pdfRules"
 import { pdfText } from "../testing/pdfText"
 import { emptyVegetation, plantEntryOf, type PlantEntry, type Vegetation } from "./entry"
 import { loadPlantList } from "./loadPlantList"
@@ -83,7 +83,7 @@ const worksheet = (point: SamplingPoint) => {
 
 describe("the blanks are where the page draws them", () => {
   const near = (a: number, b: number) => Math.abs(a - b) < 0.3
-  const drawn = (rules: Rule[], box: { x: readonly [number, number]; rule: number }) => rules.some((r) => near(r.top, box.rule) && near(r.x0, box.x[0]) && near(r.x1, box.x[1]))
+  const drawn = (rules: DrawnRule[], box: { x: readonly [number, number]; rule: number }) => rules.some((r) => near(r.top, box.rule) && near(r.left, box.x[0]) && near(r.right, box.x[1]))
 
   test("every worksheet, indicator and answer box is a rule on the official page", async () => {
     const rules = await pdfRules(blank.vegetation)

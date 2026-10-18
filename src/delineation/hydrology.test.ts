@@ -198,7 +198,9 @@ describe("page 1's Hydrology section as a PDF", () => {
   test("the values are drawn on the official page where the placements say, after the page's own text", async () => {
     const form = formFor(project, h)
     const placed = page1Placements(project, form)
-    expect(placed.map((p) => p.text).sort()).toEqual(["14", "Seasonally flooded.", "Well MW-3 read 14 in.", "X", "X", "X", "X", "X"].sort())
+    // The header above the section is drawn too (the site, here the project's name, and the point's name).
+    const hydrologyPlaced = placed.filter((p) => p.id.startsWith("page1.hydrology."))
+    expect(hydrologyPlaced.map((p) => p.text).sort()).toEqual(["14", "Seasonally flooded.", "Well MW-3 read 14 in.", "X", "X", "X", "X", "X"].sort())
     const drawn = (await pdfText(await page1Pdf(blank, project, h, form))).slice(-placed.length)
     expect(drawn.map((d) => d.text)).toEqual(placed.map((p) => p.text))
     placed.forEach((p, i) => {

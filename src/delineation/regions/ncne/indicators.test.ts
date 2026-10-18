@@ -2,7 +2,8 @@
 // indicators the page prints, with the scopes it prints, and each box is where the page draws its blank.
 import { readFileSync } from "node:fs"
 import { describe, expect, test } from "vitest"
-import { pdfRules, pdfText, type DrawnText } from "../../testing/pdfText"
+import { pdfRules } from "../../testing/pdfRules"
+import { pdfText, type DrawnText } from "../../testing/pdfText"
 import { regionOf } from ".."
 import type { Indicator } from "../types"
 
@@ -97,10 +98,10 @@ describe("the subregions", () => {
 /** The labels the official page prints, one per blank: the text after each blank up to the next one in its column. */
 async function printedLabels(): Promise<Map<string, string>> {
   const items = await pdfText(blank)
-  const rules = (await pdfRules(blank)).filter((r) => COLUMN_STARTS.some((x) => Math.abs(r.x[0] - x) < 0.1) && r.top > 330)
+  const rules = (await pdfRules(blank)).filter((r) => COLUMN_STARTS.some((x) => Math.abs(r.left - x) < 0.1) && r.top > 330)
   const labels = new Map<string, string>()
   COLUMN_STARTS.forEach((start, column) => {
-    const tops = rules.filter((r) => Math.abs(r.x[0] - start) < 0.1).map((r) => r.top).sort((a, b) => a - b)
+    const tops = rules.filter((r) => Math.abs(r.left - start) < 0.1).map((r) => r.top).sort((a, b) => a - b)
     const next = COLUMN_STARTS[column + 1] ?? 700
     const inColumn = (t: DrawnText) => t.x >= start && t.x < next - 1
     tops.forEach((top, n) => {
@@ -115,10 +116,10 @@ async function printedLabels(): Promise<Map<string, string>> {
 
 describe("against the official page", () => {
   test("the blanks are where the records say, to a tenth of a point", async () => {
-    const drawn = (await pdfRules(blank)).filter((r) => r.top > 330 && r.top < 505 && COLUMN_STARTS.some((x) => Math.abs(r.x[0] - x) < 0.1))
+    const drawn = (await pdfRules(blank)).filter((r) => r.top > 330 && r.top < 505 && COLUMN_STARTS.some((x) => Math.abs(r.left - x) < 0.1))
     expect(drawn).toHaveLength(34)
     for (const i of region.indicators) {
-      const match = drawn.filter((r) => Math.abs(r.x[0] - i.box.x[0]) < 0.06 && Math.abs(r.x[1] - i.box.x[1]) < 0.06 && Math.abs(r.top - i.box.rule) < 0.06)
+      const match = drawn.filter((r) => Math.abs(r.left - i.box.x[0]) < 0.06 && Math.abs(r.right - i.box.x[1]) < 0.06 && Math.abs(r.top - i.box.rule) < 0.06)
       expect(match, `${i.id} at x ${i.box.x}, top ${i.box.rule}`).toHaveLength(1)
     }
   })
@@ -143,7 +144,7 @@ describe("against the official page", () => {
     const { yes, no } = region.soil.hydricPresent
     const drawn = (await pdfRules(blank)).filter((r) => r.top > 540 && r.top < 560)
     for (const box of [yes, no]) {
-      const match = drawn.filter((r) => Math.abs(r.x[0] - box.x[0]) < 0.06 && Math.abs(r.x[1] - box.x[1]) < 0.06 && Math.abs(r.top - box.rule) < 0.06)
+      const match = drawn.filter((r) => Math.abs(r.left - box.x[0]) < 0.06 && Math.abs(r.right - box.x[1]) < 0.06 && Math.abs(r.top - box.rule) < 0.06)
       expect(match, `x ${box.x}, top ${box.rule}`).toHaveLength(1)
     }
     const labels = (await pdfText(blank)).filter((t) => t.baseline > 540 && t.baseline < 560 && t.x > 470)

@@ -115,7 +115,35 @@ async function openFirstVisit(page: Page, url = "/") {
 
 /** Open the app, let its service worker install, then reload so the page is one it controls. */
 async function openControlled(page: Page, url = "/") {
+  const seen: string[] = []
+  const t0 = Date.now()
+  const stamp = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`
+  page.on("console", (m) => seen.push(`${stamp()} console ${m.type()}: ${m.text().slice(0, 200)}`))
+  page.on("pageerror", (e) => seen.push(`${stamp()} pageerror ${e.message.slice(0, 200)}`))
+  page.on("requestfailed", (r) => seen.push(`${stamp()} requestfailed ${r.url()} ${r.failure()?.errorText}`))
+  page.on("response", (r) => seen.push(`${stamp()} ${r.status()} ${r.url().split("/").slice(3).join("/").slice(0, 60)}`))
   await page.goto(url)
+  seen.push(`${stamp()} goto done`)
+  const outcome = await page.evaluate(
+    () =>
+      Promise.race([
+        navigator.serviceWorker.ready.then(() => "ready"),
+        new Promise((resolve) => setTimeout(() => resolve("TIMEOUT"), 12_000)),
+      ]),
+  )
+  if (outcome === "TIMEOUT") {
+    const regs = await page.evaluate(async () =>
+      (await navigator.serviceWorker.getRegistrations()).map((r) => ({
+        scope: r.scope,
+        installing: r.installing?.state,
+        waiting: r.waiting?.state,
+        active: r.active?.state,
+      })),
+    )
+    console.log(`SWDIAG ${JSON.stringify({ regs, seen: seen.slice(-40) })}`)
+    throw new Error("SWDIAG serviceWorker.ready did not resolve in 12 s")
+  }
+  seen.push(`${stamp()} ready`)
   await page.evaluate(() => navigator.serviceWorker.ready)
   await page.reload()
   await expect

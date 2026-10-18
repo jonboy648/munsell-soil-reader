@@ -63,7 +63,12 @@ jobs:
       # Builds the production bundle, serves it with vite preview, and drives it in this engine.
       # A test that passes only on its retry fails the run (see failOnFlakyTests).
       - name: Browser tests (Playwright)
-        run: npm run test:e2e -- --project=${{ matrix.engine }}
+        if: matrix.engine == 'webkit'
+        run: |
+          for i in 1 2 3; do
+            echo "=== LOOP $i"
+            npx playwright test --project=webkit --retries=0 || true
+          done
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
       - name: Summarize

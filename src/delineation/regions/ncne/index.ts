@@ -1,11 +1,16 @@
 // Northcentral and Northeast: ENG Form 6116-8, Sep 2024. The positions were measured from the
 // official PDF's own drawing, page 3 (the Soil page): its profile table is 11 rows of rules, one
 // filled rectangle per column per row, about 1 point thick and 18.1 points apart, and the first
-// rule under the column headings is not a row. The Sampling Point box at the top is one more rule.
-// `soil-page.pdf` is that page cut from the official PDF with scripts/extract-form-page.mjs. The
-// Vegetation pages (2 and 4) were measured the same way: the rules of the rows, the totals, the Plot
-// size and Sampling Point fields, and the top of the Remarks box (page 2).
+// rule under the column headings is not a row. The Sampling Point box at the top is one more rule. The
+// hydric soil indicators' blanks, and the blanks after "Yes" and "No" of "Hydric Soil Present?", are filled
+// rectangles of the same kind (see indicatorsLeft.ts). `soil-page.pdf` is that page cut from the official
+// PDF with scripts/extract-form-page.mjs. The Vegetation pages (2 and 4) were measured the same way: the
+// rules of the rows, the totals, the Plot size and Sampling Point fields, and the top of the Remarks box
+// (page 2).
 import type { Region } from "../types"
+import { LEFT_COLUMN } from "./indicatorsLeft"
+import { MIDDLE_COLUMN } from "./indicatorsMiddle"
+import { RIGHT_COLUMN } from "./indicatorsRight"
 import { NCNE_HYDROLOGY_INDICATORS } from "./hydrologyIndicators"
 
 // Page 1's Hydrology section is measured the same way: each tick is a 15 point rule (38.3 to 53.4,
@@ -69,6 +74,12 @@ export const NCNE: Region = {
       texture: [354.7, 425.2],
       remarks: [432.1, 571.2],
     },
+    // The blanks after "Yes" and "No", each a filled rectangle 22.2 points wide on one rule.
+    hydricPresent: {
+      yes: { x: [490.7, 512.9], rule: 551.0 },
+      no: { x: [536.5, 558.7], rule: 551.0 },
+    },
+    tick: { size: 9, aboveRule: 1 },
   },
   vegetation: {
     size: { width: 612, height: 792 },
@@ -103,7 +114,16 @@ export const NCNE: Region = {
     samplingPoint: { rule: 53.8, span: [513.2, 567.1] },
     remarks: { left: 40, right: 571, firstBaseline: 668, lastBaseline: 745, leading: 11 },
   },
-  indicators: [],
+  // In the order the form prints them: the left column, then the middle, then the right.
+  indicators: [...LEFT_COLUMN, ...MIDDLE_COLUMN, ...RIGHT_COLUMN],
+  // The LRRs of the region, and the MLRAs in them that the form's indicators name.
+  subregions: [
+    { id: "K", name: "LRR K (Northcentral Forests)", mlras: [] },
+    { id: "L", name: "LRR L (Central Great Lakes Forests)", mlras: [] },
+    { id: "M", name: "LRR M", mlras: [] },
+    { id: "R", name: "LRR R", mlras: ["144A", "145"] },
+    { id: "S", name: "LRR S", mlras: ["149B"] },
+  ],
   hydrology: {
     indicators: NCNE_HYDROLOGY_INDICATORS,
     rule: {

@@ -190,6 +190,15 @@ test("opens the full license text of each credit that has one", async ({ page })
   await expect(chips.getByRole("link", { name: "CC0 1.0 legal code" })).toBeVisible()
 })
 
+test("says how a plant's status is found, and that the order of the neighbouring regions is an assumption", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("2022 National Wetland Plant List")
+  await expect(notes).toContainText("The 2022 list has no NI or NO ratings.")
+  await expect(notes).toContainText("Midwest, then the Eastern Mountains and Piedmont, then the Atlantic and Gulf Coastal Plain, then the Great Plains")
+  await expect(notes).toContainText("the order is an assumption")
+})
+
 test("says the 20-soil test has not been run, and marks what is not in this version", async ({ page }) => {
   await openMethodPage(page)
   await expect(page.getByTestId("soil-test-results")).toHaveText("The 20-soil test has not been run yet.")

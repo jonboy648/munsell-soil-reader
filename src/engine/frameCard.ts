@@ -69,6 +69,12 @@ export const frameWindow = (outline: Corners): Four<XY> => {
   return WINDOW_MM.map((corner) => map.at(corner)) as Four<XY>
 }
 
+/** The middle of the frame's window in the Photo: the window's middle on the card, so a tilt is allowed for. */
+export function frameWindowCentre(outline: Corners): XY {
+  const [tl, , br] = WINDOW_MM
+  return frameMap(outline).at({ x: (tl.x + br.x) / 2, y: (tl.y + br.y) / 2 })
+}
+
 /** Whether a place in the Photo is inside the frame's window. */
 export function insideWindow(outline: Corners, spot: XY): boolean {
   const window = frameWindow(outline)

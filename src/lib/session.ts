@@ -1,6 +1,6 @@
 // What the user has done so far with one Photo: which Card they marked and which Spots they
 // tapped. A plain reducer, so the order of taps and undo live in one place.
-import type { Batch, Card, Corners, PageHue, XY } from "@/engine"
+import { frameWindowCentre, type Batch, type Card, type Corners, type PageHue, type XY } from "@/engine"
 
 export interface LoadedPhoto {
   name: string
@@ -36,6 +36,8 @@ export interface FrameSession {
   confirmed: boolean
   /** The finder could not run at all, as opposed to finding no frame. */
   failed: boolean
+  /** The first Spot, in the middle of the window, was dropped once the frame was ready, so Undo taking it back is not undone. */
+  windowSpotPlaced: boolean
   batch: BatchState
 }
 
@@ -64,6 +66,7 @@ const freshFrame = (batch: BatchState = noBatch): FrameSession => ({
   moves: [],
   confirmed: false,
   failed: false,
+  windowSpotPlaced: false,
   batch,
 })
 
@@ -128,6 +131,17 @@ export function cardOf(session: Session): Card | null {
   return null
 }
 
+/**
+ * The window is where the soil is, so once the frame is ready (outline confirmed, batch measured)
+ * a Spot goes in the middle of it, which saves a tap. It goes once: Undo takes it back, and it
+ * stays gone until the outline is confirmed again.
+ */
+function withWindowSpot(session: Session): Session {
+  const { outline, windowSpotPlaced } = session.frame
+  if (session.cardKind !== "frame" || !outline || windowSpotPlaced || session.spots.length > 0 || !frameReady(session)) return session
+  return { ...session, spots: [frameWindowCentre(outline)], frame: { ...session.frame, windowSpotPlaced: true } }
+}
+
 const dist = (a: XY, b: XY) => Math.hypot(a.x - b.x, a.y - b.y)
 
 /**
@@ -167,15 +181,15 @@ export function sessionReducer(session: Session, action: SessionAction): Session
     case "hue":
       return { ...session, hue: action.hue, corners: [], spots: [] }
     case "frameFound":
-      return { ...session, frame: { ...session.frame, searched: true, outline: action.outline, moves: [], confirmed: false, failed: action.failed ?? false } }
+      return { ...session, frame: { ...session.frame, searched: true, outline: action.outline, moves: [], confirmed: false, failed: action.failed ?? false, windowSpotPlaced: false } }
     case "frameConfirm":
-      return session.frame.outline ? { ...session, frame: { ...session.frame, confirmed: true } } : session
+      return session.frame.outline ? withWindowSpot({ ...session, frame: { ...session.frame, confirmed: true } }) : session
     case "batchCode":
       return { ...session, frame: { ...session.frame, batch: action.code.trim() === "" ? { code: action.code, state: "none" } : { code: action.code, state: "loading" } } }
     case "batchResult":
       // An answer for a code the user has since changed is out of date.
       return session.frame.batch.code === action.code
-        ? { ...session, frame: { ...session.frame, batch: { code: action.code, ...action.result } } }
+        ? withWindowSpot({ ...session, frame: { ...session.frame, batch: { code: action.code, ...action.result } } })
         : session
     case "tap":
       switch (stepOf(session)) {
@@ -197,7 +211,7 @@ export function sessionReducer(session: Session, action: SessionAction): Session
       if (session.noCard) return { ...session, noCard: false }
       if (session.cardKind === "frame") {
         const { confirmed, moves } = session.frame
-        if (confirmed) return { ...session, frame: { ...session.frame, confirmed: false } }
+        if (confirmed) return { ...session, frame: { ...session.frame, confirmed: false, windowSpotPlaced: false } }
         if (moves.length) return { ...session, frame: { ...session.frame, outline: moves[moves.length - 1], moves: moves.slice(0, -1) } }
         return session
       }
@@ -213,7 +227,7 @@ export function sessionReducer(session: Session, action: SessionAction): Session
         noCard: false,
         corners: [],
         spots: [],
-        frame: { ...session.frame, outline: moves[0] ?? outline, moves: [], confirmed: false },
+        frame: { ...session.frame, outline: moves[0] ?? outline, moves: [], confirmed: false, windowSpotPlaced: false },
       }
     }
   }

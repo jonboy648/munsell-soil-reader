@@ -42,7 +42,7 @@ async function confirmedFrame(page: Page, name = "Frame as the Card") {
   await expect(page.getByTestId("photo")).toBeInViewport({ ratio: 1 })
 }
 
-test("finds the frame with no taps, and a Spot in the window reads the corrected Chip", async ({ page }) => {
+test("finds the frame with no taps, and the Spot dropped in the window reads the corrected Chip", async ({ page }) => {
   await page.goto("/")
   await pickExample(page, "Frame as the Card")
 
@@ -53,12 +53,12 @@ test("finds the frame with no taps, and a Spot in the window reads the corrected
   await expect(page.getByTestId("batch-status")).toHaveAttribute("data-state", "ready")
   await expect(page.getByTestId("batch-code")).toHaveValue("SIM-1")
   await expect(page.getByTestId("spot-prompt")).toHaveCount(0) // not until the outline is confirmed
+  await expect(page.getByTestId("reading-notation")).toHaveCount(0)
 
+  // Confirming drops a Spot in the middle of the window, where the soil is: no tap needed.
   await page.getByTestId("confirm-outline").click()
   await expect(frameStatus(page)).toHaveAttribute("data-state", "confirmed")
-  await expect(page.getByTestId("spot-prompt")).toContainText("Tap the middle of the soil in the frame's window")
-
-  await tapPhoto(page, SIM_FRAME_SPOT)
+  await expect(page.getByTestId("spot-prompt")).toContainText("1 Spot read. The first went in the middle of the frame's window")
   await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
   await expect(page.getByTestId("quality-flag")).toHaveCount(0)
@@ -74,16 +74,13 @@ test("finds the frame with no taps, and a Spot in the window reads the corrected
 
 test("finds a frame at an angle too", async ({ page }) => {
   await confirmedFrame(page, "Frame at an angle")
-  const [tl, , br] = outlineOf("Frame at an angle")
-  // The soil in the window of a tilted frame: the middle of the frame's outline is in the window.
-  await tapPhoto(page, { x: (tl.x + br.x) / 2, y: (tl.y + br.y) / 2 })
+  // The Spot is in the middle of the tilted window, which is not the middle of the Photo's outline.
   await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
 })
 
 test("a Spot outside the window is allowed, with a note", async ({ page }) => {
-  await confirmedFrame(page)
-  await tapPhoto(page, SIM_FRAME_SPOT)
+  await confirmedFrame(page) // Spot 1 is in the window
   await tapPhoto(page, { x: 40, y: 560 }) // the bare ground below the frame
 
   await expect(page.getByTestId("spot-prompt")).toContainText("2 Spots")
@@ -110,7 +107,6 @@ test("a corner of the outline can be moved with a tap, and Undo puts it back", a
   const [tl] = outlineOf("Frame as the Card")
   await tapPhoto(page, { x: tl.x + 110, y: tl.y + 80 })
   await page.getByTestId("confirm-outline").click()
-  await tapPhoto(page, SIM_FRAME_SPOT)
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "failed")
   await page.getByRole("button", { name: "Open Readings" }).click()
   await expect(page.getByRole("dialog")).toContainText("The outline was probably not on the frame")
@@ -123,7 +119,6 @@ test("a corner of the outline can be moved with a tap, and Undo puts it back", a
   await expect(frameStatus(page)).toHaveAttribute("data-state", "found")
   await undo.click()
   await page.getByTestId("confirm-outline").click()
-  await tapPhoto(page, SIM_FRAME_SPOT)
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
 })
 
@@ -133,13 +128,11 @@ test("a tap far from every corner does not move the outline", async ({ page }) =
   // and, confirmed as it is, the Reading is good.
   await tapPhoto(page, SIM_FRAME_SPOT)
   await page.getByTestId("confirm-outline").click()
-  await tapPhoto(page, SIM_FRAME_SPOT)
   await expect(page.getByTestId("card-check")).toHaveAttribute("data-verdict", "good")
 })
 
 test("a Reading of the frame saves to the Log, which names the Card", async ({ page }) => {
   await confirmedFrame(page)
-  await tapPhoto(page, SIM_FRAME_SPOT)
   await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
 
   await page.getByRole("button", { name: "Save to Log" }).click()
@@ -154,6 +147,23 @@ test("a Reading of the frame saves to the Log, which names the Card", async ({ p
   await expect(log).toContainText("F1")
   await expect(log).toContainText("10YR 4/3")
   await expect(log).toContainText("Frame")
+})
+
+test("Undo takes the Spot in the window back, and a tap reads where the user taps", async ({ page }) => {
+  await confirmedFrame(page)
+  await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
+
+  await page.getByRole("button", { name: "Undo" }).click()
+  await expect(page.getByTestId("reading-notation")).toHaveCount(0)
+  await expect(page.getByTestId("spot-prompt")).toContainText("Tap the middle of the soil in the frame's window")
+  // It does not come back by itself.
+  await expect(frameStatus(page)).toHaveAttribute("data-state", "confirmed")
+  await page.waitForTimeout(300)
+  await expect(page.getByTestId("reading-notation")).toHaveCount(0)
+
+  await tapPhoto(page, SIM_FRAME_SPOT)
+  await expect(page.getByTestId("reading-notation")).toHaveText("10YR 4/3")
+  await expect(page.getByTestId("spot-prompt")).toContainText("1 Spot read")
 })
 
 test("a batch that has not been measured is refused, with the reason", async ({ page }) => {

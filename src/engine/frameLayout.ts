@@ -15,9 +15,6 @@ export type Mm = XY
 /** The card's size, in millimetres. */
 export const FRAME_SIZE_MM = { width: layout.frame.width_mm, height: layout.frame.height_mm }
 
-/** Which design the layout is: the batch files are made for one. */
-export const FRAME_VERSION = layout.frame.version
-
 /**
  * The codes of markers 0 to 3 (top left, top right, bottom right, bottom left) in the
  * ARUCO_MIP_36h12 dictionary, as js-aruco2 ships it. Each is 36 bits, a 6x6 grid row by row,

@@ -37,7 +37,7 @@ jobs:
   # No job cancels the others, so one pull request shows every engine's result, and the
   # workflow fails if any one of them fails.
   browser:
-    name: Browser tests (${{ matrix.engine }})
+    name: Browser tests (${{ matrix.engine }}${{ matrix.copy }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -47,6 +47,15 @@ jobs:
           - { engine: chromium, os: ubuntu-latest }
           - { engine: firefox, os: ubuntu-latest }
           - { engine: webkit, os: macos-latest }
+          - { engine: webkit, os: macos-latest, copy: 2 }
+          - { engine: webkit, os: macos-latest, copy: 3 }
+          - { engine: webkit, os: macos-latest, copy: 4 }
+          - { engine: webkit, os: macos-latest, copy: 5 }
+          - { engine: webkit, os: macos-latest, copy: 6 }
+          - { engine: webkit, os: macos-latest, copy: 7 }
+          - { engine: webkit, os: macos-latest, copy: 8 }
+          - { engine: webkit, os: macos-latest, copy: 9 }
+          - { engine: webkit, os: macos-latest, copy: 10 }
     steps:
       - uses: actions/checkout@v7
 
@@ -63,7 +72,15 @@ jobs:
       # Builds the production bundle, serves it with vite preview, and drives it in this engine.
       # A test that passes only on its retry fails the run (see failOnFlakyTests).
       - name: Browser tests (Playwright)
-        run: npm run test:e2e -- --project=${{ matrix.engine }}
+        run: |
+          if [ "${{ matrix.engine }}" = "webkit" ]; then
+            echo "=== SW x10 first"
+            npm run test:e2e -- --project=webkit-sw --repeat-each=10 --retries=0 || true
+            echo "=== SW x10 second"
+            npm run test:e2e -- --project=webkit-sw --repeat-each=10 --retries=0 || true
+          else
+            npm run test:e2e -- --project="${{ matrix.engine }}*"
+          fi
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
       - name: Summarize

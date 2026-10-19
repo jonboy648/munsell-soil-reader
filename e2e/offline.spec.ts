@@ -106,17 +106,72 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
 // playwright.config.ts blocks service workers, so the other specs never see their notices; this
 // spec is the one about them.
 test.use({ serviceWorkers: "allow" })
+test.setTimeout(120_000)
+
+/** Temporary: if `ready` never comes, tries ways of recovering and says which one worked. */
+async function ready(page: Page, label: string) {
+  const t0 = Date.now()
+  const stamp = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`
+  const outcome = await page.evaluate(() =>
+    Promise.race([
+      navigator.serviceWorker.ready.then(() => "ready"),
+      new Promise((resolve) => setTimeout(() => resolve("TIMEOUT"), 12_000)),
+    ]),
+  )
+  if (outcome !== "TIMEOUT") return
+  const readyIn = (p: Page, ms: number) =>
+    p.evaluate(
+      (limit) =>
+        Promise.race([
+          navigator.serviceWorker.ready.then(() => true),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), limit)),
+        ]),
+      ms,
+    )
+  const url = page.url()
+  const stages: string[] = []
+  let recovered = "none"
+  try {
+    await page.evaluate(async () => {
+      const reg = await navigator.serviceWorker.getRegistration()
+      await reg?.unregister()
+      await navigator.serviceWorker.register("/sw.js")
+    })
+    if (await readyIn(page, 10_000)) recovered = "unregister+register"
+  } catch (e) {
+    stages.push(`unregister+register threw ${String(e).slice(0, 100)}`)
+  }
+  stages.push(`${stamp()} unregister+register: ${recovered}`)
+  if (recovered === "none") {
+    const p2 = await page.context().newPage()
+    await p2.goto(url)
+    if (await readyIn(p2, 10_000)) recovered = "new page, same context"
+    stages.push(`${stamp()} new page: ${recovered}`)
+    await p2.close()
+  }
+  if (recovered === "none") {
+    const c2 = await page.context().browser()!.newContext({ serviceWorkers: "allow" })
+    const p3 = await c2.newPage()
+    await p3.goto(url)
+    if (await readyIn(p3, 10_000)) recovered = "new context"
+    stages.push(`${stamp()} new context: ${recovered}`)
+    await c2.close()
+  }
+  console.log(`SWDIAG ${label} recovered=${recovered} ${JSON.stringify(stages)}`)
+  throw new Error(`SWDIAG ${label}: serviceWorker.ready did not resolve in 12 s (recovered: ${recovered})`)
+}
 
 /** Open the app and wait for the first install to finish; the page is not controlled yet. */
 async function openFirstVisit(page: Page, url = "/") {
   await page.goto(url)
+  await ready(page, "first-visit")
   await expect(page.getByTestId("offline-notice")).toBeVisible()
 }
 
 /** Open the app, let its service worker install, then reload so the page is one it controls. */
 async function openControlled(page: Page, url = "/") {
   await page.goto(url)
-  await page.evaluate(() => navigator.serviceWorker.ready)
+  await ready(page, "controlled")
   await page.reload()
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))

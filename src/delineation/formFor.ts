@@ -294,9 +294,14 @@ export function formFor(project: Project, point: SamplingPoint): Form {
   }
 
   // Whether the sampling point has the hydric soil and wetland hydrology indicators that the prevalence index assumes.
-  const hydricSoil = region.indicators.some((i) => i.id !== "other" && point.indicators?.[i.id]?.state === "confirmed")
+  // Only the hydric soil list counts: the problematic-soil indicators (A10, S3 and the rest, and "Other") are for
+  // where hydrophytic vegetation is already shown (supplement p. 68, p. 132 step 1), so they cannot open the gate.
+  // They are offered to the user as a reason for applying the index anyway.
+  const soilConfirmed = region.indicators.filter((i) => point.indicators?.[i.id]?.state === "confirmed")
+  const hydricSoil = soilConfirmed.some((i) => i.list === "hydric")
+  const problematicSoil = soilConfirmed.filter((i) => i.list === "problematic" && i.id !== "other").map(indicatorLabel)
   const hydrologyMet = suggestWetlandHydrology(region, point.hydrology?.ticked ?? []).answer
-  const vegetation = vegetationFields(project, point, name.text, { hydricSoil, hydrology: hydrologyMet })
+  const vegetation = vegetationFields(project, point, name.text, { hydricSoil, hydrology: hydrologyMet, problematicSoil })
   const restrictive = point.restrictive
   const restrictiveType = printable(restrictive?.type ?? "")
   if (restrictiveType.replaced) {

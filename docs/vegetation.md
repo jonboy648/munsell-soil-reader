@@ -126,8 +126,10 @@ test. Covers are compared in whole thousandths, so floating point never decides 
   in `prevalenceIndex()`: `counted` is `p.status !== null && p.identified !== "none"`, and
   `identified === "species"` would leave genus-only plants out. JF-1 (Sow thistle, 2 percent) reads A 85,
   B 217, 2.55 as it is, and A 83, B 209, 2.52 with the switch; the dominance test is the same either way.
-- The prevalence index is applied only when the dominance test fails and a hydric soil indicator is confirmed
-  (the Soil page's "Other" does not count) and the hydrology ticks meet the rule (one primary or two secondary),
+- The prevalence index is applied only when the dominance test fails and an indicator of the hydric soil list is
+  confirmed (the problematic-soil list, A10, S3 and the rest and "Other", does not count: the supplement uses
+  those where hydrophytic vegetation is already shown, p. 68 and p. 132 step 1; a confirmed one is offered as a
+  reason the user can give for applying the index anyway) and the hydrology ticks meet the rule (one primary or two secondary),
   or when the user applies it with a reason, which goes on the cover note.
 - The Rapid Test is computed from the dominants (the supplement calls it a visual assessment). Morphological
   adaptations and Problematic Hydrophytic Vegetation are the user's tick with a reason: the app does not

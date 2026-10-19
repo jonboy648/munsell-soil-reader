@@ -281,6 +281,28 @@ describe("the prevalence index is applied by the supplement's order, or by the u
     expect(formFor(JF1_PROJECT, point).vegetation.prevalenceApplied).toBe(false)
   })
 
+  test("a problematic-soil indicator does not open the gate, and is offered as the user's reason instead", () => {
+    for (const id of ["A10", "S3"]) {
+      const point = { ...withIndicators({}, false, true), indicators: { [id]: { state: "confirmed" as const } } }
+      const form = formFor(JF1_PROJECT, point)
+      expect(form.vegetation.prevalenceApplied, id).toBe(false)
+      expect(form.vegetation.indicators.find((i) => i.id === "prevalence")!.reason).toContain("Missing: a hydric soil indicator (a problematic-soil indicator does not count).")
+      expect(form.vegetation.offeredReason).toContain(`Problematic hydric soil indicator confirmed: ${id} `)
+    }
+    expect(formFor(JF1_PROJECT, withIndicators({}, true, true)).vegetation.offeredReason).toBe("")
+    expect(formFor(JF1_PROJECT, withIndicators({}, false, true)).vegetation.offeredReason).toBe("")
+  })
+
+  test("a problematic-soil indicator does not let a morphological tick count towards Yes either", () => {
+    const morph = { indicators: { morphological: { state: "confirmed" as const, manual: true, remark: "Adventitious roots" } } }
+    const failingDry = [rated("herb", "U", "UPL", 60), rated("herb", "F", "FACU", 40)]
+    const base = pointWith((v) => ({ ...v, plants: failingDry, ...morph }))
+    const point = { ...base, indicators: { A10: { state: "confirmed" as const } }, hydrology: { ...emptyHydrology, ticked: ["A1"] } } as SamplingPoint
+    expect(formFor(JF1_PROJECT, point).vegetation.conclusion.suggested).toBeNull()
+    const hydric = { ...point, indicators: { A12: { state: "confirmed" as const } } } as SamplingPoint
+    expect(formFor(JF1_PROJECT, hydric).vegetation.conclusion.suggested).toBe("yes")
+  })
+
   test("the user can apply it anyway with a reason, and the reason is on the cover note", () => {
     const form = formFor(JF1_PROJECT, withIndicators({ prevalenceReason: "  Hydric soil confirmed on the next point  " }))
     expect(form.vegetation.prevalenceApplied).toBe(true)

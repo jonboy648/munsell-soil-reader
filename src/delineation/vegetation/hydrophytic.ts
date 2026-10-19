@@ -15,10 +15,12 @@ export type VegIndicatorId = (typeof VEG_INDICATORS)[number]
 
 /** What the hydric soil and the hydrology of the sampling point say, as far as the prevalence index is concerned. */
 export interface VegContext {
-  /** At least one hydric soil indicator is confirmed. */
+  /** At least one indicator of the hydric soil list is confirmed. The problematic-soil list does not count. */
   hydricSoil: boolean
   /** The hydrology indicators ticked meet the supplement's rule (one primary or two secondary). */
   hydrology: boolean
+  /** The problematic-soil indicators confirmed, by label: offered as a reason for applying the index anyway. */
+  problematicSoil?: readonly string[]
 }
 
 export type VegIndicatorState = "satisfied" | "not met" | "not applied" | "yours"
@@ -63,6 +65,11 @@ export interface HydrophyticVegetation {
   conclusion: VegConclusion
   /** Dominants that are not identified to species, by name: a dominant must be (p. 26). */
   notIdentified: string[]
+  /**
+   * A reason the user can give for applying the prevalence index anyway, when only a problematic-soil indicator
+   * is confirmed and the index is not applied: it does not open the gate by itself. Empty otherwise.
+   */
+  offeredReason: string
 }
 
 const SUPPLEMENT = "Northcentral and Northeast Regional Supplement, ERDC/EL TR-12-1, Version 2.0 (2012)"
@@ -159,7 +166,9 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
       : prevalence.a === 0 && prevalence.identified === 0
         ? "No plants are recorded."
         : `Only ${percent(prevalence.identified)} percent of the cover is identified and rated, and 80 percent is needed, so the index is not valid (supplement pp. 27-28).`
-  const missing = [context.hydricSoil ? "" : "a hydric soil indicator", context.hydrology ? "" : "wetland hydrology indicators"].filter(Boolean)
+  const problematicSoil = context.problematicSoil ?? []
+  const soilMissing = problematicSoil.length > 0 ? "a hydric soil indicator (a problematic-soil indicator does not count)" : "a hydric soil indicator"
+  const missing = [context.hydricSoil ? "" : soilMissing, context.hydrology ? "" : "wetland hydrology indicators"].filter(Boolean)
   const prevalenceIndicator = applied
     ? indicator("prevalence", prevalence.passes === true ? "satisfied" : "not met", `${reason !== "" ? `Applied at your request: ${reason}. ` : ""}${indexWords}`)
     : dominanceMet
@@ -202,5 +211,9 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
   }
 
   const notIdentified = dominance.dominants.map((d) => statusOf(d.id)).filter((p) => p.identified !== "species").map((p) => p.name)
-  return { dominance, prevalence, indicators, prevalenceApplied: applied, conclusion, notIdentified }
+  const offeredReason =
+    !applied && !dominanceMet && !context.hydricSoil && problematicSoil.length > 0
+      ? `Problematic hydric soil indicator confirmed: ${problematicSoil.join(", ")}`
+      : ""
+  return { dominance, prevalence, indicators, prevalenceApplied: applied, conclusion, notIdentified, offeredReason }
 }

@@ -131,7 +131,7 @@ function OwnTick({ i, onChoose }: { i: VegIndicator; onChoose: (id: VegIndicator
 }
 
 /** Apply the prevalence index where the supplement's order would not, and say why. */
-function ApplyAnyway({ reason, onChange }: { reason: string; onChange: Props["onChange"] }) {
+function ApplyAnyway({ reason, offered = "", onChange }: { reason: string; offered?: string; onChange: Props["onChange"] }) {
   const [text, setText] = React.useState("")
   const { problem, write, fail } = useWrite()
   if (reason !== "") {
@@ -156,6 +156,11 @@ function ApplyAnyway({ reason, onChange }: { reason: string; onChange: Props["on
     <form onSubmit={submit} noValidate className="grid gap-2" aria-label="Apply the prevalence index anyway">
       <Label htmlFor="veg-prevalence-reason">Apply the prevalence index anyway, because</Label>
       <Input id="veg-prevalence-reason" className="h-11 text-base" autoComplete="off" value={text} onChange={(e) => setText(e.target.value)} />
+      {offered && text !== offered && (
+        <Button type="button" variant="outline" className="h-auto min-h-11 justify-start py-2 text-left text-sm whitespace-normal" onClick={() => setText(offered)}>
+          Use: {offered}
+        </Button>
+      )}
       {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
       <Button type="submit" variant="outline" className="h-11 text-base">
         Apply it
@@ -202,7 +207,7 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
         {result.indicators.map((i) => (
           <IndicatorCard key={i.id} i={i} onChoose={choose}>
             {i.state === "yours" && <OwnTick i={i} onChoose={choose} />}
-            {i.id === "prevalence" && i.state !== "satisfied" && !result.prevalenceApplied && <ApplyAnyway reason="" onChange={onChange} />}
+            {i.id === "prevalence" && i.state !== "satisfied" && !result.prevalenceApplied && <ApplyAnyway reason="" offered={result.offeredReason} onChange={onChange} />}
             {i.id === "prevalence" && result.cover.prevalenceReason !== "" && <ApplyAnyway reason={result.cover.prevalenceReason} onChange={onChange} />}
           </IndicatorCard>
         ))}

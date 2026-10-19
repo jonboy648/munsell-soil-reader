@@ -63,8 +63,8 @@ export function DecidesSection() {
           Piedmont, then the Atlantic and Gulf Coastal Plain, then the Great Plains. The supplement
           does not name the order, so the order is an assumption, and it matters only when two
           neighbours rate the plant differently. A plant on no list is recorded as UPL, as the
-          supplement says to assume, and marked not identified when the app cannot place it in a
-          genus.
+          supplement says to assume. You can mark it not identified, and a name such as
+          &ldquo;Unknown forb&rdquo; starts out that way.
         </p>
         <p>
           The dominant species of each stratum are chosen by the supplement&apos;s 50/20 rule: the
@@ -81,8 +81,9 @@ export function DecidesSection() {
           Decided on 2026-10-18: a plant identified only to its genus, where every species of the
           genus has the same status (Sonchus spp.), counts in the prevalence index and in the 80
           percent of cover that must be identified and rated. The supplement says not to include
-          species that were not identified and does not say whether a genus is enough. A plant the list does
-          not find is left out of the index. A dominant that is not identified to species is kept in
+          species that were not identified and does not say whether a genus is enough. A plant you
+          mark as not identified is left out of the index and counts against the 80 percent. A
+          named plant that is not on the list counts as UPL. A dominant that is not identified to species is kept in
           the dominance test and warned about, because leaving it out could let the test pass.
         </p>
         <p>

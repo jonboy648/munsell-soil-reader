@@ -208,6 +208,7 @@ test("says how the dominant species are chosen, when the prevalence index is app
   await expect(notes).toContainText("nothing is ticked on the form until you confirm it")
   await expect(notes).toContainText("Decided on 2026-10-18: a plant identified only to its genus")
   await expect(notes).toContainText("the 80 percent of cover that must be identified and rated")
+  await expect(notes).toContainText("A plant you mark as not identified is left out of the index and counts against the 80 percent. A named plant that is not on the list counts as UPL.")
 })
 
 test("says the 20-soil test has not been run, and marks what is not in this version", async ({ page }) => {

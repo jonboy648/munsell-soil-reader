@@ -264,6 +264,24 @@ describe("the supplement's worked example", () => {
     expect(form.warnings.find((w) => w.kind === "veg-prevalence-invalid")!.text).toContain("Only 20% of the vegetation cover is identified and rated")
   })
 
+  test("a plant with no status leaves its Dominant box blank, and its cover counts against the 80 percent", () => {
+    const unrated: PlantEntry = { ...rated("herb", "Unrated", "FAC", 30), status: null, listed: "NI" }
+    const point = pointWith((v) => ({ ...v, plants: [rated("herb", "Carex stricta", "OBL", 70), unrated] }))
+    const form = formFor(JF1_PROJECT, point)
+    expect([form.fields["veg.herb.0.dominant"], form.fields["veg.herb.1.dominant"]]).toEqual(["Yes", ""])
+    expect(form.fields["veg.herb.1.status"]).toBe("NI")
+    // 70 of 100 is identified and rated: under 80, so the index is left blank.
+    expect(form.fields["veg.prevalence.total.a"]).toBe("70")
+    expect(form.fields["veg.prevalence.index"]).toBe("")
+    expect(form.warnings.find((w) => w.kind === "veg-prevalence-invalid")!.text).toContain("Only 70% of the vegetation cover is identified and rated")
+  })
+
+  test("a percent is written to one decimal: 2 of 3 is 66.7%", () => {
+    const point = pointWith((v) => ({ ...v, plants: [rated("herb", "F1", "FAC", 20), rated("herb", "F2", "FACW", 20), rated("herb", "U", "UPL", 20)] }))
+    expect(worksheet(point)).toMatchObject({ "veg.dominance.a": "2", "veg.dominance.b": "3", "veg.dominance.percent": "66.7%" })
+    expect(formFor(JF1_PROJECT, point).vegetation.indicators.find((i) => i.id === "dominance")!.reason).toContain("66.7 percent")
+  })
+
   test("an index just over 3.0 is written with the digits that show it: A 250, B 751 is 3.004, not 3.00", () => {
     const point = pointWith((v) => ({ ...v, plants: [rated("herb", "F1", "FAC", 99), rated("herb", "F2", "FAC", 100), rated("herb", "F3", "FAC", 50), rated("herb", "U", "FACU", 1)] }))
     expect(worksheet(point)).toMatchObject({ "veg.prevalence.total.a": "250", "veg.prevalence.total.b": "751", "veg.prevalence.index": "3.004" })
@@ -359,6 +377,30 @@ describe("the prevalence index is applied by the supplement's order, or by the u
     expect(form.vegetation.prevalenceApplied).toBe(true)
     expect(form.vegetation.indicators.find((i) => i.id === "prevalence")).toMatchObject({ state: "satisfied" })
     expect(form.vegetation.conclusion.suggested).toBe("yes")
+  })
+
+  test("hydric soil without hydrology, or hydrology without hydric soil: not applied, and it says what is missing", () => {
+    for (const [point, missing] of [
+      [withIndicators({}, true, false), "Missing: wetland hydrology indicators."],
+      [withIndicators({}, false, true), "Missing: a hydric soil indicator."],
+    ] as const) {
+      const form = formFor(JF1_PROJECT, point)
+      expect(form.vegetation.prevalenceApplied).toBe(false)
+      expect(form.vegetation.indicators.find((i) => i.id === "prevalence")!.reason).toContain(missing)
+    }
+  })
+
+  test("hydrology by the supplement's rule: one secondary indicator is not enough, two are", () => {
+    const withSecondary = (ticked: string[]) => ({ ...withIndicators({}, true, false), hydrology: { ...emptyHydrology, ticked } }) as SamplingPoint
+    expect(formFor(JF1_PROJECT, withSecondary(["B6"])).vegetation.prevalenceApplied).toBe(false)
+    expect(formFor(JF1_PROJECT, withSecondary(["B6", "B10"])).vegetation.prevalenceApplied).toBe(true)
+  })
+
+  test("only a confirmed hydric soil indicator counts: a rejected or undecided one does not", () => {
+    for (const choice of [{ state: "rejected" as const }, { state: "pending" as const }]) {
+      const point = { ...withIndicators({}, false, true), indicators: { A12: choice } } as SamplingPoint
+      expect(formFor(JF1_PROJECT, point).vegetation.prevalenceApplied, choice.state).toBe(false)
+    }
   })
 
   test("a hydric soil indicator the user typed as Other does not count", () => {

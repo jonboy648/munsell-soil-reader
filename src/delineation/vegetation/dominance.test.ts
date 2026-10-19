@@ -242,7 +242,7 @@ describe("JF-1's herb stratum", () => {
     plant("herb", "Echinochloa crus-galli", "FAC", 5),
     plant("herb", "Sonchus spp.", "FACU", 2, { identified: "genus" }),
     plant("herb", "Persicaria maculosa", "FAC", 3),
-    plant("herb", "Stiff greenthread", "UPL", 1, { identified: "none" }),
+    plant("herb", "Stiff greenthread", "UPL", 1, { unlisted: true }),
   ]
 
   test("fall panicgrass is the only dominant: 50 of 85, over the 42.5 line, and nothing else reaches 17", () => {
@@ -260,13 +260,27 @@ describe("JF-1's herb stratum", () => {
       ["FACW", 53, 106],
       ["FAC", 18, 54],
       ["FACU", 13, 52],
-      ["UPL", 0, 0],
+      ["UPL", 1, 5],
     ])
-    // The 1 percent plant that was not identified is left out: 84 of 85 is identified.
+    // Stiff greenthread is not on the plant list, so it counts as UPL (pp. 22-23): all 85 is counted.
+    expect(pi).toMatchObject({ a: 85, b: 217, valid: true, passes: true, identified: 100 })
+    expect(pi.index!.toFixed(2)).toBe("2.55")
+  })
+
+  test("marked not identified, stiff greenthread is left out: 84 of 85 is identified", () => {
+    const marked = jf1.map((p) => (p.name === "Stiff greenthread" ? { ...p, identified: "none" as const } : p))
+    const pi = prevalenceIndex(marked)
     expect(pi).toMatchObject({ a: 84, b: 212, valid: true, passes: true })
     expect(pi.index!.toFixed(2)).toBe("2.52")
     expect(pi.identified).toBeCloseTo(98.82, 2)
   })
+})
+
+test("a named plant that is not on the list counts as UPL: Setaria pumila 90 and Thelesperma filifolium 10 is 3.20, over 3.0", () => {
+  const plants = [plant("herb", "Setaria pumila", "FAC", 90), plant("herb", "Thelesperma filifolium", "UPL", 10, { unlisted: true })]
+  const pi = prevalenceIndex(plants)
+  expect(pi).toMatchObject({ a: 100, b: 320, identified: 100, passes: false })
+  expect(pi.index).toBeCloseTo(3.2, 10)
 })
 
 test("the weights are the supplement's: OBL 1 to UPL 5", () => {

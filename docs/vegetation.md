@@ -57,11 +57,13 @@ resolves by itself; the user always sees what a name came to before it is added.
 5. A near miss (`fal panicgrass`): candidates, never a guess.
 
 A name that finds nothing is not on the list. The supplement says to assume UPL for a plant that is not
-listed (pp. 22-23), so it is recorded as UPL with a note. If it reads as a scientific name of a genus the
-list knows it counts as identified; otherwise (a common name the list does not have, like *stiff
-greenthread*) it is recorded as typed, as UPL, and as **not identified**, since the supplement leaves
-unidentified plants out of the prevalence index (p. 28) and the app cannot tell what it is. #34 reads
-`identified` on each plant.
+listed (pp. 22-23), so it is recorded as typed, as UPL, with `unlisted` set and a note. A plant the user
+named is identified, whether the name is a binomial the list lacks (*Zea mays*, *Thelesperma filifolium*:
+row crops are not on the list) or a common name it does not have (*stiff greenthread*): the supplement counts
+species "not listed and assumed to be UPL" in the prevalence index and its 80 percent (pp. 27-28). Its row
+has a **Not identified** button that leaves it out instead, as the supplement leaves out species that were
+not identified (p. 28); a name such as "Unknown forb", "Unid. sedge" or one with a "?" starts out not
+identified. #34 reads `identified` on each plant.
 
 ## The status a plant gets (`statusFor`)
 
@@ -114,14 +116,16 @@ test. Covers are compared in whole thousandths, so floating point never decides 
   cover must be identified and rated, or the index is not valid and is left blank.
 - A plant with no status to use (`status` null) is left out of the stratum total, the ranking and the index, and
   its Dominant box stays blank. A dominant that is not identified to species is kept in the ranking and in B (a
-  plant of unknown name counts as UPL, as recorded) and warned about: dropping it could let the test pass.
+  plant marked not identified counts as UPL, as recorded) and warned about: dropping it could let the test pass.
+- A named plant that is not on the list counts as UPL in the prevalence index and in the 80 percent. A plant
+  marked not identified is left out of the index and its cover counts against the 80 percent.
 - **Decided by Jon, 2026-10-18: count genus-only plants when all species share a status.** A plant identified
   to its genus only (`identified: "genus"`: Sonchus spp., every NCNE species FACU) is counted in the prevalence
   index and in the 80 percent. The supplement says not to include "species that were not identified" (p. 28)
   and does not say whether a genus is enough. The switch, kept here in case it is ever reversed, is one filter
   in `prevalenceIndex()`: `counted` is `p.status !== null && p.identified !== "none"`, and
-  `identified === "species"` would leave genus-only plants out. JF-1 (Sow thistle, 2 percent) reads A 84,
-  B 212, 2.52 as it is, and A 82, B 204, 2.49 with the switch; the dominance test is the same either way.
+  `identified === "species"` would leave genus-only plants out. JF-1 (Sow thistle, 2 percent) reads A 85,
+  B 217, 2.55 as it is, and A 83, B 209, 2.52 with the switch; the dominance test is the same either way.
 - The prevalence index is applied only when the dominance test fails and a hydric soil indicator is confirmed
   (the Soil page's "Other" does not count) and the hydrology ticks meet the rule (one primary or two secondary),
   or when the user applies it with a reason, which goes on the cover note.

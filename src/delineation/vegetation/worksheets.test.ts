@@ -121,7 +121,7 @@ describe("JF-1", () => {
     expect(worksheet(jf1())).toMatchObject({ "veg.dominance.a": "1", "veg.dominance.b": "1", "veg.dominance.percent": "100%" })
   })
 
-  test("the Prevalence Index worksheet, with the FACW total 53", () => {
+  test("the Prevalence Index worksheet, with the FACW total 53 and stiff greenthread, not on the list, as UPL", () => {
     expect(worksheet(jf1())).toMatchObject({
       "veg.prevalence.OBL.cover": "0",
       "veg.prevalence.OBL.product": "0",
@@ -131,8 +131,21 @@ describe("JF-1", () => {
       "veg.prevalence.FAC.product": "54",
       "veg.prevalence.FACU.cover": "13",
       "veg.prevalence.FACU.product": "52",
+      "veg.prevalence.UPL.cover": "1",
+      "veg.prevalence.UPL.product": "5",
+      "veg.prevalence.total.a": "85",
+      "veg.prevalence.total.b": "217",
+      "veg.prevalence.index": "2.55",
+    })
+  })
+
+  test("stiff greenthread marked not identified is left out of the worksheet", () => {
+    const marked = pointWith((v) => ({
+      ...v,
+      plants: JF1_PLANTS_TYPED.map(([name, cover]) => typed(name, cover)).map((p) => (p.name === "Stiff greenthread" ? { ...p, identified: "none" as const } : p)),
+    }))
+    expect(worksheet(marked)).toMatchObject({
       "veg.prevalence.UPL.cover": "0",
-      "veg.prevalence.UPL.product": "0",
       "veg.prevalence.total.a": "84",
       "veg.prevalence.total.b": "212",
       "veg.prevalence.index": "2.52",
@@ -196,7 +209,7 @@ describe("the supplement's worked example", () => {
   })
 
   test("a prevalence index that is not valid is left blank and warned about", () => {
-    const point = pointWith((v) => ({ ...v, plants: [typed("Carex stricta", 20), typed("Stiff greenthread", 80)] }))
+    const point = pointWith((v) => ({ ...v, plants: [typed("Carex stricta", 20), typed("Unknown forb", 80)] }))
     const form = formFor(JF1_PROJECT, point)
     expect(form.fields["veg.prevalence.index"]).toBe("")
     expect(form.fields["veg.prevalence.total.a"]).toBe("20")
@@ -282,7 +295,7 @@ describe("the Vegetation page's drawing", () => {
     const at = (id: string) => vegetation.find((p) => p.id === id)
     const { worksheets } = page
     expect(at("veg.dominance.percent")).toMatchObject({ text: "100%", x: worksheets.dominance.percent.x[0] + page.inset, baseline: worksheets.dominance.percent.rule - page.aboveRule })
-    expect(at("veg.prevalence.index")).toMatchObject({ text: "2.52", baseline: worksheets.prevalence.index.rule - page.aboveRule })
+    expect(at("veg.prevalence.index")).toMatchObject({ text: "2.55", baseline: worksheets.prevalence.index.rule - page.aboveRule })
     expect(at("veg.prevalence.FACW.cover")).toMatchObject({ text: "53", x: worksheets.prevalence.rows.FACW.cover.x[0] + page.inset })
     expect(at("veg.herb.0.dominant")).toMatchObject({ text: "Yes", x: page.columns.dominant[0] + page.inset })
     const empty = vegetationPlacements(JF1_PROJECT, formFor(JF1_PROJECT, JF1_POINT)).vegetation
@@ -318,7 +331,7 @@ describe("the PDF and its cover note", () => {
       expect(mine[i].x).toBeCloseTo(p.x, 1)
       expect(mine[i].baseline).toBeCloseTo(p.baseline, 1)
     })
-    for (const value of ["100%", "2.52", "212", "84", "Yes"]) expect(mine.map((d) => d.text), value).toContain(value)
+    for (const value of ["100%", "2.55", "217", "85", "Yes"]) expect(mine.map((d) => d.text), value).toContain(value)
     expect(mine.filter((d) => d.text === "X")).toHaveLength(3)
   })
 

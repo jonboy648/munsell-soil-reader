@@ -12,6 +12,7 @@ import { regionOf } from "../regions"
 import type { VegColumn } from "../regions/types"
 import { vegetationOf, type Project, type SamplingPoint } from "../model"
 import { printable, wrap, written } from "../text"
+import { isUnlisted } from "./entry"
 import { hydrophyticVegetation, VEG_INDICATORS, type HydrophyticVegetation, type VegContext, type VegIndicatorId } from "./hydrophytic"
 import { STATUSES, type Status } from "./status"
 import { STRATA, STRATUM_LABEL, SUGGESTED_PLOT, type Stratum } from "./strata"
@@ -37,7 +38,7 @@ export type VegFieldId =
 export const vegFieldId = (stratum: Stratum, row: number, column: VegColumn): VegFieldId => `veg.${stratum}.${row}.${column}`
 
 export interface VegWarning {
-  kind: "veg-overflow" | "veg-not-identified" | "veg-genus" | "veg-left-out" | "veg-remarks-cut" | "veg-dominant-identity" | "veg-prevalence-invalid" | "text-changed"
+  kind: "veg-overflow" | "veg-not-identified" | "veg-unlisted" | "veg-genus" | "veg-left-out" | "veg-remarks-cut" | "veg-dominant-identity" | "veg-prevalence-invalid" | "text-changed"
   text: string
 }
 
@@ -107,7 +108,9 @@ export function vegetationFields(
     }
     for (const plant of plants) {
       if (plant.identified === "none") {
-        warnings.push({ kind: "veg-not-identified", text: `${plant.name}: not found on the plant list, so it is recorded as UPL and as not identified.` })
+        warnings.push({ kind: "veg-not-identified", text: `${plant.name}: not identified, so it is left out of the prevalence index and its cover counts against the 80% that must be identified.` })
+      } else if (isUnlisted(plant)) {
+        warnings.push({ kind: "veg-unlisted", text: `${plant.name}: not on the plant list, so it is counted as UPL (supplement pp. 22-23).` })
       } else if (plant.identified === "genus") {
         warnings.push({ kind: "veg-genus", text: `${plant.name}: identified to genus only. A dominant must be identified to species.` })
       }

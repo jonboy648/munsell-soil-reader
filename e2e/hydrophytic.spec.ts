@@ -47,9 +47,11 @@ test("JF-1: the dominant is marked, the worksheets are filled, and what is confi
     ["veg.prevalence.FACW.product", "106"],
     ["veg.prevalence.FAC.cover", "18"],
     ["veg.prevalence.FACU.cover", "13"],
-    ["veg.prevalence.total.a", "84"],
-    ["veg.prevalence.total.b", "212"],
-    ["veg.prevalence.index", "2.52"],
+    ["veg.prevalence.UPL.cover", "1"],
+    ["veg.prevalence.UPL.product", "5"],
+    ["veg.prevalence.total.a", "85"],
+    ["veg.prevalence.total.b", "217"],
+    ["veg.prevalence.index", "2.55"],
   ] as const) {
     await expect(field(sheet, id), id).toHaveText(text)
   }
@@ -60,7 +62,7 @@ test("JF-1: the dominant is marked, the worksheets are filled, and what is confi
   expect(states).toEqual([["rapid", "satisfied"], ["dominance", "satisfied"], ["prevalence", "not applied"], ["morphological", "yours"], ["problematic", "yours"]])
   await expect(indicator(sheet, "dominance").getByTestId("veg-indicator-reason")).toHaveText("1 of 1 dominant species is OBL, FACW or FAC: 100 percent. It must be more than 50.")
   await expect(indicator(sheet, "dominance").getByTestId("veg-indicator-rule")).toContainText("More than 50 percent of the dominant plant species across all strata are rated OBL, FACW, or FAC.")
-  await expect(indicator(sheet, "prevalence").getByTestId("veg-indicator-reason")).toContainText("Not needed: the dominance test is satisfied. The prevalence index is 2.52 (212 / 84), 3.0 or less.")
+  await expect(indicator(sheet, "prevalence").getByTestId("veg-indicator-reason")).toContainText("Not needed: the dominance test is satisfied. The prevalence index is 2.55 (217 / 85), 3.0 or less.")
 
   // Nothing is ticked until it is confirmed; the unconfirmed suggestions go on a cover note.
   const preview = sheet.getByTestId("veg-preview-text")
@@ -85,7 +87,7 @@ test("JF-1: the dominant is marked, the worksheets are filled, and what is confi
   expect(made.pages).toBe(1)
   const drawn = await pdfText(made.bytes, 1)
   const texts = drawn.map((d) => d.text)
-  for (const value of ["100%", "2.52", "212", "84", "53"]) expect(texts, value).toContain(value)
+  for (const value of ["100%", "2.55", "217", "85", "53"]) expect(texts, value).toContain(value)
   const ticks = drawn.filter((d) => d.text === "X")
   expect(ticks).toHaveLength(3)
   const label = (text: string) => drawn.find((d) => d.text === text)!

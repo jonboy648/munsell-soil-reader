@@ -3,7 +3,7 @@
 // rules, which the 2022 list no longer contains, are run on a small list of made-up plants.
 import { beforeAll, describe, expect, test } from "vitest"
 import { JF1_PLANTS_EXPECTED, JF1_PLANTS_TYPED } from "../fixtures/jf1"
-import { plantEntryOf } from "./entry"
+import { plantEntryOf, plantNote } from "./entry"
 import { loadPlantList } from "./loadPlantList"
 import { buildPlantList, pickPlant, resolvePlant, statusFor, type PlantList, type RawPlantList, type Resolution } from "./plantList"
 
@@ -83,13 +83,26 @@ describe("resolving what is typed", () => {
 })
 
 describe("a plant that is not on the list is UPL, with a note", () => {
-  test("a name found nowhere is UPL and not identified", () => {
+  test("a name the user gave that is found nowhere is UPL, identified, and not on the list", () => {
     const r = resolvePlant(list, "Stiff greenthread")
     expect(r.kind).toBe("unknown")
     const entry = plantEntryOf(r, "p1", "herb", "Stiff greenthread", 1)!
-    expect(entry).toMatchObject({ name: "Stiff greenthread", status: "UPL", identified: "none", cover: 1 })
+    expect(entry).toMatchObject({ name: "Stiff greenthread", status: "UPL", identified: "species", unlisted: true, cover: 1 })
     expect(entry.note).toContain("Not found on the plant list")
     expect(entry.note).toContain("pp. 22-23")
+    expect(plantNote(entry)).toBe("Not on the plant list: counted as UPL (supplement pp. 22-23).")
+  })
+
+  test.each(["Zea mays", "Glycine max", "Triticum aestivum", "Beta vulgaris", "Thelesperma filifolium"])("%s, a crop or plant not on the list, counts as identified UPL", (name) => {
+    expect(plantEntryOf(resolvePlant(list, name), "p1", "herb", name, 10)).toMatchObject({ status: "UPL", identified: "species", unlisted: true })
+  })
+
+  test.each(["Unknown forb", "unidentified grass", "Unid. sedge", "Unk shrub", "Mystery seedling?"])("%s defaults to not identified", (name) => {
+    const r = resolvePlant(list, name)
+    if (r.kind !== "unknown" && r.kind !== "unlisted") return expect.fail(`${name} resolved as ${r.kind}`)
+    const entry = plantEntryOf(r, "p1", "herb", name, 10)!
+    expect(entry).toMatchObject({ identified: "none", unlisted: true })
+    expect(plantNote(entry)).toContain("Not identified: left out of the prevalence index")
   })
 
   test("a scientific name of a genus the list knows, for a species it does not list, is UPL and identified", () => {

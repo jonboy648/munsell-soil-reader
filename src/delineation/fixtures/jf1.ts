@@ -71,5 +71,5 @@ export const JF1_PLANTS_EXPECTED = [
   ["Echinochloa crus-galli", "FAC", "species"],
   ["Sonchus spp.", "FACU", "genus"],
   ["Persicaria maculosa", "FAC", "species"],
-  ["Stiff greenthread", "UPL", "none"],
+  ["Stiff greenthread", "UPL", "species"],
 ] as const

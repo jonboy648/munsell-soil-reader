@@ -117,7 +117,7 @@ export interface PrevalenceResult {
   b: number
   /** B/A. Null when the index cannot be told: nothing counted, or too little of the cover is identified. */
   index: number | null
-  /** The share of all the plot's cover that is identified and has a status, in percent. At least 80 is needed (p. 27-28). */
+  /** The share of all the plot's cover that is identified and has a status, or is not listed and assumed UPL, in percent. At least 80 is needed (p. 27-28). */
   identified: number
   /** The 80 percent test. */
   valid: boolean
@@ -126,10 +126,11 @@ export interface PrevalenceResult {
 }
 
 /**
- * The Prevalence Index. Every stratum counts, whatever its cover (Table 4, footnote 2). A plant that is not
- * identified is left out of the sums, and so is one with no status; both count against the 80 percent of the
- * cover that must be identified and rated. A plant identified to its genus only counts: the plant list gave it
- * a status because every species of the genus has the same one.
+ * The Prevalence Index. Every stratum counts, whatever its cover (Table 4, footnote 2). A plant the user named
+ * that is not on the plant list counts as UPL (pp. 22-23, 27-28). A plant marked not identified is left out of
+ * the sums, and so is one with no status; both count against the 80 percent of the cover that must be
+ * identified and rated. A plant identified to its genus only counts: the plant list gave it a status because
+ * every species of the genus has the same one.
  */
 export function prevalenceIndex(plants: readonly PlantEntry[]): PrevalenceResult {
   const counted = plants.filter((p) => p.status !== null && p.identified !== "none")

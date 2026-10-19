@@ -55,10 +55,10 @@ describe("JF-1's herb stratum on the form", () => {
     expect(form.fields["veg.remarks"]).toBe("Bare ground - 10%")
   })
 
-  test("the plants that need a word are warned about: one not identified, one identified to the genus only", () => {
+  test("the plants that need a word are warned about: one not on the list, one identified to the genus only", () => {
     const veg = form.warnings.filter((w) => w.kind.startsWith("veg-"))
-    expect(veg.map((w) => w.kind).sort()).toEqual(["veg-genus", "veg-not-identified"])
-    expect(veg.find((w) => w.kind === "veg-not-identified")!.text).toContain("Stiff greenthread")
+    expect(veg.map((w) => w.kind).sort()).toEqual(["veg-genus", "veg-unlisted"])
+    expect(veg.find((w) => w.kind === "veg-unlisted")!.text).toBe("Stiff greenthread: not on the plant list, so it is counted as UPL (supplement pp. 22-23).")
     expect(veg.find((w) => w.kind === "veg-genus")!.text).toContain("Sonchus spp.")
   })
 

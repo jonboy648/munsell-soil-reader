@@ -1,5 +1,6 @@
-// A Sampling point's own header lines: its latitude, longitude and datum, and whether it is the
-// wetland or upland half of a pair with another point of the Project.
+// A Sampling point's own header lines: its latitude, longitude and datum, its Soil Map Unit Name and
+// NWI classification (which a look-up by location can fill), and whether it is the wetland or upland
+// half of a pair with another point of the Project.
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +13,9 @@ export interface PointDetailsChange {
   lat: string
   long: string
   datum: string
+  /** Blank means the project's header line is used. */
+  soilMapUnit: string
+  nwi: string
   pair: Pair | null
 }
 
@@ -32,6 +36,8 @@ export function PointDetails({ project, point, onSave, onCancel }: Props) {
   const [lat, setLat] = React.useState(point.lat)
   const [long, setLong] = React.useState(point.long)
   const [datum, setDatum] = React.useState(point.datum)
+  const [soilMapUnit, setSoilMapUnit] = React.useState(point.soilMapUnit ?? "")
+  const [nwi, setNwi] = React.useState(point.nwi ?? "")
   const [partner, setPartner] = React.useState(current?.other.id ?? "")
   const [role, setRole] = React.useState<PairRole>(current?.role ?? "wetland")
   const [problem, setProblem] = React.useState<string | null>(null)
@@ -41,7 +47,7 @@ export function PointDetails({ project, point, onSave, onCancel }: Props) {
     e.preventDefault()
     setProblem(null)
     try {
-      await onSave({ lat, long, datum, pair: partner ? { with: partner, role } : null })
+      await onSave({ lat, long, datum, soilMapUnit, nwi, pair: partner ? { with: partner, role } : null })
     } catch {
       setProblem("The Log could not be written on this device. Try again.")
     }
@@ -56,12 +62,30 @@ export function PointDetails({ project, point, onSave, onCancel }: Props) {
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="point-long">Long</Label>
-          <Input id="point-long" className={INPUT} inputMode="decimal" autoComplete="off" value={long} onChange={(e) => setLong(e.target.value)} />
+          {/* Text, not decimal: the iPhone's decimal keypad has no minus key, and a west longitude is negative. */}
+          <Input id="point-long" className={INPUT} inputMode="text" autoComplete="off" autoCapitalize="off" value={long} onChange={(e) => setLong(e.target.value)} />
         </div>
+        <p className="col-span-2 text-xs text-muted-foreground">West longitudes are negative, like -93.6.</p>
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="point-datum">Datum</Label>
         <Input id="point-datum" className={INPUT} placeholder="WGS84" autoComplete="off" value={datum} onChange={(e) => setDatum(e.target.value)} />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="point-soilmapunit">Soil Map Unit Name</Label>
+        <Input
+          id="point-soilmapunit"
+          className={INPUT}
+          placeholder={project.header.soilMapUnit}
+          autoComplete="off"
+          value={soilMapUnit}
+          onChange={(e) => setSoilMapUnit(e.target.value)}
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="point-nwi">NWI classification</Label>
+        <Input id="point-nwi" className={INPUT} placeholder={project.header.nwi} autoComplete="off" value={nwi} onChange={(e) => setNwi(e.target.value)} />
+        <p className="text-xs text-muted-foreground">Left blank, these two print the project header's lines. A look-up by location fills them; what you type stays.</p>
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="point-pair">Paired with</Label>

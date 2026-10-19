@@ -183,11 +183,46 @@ function HeaderCard({ project, change }: { project: Project; change: Change }) {
     <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Form header, page 1</h4>
       <p data-testid="header-summary" className="text-sm">
-        {filled} of {PROJECT_FIELDS.length} lines filled. They print on every sampling point's form.
+        {filled} of {PROJECT_FIELDS.length} lines filled. They print on every sampling point's form, except that a point's own Soil Map Unit Name and
+        NWI classification print instead of these two.
       </p>
       <Button variant="outline" className="h-11 text-base" onClick={() => setEditing(true)}>
         Edit header
       </Button>
+    </div>
+  )
+}
+
+/** The one switch for using the phone's position and the two look-ups by it. Off until it is turned on. */
+function LocationCard({ project, change }: { project: Project; change: Change }) {
+  // Shown at once, so the box does not snap back while the Log is written.
+  const [on, setOn] = React.useState(project.location === true)
+  const [problem, setProblem] = React.useState<string | null>(null)
+  React.useEffect(() => setOn(project.location === true), [project.location])
+  const toggle = async (next: boolean) => {
+    setOn(next)
+    setProblem(null)
+    try {
+      await change(project.id, (p) => ({ ...p, location: next || undefined }))
+    } catch {
+      setOn(!next)
+      setProblem(WRITE_PROBLEM)
+    }
+  }
+  return (
+    <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
+      <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Location</h4>
+      <label className="flex min-h-11 items-center gap-3 text-base">
+        <input type="checkbox" className="size-5 shrink-0 accent-foreground" checked={on} onChange={(e) => void toggle(e.target.checked)} />
+        Use this phone's location in this project
+      </label>
+      <p className="text-sm text-muted-foreground">
+        Off unless you turn it on. While it is off, this project's sampling points never read the phone's position and send nothing. On, each
+        sampling point gets a button that fills its latitude and longitude and, with a signal, sends that position to NRCS Soil Data Access and the
+        US Fish and Wildlife Service wetlands map to fill the Soil Map Unit Name and the NWI classification. You can edit what comes back. Saving a
+        position with a Sample in the Log is a separate switch, on the save sheet.
+      </p>
+      {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
     </div>
   )
 }
@@ -202,6 +237,7 @@ function ProjectView({ project, change, onOpen, onBack }: { project: Project; ch
       <p className="text-sm text-muted-foreground">{regionOf(project.region).name}</p>
       <SubregionPicker project={project} change={change} />
       <HeaderCard project={project} change={change} />
+      <LocationCard project={project} change={change} />
       {project.points.length === 0 && <p className="text-base">No sampling points yet.</p>}
       <ul className="grid gap-3">
         {project.points.map((point) => (

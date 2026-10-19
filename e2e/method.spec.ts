@@ -207,8 +207,17 @@ test("says the 20-soil test has not been run, and marks what is not in this vers
     await expect(page.getByTestId(stub)).toContainText("Not yet in this version")
   }
   await expect(page.getByTestId("leaves-stub")).toContainText("Plant photo identification")
-  await expect(page.getByTestId("leaves-stub")).toContainText("Your location")
-  await expect(page.getByTestId("leaves-stub")).toContainText("Look-ups by location")
+  // The location look-ups are in this version, so they are listed as what happens, not as planned.
+  await expect(page.getByTestId("leaves-stub")).not.toContainText("Look-ups by location")
+  const lookups = page.getByTestId("leaves-lookups")
+  await expect(lookups).toContainText("Location is off for every project until you turn it on")
+  await expect(lookups).toContainText("Use my location")
+  await expect(lookups).toContainText("Look-ups by location")
+  await expect(lookups).toContainText("USDA NRCS Soil Data Access")
+  await expect(lookups).toContainText("National Wetlands Inventory")
+  // The tap that reads the position also sends it, with a signal; the Log's own switch is a separate thing.
+  await expect(lookups).toContainText("With a signal, the same tap then sends that position to the two services below")
+  await expect(page.getByTestId("leaves-log-location")).toContainText("Save my location with this Sample")
   await expect(page.locator("#privacy")).toContainText("Your Photos and Readings never leave it.")
   await expect(page.locator("#privacy")).toContainText("soil.joncackler.com")
   await expect(page.locator("#privacy")).toContainText("carries no Photo and no Reading")

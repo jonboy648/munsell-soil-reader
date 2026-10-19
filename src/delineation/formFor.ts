@@ -149,7 +149,9 @@ function page1Fields(project: Project, point: SamplingPoint, warnings: FormWarni
     out[`page1.${field}`] = shown
   }
   for (const { key, field, label } of PROJECT_FIELDS) {
-    put(field, label, key === "date" ? writtenDate(header.date) : String(header[key]))
+    // A look-up by location finds these two for one point, so the point's own value wins over the header's.
+    const own = key === "soilMapUnit" || key === "nwi" ? point[key]?.trim() : ""
+    put(field, label, key === "date" ? writtenDate(header.date) : own || String(header[key]))
   }
   put("subregion", "Subregion", subregionText(project.subregion))
   for (const { key, field, label } of POINT_FIELDS) put(field, label, String(point[key]))

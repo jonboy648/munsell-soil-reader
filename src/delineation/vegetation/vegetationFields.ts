@@ -12,6 +12,7 @@ import { regionOf } from "../regions"
 import type { VegColumn } from "../regions/types"
 import { vegetationOf, type Project, type SamplingPoint } from "../model"
 import { printable, wrap, written } from "../text"
+import { writtenIndex } from "./dominance"
 import { isUnlisted } from "./entry"
 import { hydrophyticVegetation, VEG_INDICATORS, type HydrophyticVegetation, type VegContext, type VegIndicatorId } from "./hydrophytic"
 import { STATUSES, type Status } from "./status"
@@ -137,7 +138,7 @@ export function vegetationFields(
   }
   fields["veg.prevalence.total.a"] = any ? written(prevalence.a) : ""
   fields["veg.prevalence.total.b"] = any ? written(prevalence.b) : ""
-  fields["veg.prevalence.index"] = prevalence.index !== null ? prevalence.index.toFixed(2) : ""
+  fields["veg.prevalence.index"] = prevalence.index !== null ? writtenIndex(prevalence.index, prevalence.passes === true) : ""
   if (vegetation.plants.length > 0 && !prevalence.valid) {
     warnings.push({
       kind: "veg-prevalence-invalid",

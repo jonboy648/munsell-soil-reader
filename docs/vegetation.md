@@ -112,7 +112,8 @@ test. Covers are compared in whole thousandths, so floating point never decides 
   present", read literally).
 - A is the dominants rated OBL, FACW or FAC, B all dominants, across strata, a species dominant in two strata
   counted in each. More than 50 percent passes: exactly half fails.
-- The prevalence index uses every stratum, whatever its cover. 3.0 or less passes. At least 80 percent of all
+- The prevalence index uses every stratum, whatever its cover. 3.0 or less passes, decided exactly (B ≤ 3A); the
+  index is written to two decimals, or more when that would round an index over 3.0 down to "3.00" (3.004). At least 80 percent of all
   cover must be identified and rated, or the index is not valid and is left blank.
 - A plant with no status to use (`status` null) is left out of the stratum total, the ranking and the index, and
   its Dominant box stays blank. A dominant that is not identified to species is kept in the ranking and in B (a

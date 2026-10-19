@@ -118,6 +118,13 @@ describe("the prevalence index is applied only where the supplement's order appl
     expect(stateOf(result, "prevalence").reason).toBe("The prevalence index is 3.80 (380 / 100), over 3.0.")
   })
 
+  test("just over 3.0: not met, and written so it reads over 3.0 (751 / 250 is 3.004)", () => {
+    const plants = [plant("herb", "F1", "FAC", 99), plant("herb", "F2", "FAC", 100), plant("herb", "F3", "FAC", 50), plant("herb", "U", "FACU", 1)]
+    const result = hydrophyticVegetation(veg(plants, { prevalenceReason: "Check" }), NEITHER)
+    expect(stateOf(result, "prevalence")).toMatchObject({ state: "not met" })
+    expect(stateOf(result, "prevalence").reason).toContain("The prevalence index is 3.004 (751 / 250), over 3.0.")
+  })
+
   test("applied by the user with a reason, though soil and hydrology are not there", () => {
     const result = hydrophyticVegetation(veg(failingButWet(), { prevalenceReason: "Hydric soil indicator not yet confirmed" }), NEITHER)
     expect(result.prevalenceApplied).toBe(true)

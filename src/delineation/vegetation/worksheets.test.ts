@@ -216,6 +216,13 @@ describe("the supplement's worked example", () => {
     expect(form.warnings.find((w) => w.kind === "veg-prevalence-invalid")!.text).toContain("Only 20% of the vegetation cover is identified and rated")
   })
 
+  test("an index just over 3.0 is written with the digits that show it: A 250, B 751 is 3.004, not 3.00", () => {
+    const point = pointWith((v) => ({ ...v, plants: [rated("herb", "F1", "FAC", 99), rated("herb", "F2", "FAC", 100), rated("herb", "F3", "FAC", 50), rated("herb", "U", "FACU", 1)] }))
+    expect(worksheet(point)).toMatchObject({ "veg.prevalence.total.a": "250", "veg.prevalence.total.b": "751", "veg.prevalence.index": "3.004" })
+    const exactly = pointWith((v) => ({ ...v, plants: [rated("herb", "F", "FAC", 100)] }))
+    expect(worksheet(exactly)["veg.prevalence.index"]).toBe("3.00")
+  })
+
   test("a dominant that is only identified to its genus is warned about", () => {
     const point = pointWith((v) => ({ ...v, plants: [typed("Sow thistle", 50), typed("Carex stricta", 5)] }))
     expect(formFor(JF1_PROJECT, point).warnings.find((w) => w.kind === "veg-dominant-identity")!.text).toContain("Sonchus spp. is a dominant species but is not identified to species")

@@ -7,7 +7,7 @@
 // delineator saw: the app lists them and takes the user's tick and reason, and does not recalculate.
 // Nothing here ticks anything: a suggestion counts when the user confirms it.
 import type { IndicatorChoice } from "../model"
-import { dominanceTest, prevalenceIndex, type DominanceResult, type PrevalenceResult } from "./dominance"
+import { dominanceTest, prevalenceIndex, writtenIndex, type DominanceResult, type PrevalenceResult } from "./dominance"
 import type { Vegetation } from "./entry"
 
 export const VEG_INDICATORS = ["rapid", "dominance", "prevalence", "morphological", "problematic"] as const
@@ -162,7 +162,7 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
   const index = prevalence.index
   const indexWords =
     index !== null
-      ? `The prevalence index is ${index.toFixed(2)} (${number(prevalence.b)} / ${number(prevalence.a)}), ${index <= 3 ? "3.0 or less" : "over 3.0"}.`
+      ? `The prevalence index is ${writtenIndex(index, prevalence.passes === true)} (${number(prevalence.b)} / ${number(prevalence.a)}), ${prevalence.passes ? "3.0 or less" : "over 3.0"}.`
       : prevalence.a === 0 && prevalence.identified === 0
         ? "No plants are recorded."
         : `Only ${percent(prevalence.identified)} percent of the cover is identified and rated, and 80 percent is needed, so the index is not valid (supplement pp. 27-28).`

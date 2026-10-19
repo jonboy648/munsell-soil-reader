@@ -102,6 +102,16 @@ export function dominanceTest(plants: readonly PlantEntry[]): DominanceResult {
   return { strata, dominants, a, b, percent: b > 0 ? (100 * a) / b : null, passes: b > 0 ? 2 * a > b : null }
 }
 
+/**
+ * The index as it is written: two decimals, or as many more as it takes to show that an index over 3.0 is
+ * over it (751 / 250 is 3.004, not "3.00").
+ */
+export function writtenIndex(index: number, passes: boolean): string {
+  let digits = 2
+  while (!passes && digits < 10 && Number(index.toFixed(digits)) <= 3) digits++
+  return index.toFixed(digits)
+}
+
 export interface PrevalenceRow {
   status: Status
   /** Total cover of the plants of this status, summed across strata. */

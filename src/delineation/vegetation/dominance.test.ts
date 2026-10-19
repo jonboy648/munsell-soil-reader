@@ -100,6 +100,12 @@ describe("the 50/20 rule", () => {
     return namesOf(plants, dominanceTest(plants), stratum)
   }
 
+  test("plants are ranked by cover first, whatever order they were entered in", () => {
+    // Total 100: 30 + 25 = 55 passes half, and 20 is a fifth by itself. The 10 entered first is not taken.
+    expect(dominant([10, 30, 25, 20, 15])).toEqual(["Plant 1", "Plant 2", "Plant 3"])
+    expect(dominant([15, 20, 25, 30, 10])).toEqual(["Plant 3", "Plant 2", "Plant 1"])
+  })
+
   test("plants are taken until the running total is MORE than half: exactly half is not enough", () => {
     // Total 100: the first plant is exactly half, so the second is taken as well, though it is under 20 percent.
     expect(dominant([50, 16, 14, 10, 10])).toEqual(["Plant 0", "Plant 1"])

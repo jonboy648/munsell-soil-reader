@@ -12,7 +12,7 @@ import { emptyVegetation, plantEntryOf, type PlantEntry, type Vegetation } from 
 import { loadPlantList } from "./loadPlantList"
 import { VEG_INDICATORS } from "./hydrophytic"
 import { resolvePlant } from "./plantList"
-import type { Status } from "./status"
+import { STATUSES, type Status } from "./status"
 import type { Stratum } from "./strata"
 import { vegetationPlacements } from "./vegetationPage"
 import { vegetationPdf } from "./vegetationPdf"
@@ -21,6 +21,7 @@ const page = regionOf("NCNE").vegetation
 const read = (name: string) => new Uint8Array(readFileSync(new URL(`../regions/ncne/${name}`, import.meta.url)))
 const blank = { vegetation: read("vegetation-page.pdf"), continued: read("vegetation-continued-page.pdf") }
 const list = await loadPlantList("NCNE")
+const blankText = await pdfText(blank.vegetation)
 
 const typed = (name: string, cover: number, stratum: Stratum = "herb", id = `${stratum}-${name}`): PlantEntry =>
   plantEntryOf(resolvePlant(list, name), id, stratum, name, cover)!
@@ -110,6 +111,52 @@ describe("the blanks are where the page draws them", () => {
     for (const label of ["Dominance Test worksheet:", "Prevalence Index worksheet:", "Rapid Test for Hydrophytic Vegetation", "Dominance Test is >50%", "Morphological Adaptations", "Problematic Hydrophytic Vegetation", "Hydrophytic", "Present?"]) {
       expect(text, label).toContain(label)
     }
+  })
+
+  // The page prints each label on the line of its blank, its baseline a little above the rule. A box is pinned to
+  // the text printed nearest it on its line, on the left and on the right, so two boxes swapped in the records fail.
+  describe("each box is beside the label printed on its line", () => {
+    const items = blankText
+    type Box = { x: readonly [number, number]; rule: number }
+    const line = (box: Box) => items.filter((t) => t.baseline > box.rule - 4 && t.baseline <= box.rule)
+    const leftOf = (box: Box) => line(box).filter((t) => t.x < box.x[0]).sort((a, b) => b.x - a.x)[0]?.text
+    const rightOf = (box: Box) => line(box).filter((t) => t.x > box.x[1] - 0.5).sort((a, b) => a.x - b.x)[0]?.text
+    const { dominance, prevalence, indicators, present } = page.worksheets
+
+    test("the Dominance Test worksheet: A, B and A/B", () => {
+      expect([leftOf(dominance.a), rightOf(dominance.a)]).toEqual(["That Are OBL, FACW, or FAC:", "(A)"])
+      expect([leftOf(dominance.b), rightOf(dominance.b)]).toEqual(["Species Across All Strata:", "(B)"])
+      expect([leftOf(dominance.percent), rightOf(dominance.percent)]).toEqual(["That Are OBL, FACW, or FAC:", "(A/B)"])
+    })
+
+    test.each(STATUSES.map((status, n) => [status, n + 1] as const))("the Prevalence Index worksheet: the %s row, times %i", (status, weight) => {
+      const row = prevalence.rows[status]
+      expect(leftOf(row.cover)).toBe(`${status} species`)
+      expect(rightOf(row.cover)).toBe(`x ${weight} =`)
+      expect(leftOf(row.product)).toBe(`x ${weight} =`)
+    })
+
+    test("the Prevalence Index worksheet: the column totals and B/A", () => {
+      expect([leftOf(prevalence.totals.a), rightOf(prevalence.totals.a)]).toEqual(["Column Totals:", "(A)"])
+      expect([leftOf(prevalence.totals.b), rightOf(prevalence.totals.b)]).toEqual(["(A)", "(B)"])
+      expect(leftOf(prevalence.index)).toBe("Prevalence Index = B/A =")
+    })
+
+    test("the indicators' blanks, each before its label", () => {
+      const labels = {
+        rapid: "1 - Rapid Test for Hydrophytic Vegetation",
+        dominance: "2 - Dominance Test is >50%",
+        prevalence: "3 - Prevalence Index is",
+        morphological: "4 - Morphological Adaptations",
+        problematic: "Problematic Hydrophytic Vegetation",
+      }
+      for (const id of VEG_INDICATORS) expect(rightOf(indicators[id]), id).toBe(labels[id])
+    })
+
+    test("Hydrophytic Vegetation Present?: Yes and No", () => {
+      expect(leftOf(present.yes)).toBe("Yes")
+      expect(leftOf(present.no)).toBe("No")
+    })
   })
 })
 

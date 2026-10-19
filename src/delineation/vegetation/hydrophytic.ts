@@ -62,6 +62,11 @@ export interface HydrophyticVegetation {
   indicators: VegIndicator[]
   /** Whether the prevalence index is applied: by the supplement's order, or by the user's choice. */
   prevalenceApplied: boolean
+  /**
+   * Whether it is applied because of the user's reason alone: a reason is stored and the supplement's order
+   * (dominance fails, hydric soil and hydrology present) would not apply it. Only then is the reason reported.
+   */
+  overridden: boolean
   conclusion: VegConclusion
   /** Dominants that are not identified to species, by name: a dominant must be (p. 26). */
   notIdentified: string[]
@@ -145,7 +150,10 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
   const rapidMet = dominance.b > 0 && dominance.dominants.every((d) => ["OBL", "FACW"].includes(statusOf(d.id).status!))
   const dominanceMet = dominance.passes === true
   const reason = (vegetation.prevalenceReason ?? "").trim()
-  const applied = reason !== "" || (!dominanceMet && context.hydricSoil && context.hydrology)
+  const inOrder = !dominanceMet && context.hydricSoil && context.hydrology
+  const applied = reason !== "" || inOrder
+  // The user's reason only matters where the supplement's own order would not apply the index.
+  const overridden = reason !== "" && !inOrder
 
   const wet = dominance.dominants.filter((d) => ["OBL", "FACW"].includes(statusOf(d.id).status!)).length
   const rapid = indicator(
@@ -170,7 +178,7 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
   const soilMissing = problematicSoil.length > 0 ? "a hydric soil indicator (a problematic-soil indicator does not count)" : "a hydric soil indicator"
   const missing = [context.hydricSoil ? "" : soilMissing, context.hydrology ? "" : "wetland hydrology indicators"].filter(Boolean)
   const prevalenceIndicator = applied
-    ? indicator("prevalence", prevalence.passes === true ? "satisfied" : "not met", `${reason !== "" ? `Applied at your request: ${reason}. ` : ""}${indexWords}`)
+    ? indicator("prevalence", prevalence.passes === true ? "satisfied" : "not met", `${overridden ? `Applied at your request: ${reason}. ` : ""}${indexWords}`)
     : dominanceMet
       ? indicator("prevalence", "not applied", `Not needed: the dominance test is satisfied. ${indexWords}`)
       : indicator(
@@ -215,5 +223,5 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
     !applied && !dominanceMet && !context.hydricSoil && problematicSoil.length > 0
       ? `Problematic hydric soil indicator confirmed: ${problematicSoil.join(", ")}`
       : ""
-  return { dominance, prevalence, indicators, prevalenceApplied: applied, conclusion, notIdentified, offeredReason }
+  return { dominance, prevalence, indicators, prevalenceApplied: applied, overridden, conclusion, notIdentified, offeredReason }
 }

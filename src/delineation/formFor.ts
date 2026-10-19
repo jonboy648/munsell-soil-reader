@@ -100,7 +100,7 @@ export interface VegetationCover {
   ticked: VegIndicator[]
   /** Indicators 1 to 3 the user confirmed that the plants, or the soil and hydrology, no longer satisfy: they print blank. */
   stale: VegIndicator[]
-  /** Why the prevalence index was applied where the supplement's order would not apply it. Empty when it was not. */
+  /** Why the prevalence index was applied where the supplement's order would not apply it. Empty when it was not, or when the order applies it anyway. */
   prevalenceReason: string
 }
 
@@ -364,7 +364,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
         unconfirmed: vegetation.analysis.indicators.filter((i) => i.state === "satisfied" && i.decision === "pending"),
         ticked: vegetation.analysis.indicators.filter((i) => i.ticked && i.state === "yours"),
         stale: vegetation.analysis.indicators.filter((i) => i.stale),
-        prevalenceReason: (point.vegetation?.prevalenceReason ?? "").trim(),
+        prevalenceReason: vegetation.analysis.overridden ? (point.vegetation?.prevalenceReason ?? "").trim() : "",
       },
     },
     warnings,

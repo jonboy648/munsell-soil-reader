@@ -131,15 +131,17 @@ function OwnTick({ i, onChoose }: { i: VegIndicator; onChoose: (id: VegIndicator
 }
 
 /** Apply the prevalence index where the supplement's order would not, and say why. */
-function ApplyAnyway({ reason, offered = "", onChange }: { reason: string; offered?: string; onChange: Props["onChange"] }) {
+function ApplyAnyway({ reason, overridden = true, offered = "", onChange }: { reason: string; overridden?: boolean; offered?: string; onChange: Props["onChange"] }) {
   const [text, setText] = React.useState("")
   const { problem, write, fail } = useWrite()
   if (reason !== "") {
     return (
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">Applied at your request: {reason}</p>
+        <p className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">
+          {overridden ? `Applied at your request: ${reason}` : `The supplement's order applies the index here, so your reason is not needed and is not on the cover note: ${reason}`}
+        </p>
         <Button variant="outline" className="h-11 shrink-0 text-base" onClick={() => void write(() => onChange(({ prevalenceReason: _gone, ...v }) => v))}>
-          Stop applying
+          {overridden ? "Stop applying" : "Remove your reason"}
         </Button>
       </div>
     )
@@ -183,7 +185,8 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
     })
   const answerWith = (value: "yes" | "no" | null) => write(() => onChange(({ present: _gone, ...v }) => (value ? { ...v, present: value } : v)))
   // With no plants there is nothing to suggest, but a decision or an answer already stored stays in reach.
-  const stored = Object.keys(vegetation.indicators ?? {}).length > 0 || answer !== undefined || (vegetation.prevalenceReason ?? "").trim() !== ""
+  const storedReason = (vegetation.prevalenceReason ?? "").trim()
+  const stored = Object.keys(vegetation.indicators ?? {}).length > 0 || answer !== undefined || storedReason !== ""
   if (vegetation.plants.length === 0 && !stored) return null
 
   return (
@@ -208,7 +211,7 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
           <IndicatorCard key={i.id} i={i} onChoose={choose}>
             {i.state === "yours" && <OwnTick i={i} onChoose={choose} />}
             {i.id === "prevalence" && i.state !== "satisfied" && !result.prevalenceApplied && <ApplyAnyway reason="" offered={result.offeredReason} onChange={onChange} />}
-            {i.id === "prevalence" && result.cover.prevalenceReason !== "" && <ApplyAnyway reason={result.cover.prevalenceReason} onChange={onChange} />}
+            {i.id === "prevalence" && storedReason !== "" && <ApplyAnyway reason={storedReason} overridden={result.overridden} onChange={onChange} />}
           </IndicatorCard>
         ))}
       </ul>

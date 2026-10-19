@@ -313,7 +313,24 @@ describe("the prevalence index is applied by the supplement's order, or by the u
   test("the user can apply it anyway with a reason, and the reason is on the cover note", () => {
     const form = formFor(JF1_PROJECT, withIndicators({ prevalenceReason: "  Hydric soil confirmed on the next point  " }))
     expect(form.vegetation.prevalenceApplied).toBe(true)
+    expect(form.vegetation.overridden).toBe(true)
     expect(form.vegetation.cover.prevalenceReason).toBe("Hydric soil confirmed on the next point")
+  })
+
+  test("a reason kept where the supplement's own order applies the index is no override, and is not on the cover note", () => {
+    const form = formFor(JF1_PROJECT, withIndicators({ prevalenceReason: "Soil and hydrology on the next point" }, true, true))
+    expect(form.vegetation.prevalenceApplied).toBe(true)
+    expect(form.vegetation.overridden).toBe(false)
+    expect(form.vegetation.cover.prevalenceReason).toBe("")
+    expect(form.vegetation.indicators.find((i) => i.id === "prevalence")!.reason).not.toContain("Applied at your request")
+  })
+
+  test("a reason where the dominance test passes is an override: the order would not apply the index", () => {
+    const passing = pointWith((v) => ({ ...v, plants: [rated("herb", "H", "OBL", 70)], prevalenceReason: "Check the index" }))
+    const point = { ...passing, indicators: { A12: { state: "confirmed" as const } }, hydrology: { ...emptyHydrology, ticked: ["A1"] } } as SamplingPoint
+    const form = formFor(JF1_PROJECT, point)
+    expect(form.vegetation.overridden).toBe(true)
+    expect(form.vegetation.cover.prevalenceReason).toBe("Check the index")
   })
 })
 

@@ -96,8 +96,10 @@ export interface HydricSoil {
 export interface VegetationCover {
   /** Indicators the app found satisfied that the user has not confirmed: they print blank. */
   unconfirmed: VegIndicator[]
-  /** Indicators the user ticked that the arithmetic does not satisfy (morphological adaptations, problematic vegetation), with their remarks. */
+  /** Indicators the user ticked on their own observation (morphological adaptations, problematic vegetation), with their remarks. */
   ticked: VegIndicator[]
+  /** Indicators 1 to 3 the user confirmed that the plants, or the soil and hydrology, no longer satisfy: they print blank. */
+  stale: VegIndicator[]
   /** Why the prevalence index was applied where the supplement's order would not apply it. Empty when it was not. */
   prevalenceReason: string
 }
@@ -355,7 +357,8 @@ export function formFor(project: Project, point: SamplingPoint): Form {
       ...vegetation.analysis,
       cover: {
         unconfirmed: vegetation.analysis.indicators.filter((i) => i.state === "satisfied" && i.decision === "pending"),
-        ticked: vegetation.analysis.indicators.filter((i) => i.decision === "confirmed" && i.state !== "satisfied"),
+        ticked: vegetation.analysis.indicators.filter((i) => i.ticked && i.state === "yours"),
+        stale: vegetation.analysis.indicators.filter((i) => i.stale),
         prevalenceReason: (point.vegetation?.prevalenceReason ?? "").trim(),
       },
     },

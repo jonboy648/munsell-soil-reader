@@ -134,3 +134,7 @@ test. Covers are compared in whole thousandths, so floating point never decides 
   recalculate the tests with a FACU species counted as FAC. The app suggests Yes when an indicator is satisfied
   and never suggests No. Indicator ticks and the Yes or No print only when confirmed; what is not confirmed, the
   user's own ticks and the reason for applying the index go on a cover note after the page.
+- A confirmed Rapid Test, Dominance Test or Prevalence Index is ticked only while it is still satisfied. When the
+  plants, or the soil and hydrology that applied the index, change so that it is not, its box prints blank, its
+  card says "Confirmed earlier, no longer satisfied" with Undo, and the cover note lists it under that heading.
+  The user's Yes or No for Hydrophytic Vegetation Present? is theirs and is not changed.

@@ -36,6 +36,13 @@ export interface VegIndicator {
   /** What the user decided. An indicator that is not satisfied and not the user's is never confirmed. */
   decision: "pending" | "confirmed" | "rejected"
   remark?: string
+  /**
+   * Whether the form ticks it: indicators 1 to 3 while they are confirmed and still satisfied, the user's own
+   * (4 and Problematic) while they are confirmed.
+   */
+  ticked: boolean
+  /** Confirmed earlier, and the plants or the soil and hydrology no longer satisfy it: not ticked. */
+  stale: boolean
 }
 
 export interface VegConclusion {
@@ -110,15 +117,22 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
     const choice: IndicatorChoice | undefined = choices[id]
     return { decision: choice?.state ?? "pending", ...(choice?.remark ? { remark: choice.remark } : {}) }
   }
-  const indicator = (id: VegIndicatorId, state: VegIndicatorState, reason: string): VegIndicator => ({
-    id,
-    printed: RULES[id].printed,
-    state,
-    reason,
-    rule: RULES[id].rule,
-    citation: RULES[id].citation,
-    ...decision(id),
-  })
+  const indicator = (id: VegIndicatorId, state: VegIndicatorState, reason: string): VegIndicator => {
+    const decided = decision(id)
+    const confirmed = decided.decision === "confirmed"
+    const holds = state === "satisfied" || state === "yours"
+    return {
+      id,
+      printed: RULES[id].printed,
+      state,
+      reason,
+      rule: RULES[id].rule,
+      citation: RULES[id].citation,
+      ...decided,
+      ticked: confirmed && holds,
+      stale: confirmed && !holds,
+    }
+  }
 
   const statusOf = (id: string) => vegetation.plants.find((p) => p.id === id)!
   const rapidMet = dominance.b > 0 && dominance.dominants.every((d) => ["OBL", "FACW"].includes(statusOf(d.id).status!))

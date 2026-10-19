@@ -145,9 +145,9 @@ export function vegetationFields(
     })
   }
 
-  // Ticks and the answer are the user's: nothing is drawn that has not been confirmed.
-  const choices = vegetation.indicators ?? {}
-  for (const id of VEG_INDICATORS) fields[`veg.indicator.${id}`] = choices[id]?.state === "confirmed" ? "X" : ""
+  // Ticks and the answer are the user's: nothing is drawn that has not been confirmed, and a confirmed
+  // indicator 1 to 3 that the plants no longer satisfy is not drawn either.
+  for (const id of VEG_INDICATORS) fields[`veg.indicator.${id}`] = analysis.indicators.find((i) => i.id === id)!.ticked ? "X" : ""
   fields["veg.present.yes"] = vegetation.present === "yes" ? "X" : ""
   fields["veg.present.no"] = vegetation.present === "no" ? "X" : ""
 

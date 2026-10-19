@@ -55,7 +55,7 @@ function useWrite() {
 function IndicatorCard({ i, onChoose, children }: { i: VegIndicator; onChoose: (id: VegIndicatorId, choice: IndicatorChoice | null) => Promise<unknown>; children?: React.ReactNode }) {
   const { problem, write } = useWrite()
   return (
-    <li data-testid="veg-indicator" data-indicator={i.id} data-state={i.state} data-decision={i.decision} className="grid min-w-0 gap-2 rounded-lg border border-border bg-card p-3">
+    <li data-testid="veg-indicator" data-indicator={i.id} data-state={i.state} data-decision={i.decision} data-stale={i.stale} className="grid min-w-0 gap-2 rounded-lg border border-border bg-card p-3">
       <p className="font-heading text-lg font-bold [overflow-wrap:anywhere]">{i.printed}</p>
       <p className="text-sm">
         <b className="font-semibold">{STATE_WORDS[i.state]}.</b> <span data-testid="veg-indicator-reason">{i.reason}</span>
@@ -64,9 +64,9 @@ function IndicatorCard({ i, onChoose, children }: { i: VegIndicator; onChoose: (
         {i.rule}
         <footer className="mt-1 text-xs text-muted-foreground">{i.citation}</footer>
       </blockquote>
-      {i.state === "satisfied" &&
+      {i.state !== "yours" &&
         (i.decision === "pending" ? (
-          <div className="flex gap-2">
+          i.state === "satisfied" && <div className="flex gap-2">
             <Button className="h-11 flex-1 text-base" aria-label={`Confirm ${SHORT[i.id]}`} onClick={() => void write(() => onChoose(i.id, { state: "confirmed" }))}>
               Confirm
             </Button>
@@ -77,7 +77,11 @@ function IndicatorCard({ i, onChoose, children }: { i: VegIndicator; onChoose: (
         ) : (
           <div className="flex items-center justify-between gap-2">
             <p data-testid="veg-indicator-state" className="text-sm font-semibold">
-              {i.decision === "confirmed" ? "Confirmed: ticked on the Vegetation page." : "Rejected: not ticked."}
+              {i.stale
+                ? "Confirmed earlier, no longer satisfied: not ticked. It goes on the cover note."
+                : i.decision === "confirmed"
+                  ? "Confirmed: ticked on the Vegetation page."
+                  : "Rejected: not ticked."}
             </p>
             <Button variant="outline" className="h-11 text-base" aria-label={`Undo ${SHORT[i.id]}`} onClick={() => void write(() => onChoose(i.id, null))}>
               Undo
@@ -173,7 +177,9 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
       return { ...v, indicators: choice ? { ...rest, [id]: choice } : rest }
     })
   const answerWith = (value: "yes" | "no" | null) => write(() => onChange(({ present: _gone, ...v }) => (value ? { ...v, present: value } : v)))
-  if (vegetation.plants.length === 0) return null
+  // With no plants there is nothing to suggest, but a decision or an answer already stored stays in reach.
+  const stored = Object.keys(vegetation.indicators ?? {}).length > 0 || answer !== undefined || (vegetation.prevalenceReason ?? "").trim() !== ""
+  if (vegetation.plants.length === 0 && !stored) return null
 
   return (
     <section aria-label="Hydrophytic vegetation" data-testid="veg-indicators" className="grid gap-3">

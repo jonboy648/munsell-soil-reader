@@ -238,7 +238,7 @@ describe("confirming", () => {
     expect(form.fields["veg.indicator.prevalence"]).toBe("")
     expect(form.fields["veg.present.yes"]).toBe("X")
     expect(form.fields["veg.present.no"]).toBe("")
-    expect(form.vegetation.cover).toEqual({ unconfirmed: [], ticked: [], prevalenceReason: "" })
+    expect(form.vegetation.cover).toEqual({ unconfirmed: [], ticked: [], stale: [], prevalenceReason: "" })
   })
 
   test("the suggestion is not an answer: with no answer, neither Yes nor No is printed", () => {

@@ -97,7 +97,7 @@ export async function addSoilCoverNote(doc: PDFDocument, project: Project, point
 
 /** The cover note's parts for the Vegetation page: what is not ticked on it, and why the prevalence index was applied. */
 function vegetationNote(form: Form): NoteSection[] {
-  const { unconfirmed, ticked, prevalenceReason } = form.vegetation.cover
+  const { unconfirmed, ticked, stale, prevalenceReason } = form.vegetation.cover
   return [
     ...(unconfirmed.length > 0
       ? [
@@ -113,10 +113,16 @@ function vegetationNote(form: Form): NoteSection[] {
           {
             heading: "Ticked by the user",
             intro: "",
-            items: ticked.map((i) => ({
-              title: i.printed,
-              lines: [i.remark ? `The user's reason: ${i.remark}` : "No reason was given.", ...(i.state === "yours" ? [] : [`The plants do not satisfy it now: ${i.reason}`])],
-            })),
+            items: ticked.map((i) => ({ title: i.printed, lines: [i.remark ? `The user's reason: ${i.remark}` : "No reason was given."] })),
+          },
+        ]
+      : []),
+    ...(stale.length > 0
+      ? [
+          {
+            heading: "Confirmed earlier, no longer satisfied",
+            intro: "The user confirmed these, but what is recorded now does not satisfy them, so they are not ticked on the Vegetation page.",
+            items: stale.map((i) => ({ title: i.printed, lines: [i.reason, `Rule: ${i.rule}`, `Source: ${i.citation}`] })),
           },
         ]
       : []),

@@ -152,6 +152,29 @@ describe("morphological adaptations and problematic vegetation are the user's", 
     const withProblematic = hydrophyticVegetation(veg(failing(), { indicators: { problematic: { state: "confirmed", manual: true, remark: "Recently logged" } } }), BOTH)
     expect(withProblematic.conclusion.suggested).toBeNull()
   })
+
+  test("without hydric soil and hydrology, a confirmed morphological tick is printed but does not make Yes the suggestion (pp. 24, 30)", () => {
+    const morph = { indicators: { morphological: { state: "confirmed" as const, manual: true, remark: "Adventitious roots on Cirsium" } } }
+    for (const [context, missing] of [
+      [NEITHER, "a hydric soil indicator and wetland hydrology indicators"],
+      [{ hydricSoil: true, hydrology: false }, "wetland hydrology indicators"],
+      [{ hydricSoil: false, hydrology: true }, "a hydric soil indicator"],
+    ] as const) {
+      const result = hydrophyticVegetation(veg(failing(), morph), context)
+      expect(stateOf(result, "morphological")).toMatchObject({ decision: "confirmed", ticked: true })
+      expect(stateOf(result, "morphological").reason).toContain(`It does not count towards the suggested Yes: the supplement assumes a hydric soil indicator and wetland hydrology for it (pp. 24, 30). Missing: ${missing}.`)
+      expect(result.conclusion.suggested).toBeNull()
+    }
+    expect(stateOf(hydrophyticVegetation(veg(failing(), morph), BOTH), "morphological").reason).not.toContain("does not count")
+  })
+
+  test("the user's reason for applying the prevalence index anyway lets a morphological tick count", () => {
+    const result = hydrophyticVegetation(
+      veg(failing(), { prevalenceReason: "Hydric soil on the paired point", indicators: { morphological: { state: "confirmed", manual: true, remark: "Adventitious roots" } } }),
+      NEITHER,
+    )
+    expect(result.conclusion.suggested).toBe("yes")
+  })
 })
 
 describe("Hydrophytic Vegetation Present?", () => {

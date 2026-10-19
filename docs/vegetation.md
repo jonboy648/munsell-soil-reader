@@ -131,7 +131,9 @@ test. Covers are compared in whole thousandths, so floating point never decides 
   or when the user applies it with a reason, which goes on the cover note.
 - The Rapid Test is computed from the dominants (the supplement calls it a visual assessment). Morphological
   adaptations and Problematic Hydrophytic Vegetation are the user's tick with a reason: the app does not
-  recalculate the tests with a FACU species counted as FAC. The app suggests Yes when an indicator is satisfied
+  recalculate the tests with a FACU species counted as FAC. Like the prevalence index, morphological adaptations
+  assume hydric soil and wetland hydrology (pp. 24, 30): without them, or the user's reason for applying the index
+  anyway, the tick is printed but does not count towards the suggested Yes, and the card says why. The app suggests Yes when an indicator is satisfied
   and never suggests No. Indicator ticks and the Yes or No print only when confirmed; what is not confirmed, the
   user's own ticks and the reason for applying the index go on a cover note after the page.
 - A confirmed Rapid Test, Dominance Test or Prevalence Index is ticked only while it is still satisfied. When the

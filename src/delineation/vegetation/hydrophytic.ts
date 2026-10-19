@@ -170,10 +170,17 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
           `The dominance test is not met, so the supplement goes on to the prevalence index, but only where hydric soil and wetland hydrology indicators are both present. Missing: ${missing.join(" and ")}. Confirm them, or apply the index anyway with your reason. ${indexWords}`,
         )
 
+  // Like the prevalence index, morphological adaptations assume hydric soil and wetland hydrology (pp. 24, 30):
+  // without them, or the user's reason for applying the index anyway, a tick is printed but does not count towards Yes.
+  const assumed = (context.hydricSoil && context.hydrology) || reason !== ""
   const morphological = indicator(
     "morphological",
     "yours",
-    "Your observation: the features are seen on more than 50 percent of the individuals of a FACU species where hydric soil and wetland hydrology indicators are present (adventitious roots, hypertrophied lenticels, multi-stemmed trunks, shallow root systems). The species then counts as FAC and the tests are run again. The app does not recalculate: say what you saw.",
+    `Your observation: the features are seen on more than 50 percent of the individuals of a FACU species where hydric soil and wetland hydrology indicators are present (adventitious roots, hypertrophied lenticels, multi-stemmed trunks, shallow root systems). The species then counts as FAC and the tests are run again. The app does not recalculate: say what you saw.${
+      assumed
+        ? ""
+        : ` It does not count towards the suggested Yes: the supplement assumes a hydric soil indicator and wetland hydrology for it (pp. 24, 30). Missing: ${missing.join(" and ")}. Confirm them, or apply the prevalence index anyway with your reason.`
+    }`,
   )
   const problematic = indicator(
     "problematic",
@@ -182,7 +189,7 @@ export function hydrophyticVegetation(vegetation: Vegetation, context: VegContex
   )
   const indicators = [rapid, dominanceIndicator, prevalenceIndicator, morphological, problematic]
 
-  const satisfied = indicators.filter((i) => i.state === "satisfied" || (i.id === "morphological" && i.decision === "confirmed"))
+  const satisfied = indicators.filter((i) => i.state === "satisfied" || (i.id === "morphological" && i.decision === "confirmed" && assumed))
   const suggested = satisfied.length > 0
   const conclusion: VegConclusion = {
     suggested: suggested ? "yes" : null,

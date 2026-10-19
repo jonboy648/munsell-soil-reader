@@ -89,8 +89,12 @@ describe("the supplement's worked example (Tables 3 and 4)", () => {
   })
 
   test("the prevalence index includes the stratum the dominance test leaves out (Table 4, footnote 2)", () => {
-    const without = prevalenceIndex(plants.filter((p) => p.stratum !== "woodyVine"))
-    expect(without.a).toBe(163)
+    // The woody vine stratum, 1 percent, is not used by the dominance test, but its FAC poison ivy is in the index's FAC row.
+    expect(test3.strata.find((s) => s.stratum === "woodyVine")!.used).toBe(false)
+    const pi = prevalenceIndex(plants)
+    expect(pi.a).toBe(164)
+    expect(pi.rows.find((r) => r.status === "FAC")!.cover).toBe(5 + 35 + 1)
+    expect(prevalenceIndex(plants.filter((p) => p.stratum !== "woodyVine")).a).toBe(163)
   })
 })
 
@@ -133,9 +137,11 @@ describe("the 50/20 rule", () => {
   })
 
   test("covers that do not add up in floating point still compare exactly", () => {
-    // 0.1 + 0.2 + 0.3 + ... : the total is 1.5 in whole thousandths, and a plant of 0.3 is exactly 20 percent of it.
-    expect(dominant([0.3, 0.3, 0.3, 0.3, 0.3])).toHaveLength(5)
-    expect(dominant([0.7, 0.3, 0.2, 0.1, 0.2])).toEqual(["Plant 0", "Plant 1"])
+    // 2.2 + 0.6 + 0.1 + 0.1 is 3.0 and 0.6 is exactly a fifth of it; in floating point the sum is a hair over 3.0.
+    expect(dominant([2.2, 0.6, 0.1, 0.1])).toEqual(["Plant 0", "Plant 1"])
+    // 0.5 + 5 × 0.1 is 1.0 and 0.5 is exactly half, which is not enough, so the five tied at 0.1 are taken too;
+    // in floating point the sum is a hair under 1.0 and 0.5 would pass half by itself.
+    expect(dominant([0.5, 0.1, 0.1, 0.1, 0.1, 0.1])).toHaveLength(6)
   })
 
   test("a species dominant in two strata is counted in each (p. 25)", () => {
@@ -229,7 +235,10 @@ describe("the prevalence index", () => {
   test("a plant identified to its genus only counts, and one with no status does not", () => {
     const plants = [plant("herb", "Sonchus spp.", "FACU", 30, { identified: "genus" }), plant("herb", "Unrated", null, 10), plant("herb", "Carex stricta", "OBL", 60)]
     const pi = prevalenceIndex(plants)
-    expect(pi).toMatchObject({ a: 90, b: 60 + 120, valid: true })
+    // The unrated 10 counts against the 80 percent: 90 of 100 is identified and rated.
+    expect(pi).toMatchObject({ a: 90, b: 60 + 120, valid: true, identified: 90 })
+    const mostlyUnrated = [plant("herb", "Unrated", null, 25), plant("herb", "Carex stricta", "OBL", 75)]
+    expect(prevalenceIndex(mostlyUnrated)).toMatchObject({ identified: 75, valid: false, index: null })
   })
 
   test("no plants, no index", () => {

@@ -27,6 +27,7 @@ const field = (sheet: Locator, id: string) => sheet.locator(`[data-field="${id}"
 const indicator = (sheet: Locator, id: string) => sheet.getByTestId("veg-indicators").locator(`[data-testid="veg-indicator"][data-indicator="${id}"]`)
 
 test("JF-1: the dominant is marked, the worksheets are filled, and what is confirmed is ticked on the page", async ({ page }) => {
+  test.slow() // nine plants typed and two PDFs made, on engines that are slow to click through
   await page.goto("/")
   const sheet = await createPoint(page, "JF fixture", "JF-1")
   for (const [typed, cover] of JF1_PLANTS_TYPED) await addPlant(sheet, typed, String(cover))

@@ -160,6 +160,30 @@ test("a failing dominance test waits for hydric soil and hydrology, unless the u
   await expect(indicator(sheet, "prevalence")).toHaveAttribute("data-state", "not applied")
 })
 
+test("a confirmation the plants no longer satisfy is flagged, untouched on the page, and can be undone", async ({ page }) => {
+  await page.goto("/")
+  const sheet = await createPoint(page, "JF fixture", "JF-3")
+  await addPlant(sheet, "Fall panicgrass", "50")
+  await addPlant(sheet, "Creeping thistle", "10")
+  const preview = sheet.getByTestId("veg-preview-text")
+  await sheet.getByRole("button", { name: "Confirm Dominance Test" }).click()
+  await expect(indicator(sheet, "dominance")).toHaveAttribute("data-decision", "confirmed")
+  await expect(field(sheet, "veg.indicator.dominance")).toHaveText("X")
+
+  // Remove the dominant: creeping thistle, FACU, is the only dominant left, and the test is not met.
+  await sheet.getByRole("button", { name: "Remove Panicum dichotomiflorum", exact: true }).click()
+  await expect(indicator(sheet, "dominance")).toHaveAttribute("data-state", "not met")
+  await expect(indicator(sheet, "dominance")).toHaveAttribute("data-stale", "true")
+  await expect(indicator(sheet, "dominance").getByTestId("veg-indicator-state")).toHaveText("Confirmed earlier, no longer satisfied: not ticked. It goes on the cover note.")
+  await expect(preview.filter({ hasText: /^X$/ })).toHaveCount(0)
+
+  // With no plants at all, the decision is still in reach.
+  await sheet.getByRole("button", { name: "Remove Cirsium arvense", exact: true }).click()
+  await expect(indicator(sheet, "dominance")).toHaveAttribute("data-stale", "true")
+  await sheet.getByRole("button", { name: "Undo Dominance Test" }).click()
+  await expect(sheet.getByTestId("veg-indicators")).toHaveCount(0)
+})
+
 test("on a 360 px phone the vegetation indicators are not wider than the screen", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await page.goto("/")

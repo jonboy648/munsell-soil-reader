@@ -10,6 +10,7 @@ import { pdfRules, type DrawnRule } from "../testing/pdfRules"
 import { pdfText } from "../testing/pdfText"
 import { emptyVegetation, plantEntryOf, type PlantEntry, type Vegetation } from "./entry"
 import { loadPlantList } from "./loadPlantList"
+import { VEG_INDICATORS } from "./hydrophytic"
 import { resolvePlant } from "./plantList"
 import type { Status } from "./status"
 import type { Stratum } from "./strata"
@@ -255,6 +256,36 @@ describe("confirming", () => {
     expect(form.fields["veg.present.no"]).toBe("")
   })
 
+  test("a confirmation the plants no longer satisfy is not ticked, and is listed as no longer satisfied", () => {
+    const withoutDominant = withVegetation(confirmed(), (v) => ({ ...v, plants: v.plants.filter((p) => p.name !== "Panicum dichotomiflorum") }))
+    const form = formFor(JF1_PROJECT, withoutDominant)
+    expect(form.vegetation.indicators.find((i) => i.id === "dominance")).toMatchObject({ state: "not met", decision: "confirmed", ticked: false, stale: true })
+    expect(form.fields["veg.indicator.rapid"]).toBe("")
+    expect(form.fields["veg.indicator.dominance"]).toBe("")
+    expect(form.vegetation.cover.stale.map((i) => i.id)).toEqual(["rapid", "dominance"])
+    expect(form.vegetation.cover.ticked).toEqual([])
+    // The user's answer is theirs: it stays.
+    expect(form.fields["veg.present.yes"]).toBe("X")
+  })
+
+  test("with every plant removed, a confirmation is stale and nothing is ticked", () => {
+    const form = formFor(JF1_PROJECT, withVegetation(confirmed(), (v) => ({ ...v, plants: [] })))
+    for (const id of VEG_INDICATORS) expect(form.fields[`veg.indicator.${id}`], id).toBe("")
+    expect(form.vegetation.cover.stale.map((i) => i.id)).toEqual(["rapid", "dominance"])
+  })
+
+  test("a confirmed prevalence index is not ticked once the soil confirmation that applied it is undone", () => {
+    const plants = [rated("tree", "T1", "UPL", 10), rated("tree", "T2", "FACU", 10), rated("tree", "T3", "FACU", 10), rated("herb", "H", "OBL", 70)]
+    const base = pointWith((v) => ({ ...v, plants, indicators: { prevalence: { state: "confirmed" } } }))
+    const applied = { ...base, indicators: { A12: { state: "confirmed" as const } }, hydrology: { ...emptyHydrology, ticked: ["A1"] } } as SamplingPoint
+    expect(formFor(JF1_PROJECT, applied).fields["veg.indicator.prevalence"]).toBe("X")
+    for (const undone of [{ ...applied, indicators: {} }, { ...applied, hydrology: { ...emptyHydrology, ticked: [] } }] as SamplingPoint[]) {
+      const form = formFor(JF1_PROJECT, undone)
+      expect(form.fields["veg.indicator.prevalence"]).toBe("")
+      expect(form.vegetation.indicators.find((i) => i.id === "prevalence")).toMatchObject({ state: "not applied", stale: true })
+    }
+  })
+
   test("a rejected indicator is not ticked and is not on the cover note", () => {
     const form = formFor(JF1_PROJECT, pointWith((v) => ({ ...v, plants: JF1_PLANTS_TYPED.map(([name, cover]) => typed(name, cover)), indicators: { rapid: { state: "rejected" }, dominance: { state: "confirmed" } } })))
     expect(form.fields["veg.indicator.rapid"]).toBe("")
@@ -414,6 +445,19 @@ describe("the PDF and its cover note", () => {
     expect(note).toContain("Prevalence index applied by the user")
     expect(note).toContain("Checking the arithmetic")
     expect((await pdfText(bytes, 1)).filter((d) => d.text === "X")).toHaveLength(4)
+  })
+
+  test("a confirmation that no longer holds is on the cover note as such, not as the user's tick, and is not an X", async () => {
+    const point = withVegetation(confirmedJf1(), (v) => ({ ...v, plants: v.plants.filter((p) => p.name !== "Panicum dichotomiflorum") }))
+    const bytes = await pdf(point)
+    expect(await pages(bytes)).toBe(2)
+    const note = (await pdfText(bytes, 2)).map((d) => d.text).join(" ")
+    expect(note).toContain("Confirmed earlier, no longer satisfied")
+    expect(note).toContain("2 - Dominance Test is >50%")
+    expect(note).not.toContain("Ticked by the user")
+    expect(note).not.toContain("No reason was given")
+    // Only the user's Yes is left on the page.
+    expect((await pdfText(bytes, 1)).filter((d) => d.text === "X")).toHaveLength(1)
   })
 
   test("with more plants than the first page holds, the cover note follows the Continued page", async () => {

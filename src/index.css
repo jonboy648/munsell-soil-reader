@@ -112,3 +112,91 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* The reading surface stays neutral and opaque: colored glass would bias comparison.
+ * ReUI's 21st.dev Stepper supplies progress; the workspace gives it room on a desktop.
+ */
+.reader-workspace {
+  width: 100%;
+  max-width: 74rem;
+}
+
+.reader-header {
+  margin-inline: 1rem;
+  box-shadow: inset 0 -1px var(--border);
+}
+
+.reader-layout {
+  display: grid;
+  gap: 1.5rem;
+  padding: 1.25rem 1rem calc(15rem + env(safe-area-inset-bottom));
+  align-content: start;
+}
+
+.reader-tools {
+  align-self: start;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--card);
+}
+
+.reader-tool-section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+}
+
+.reader-tool-section + .reader-tool-section {
+  border-top: 1px solid var(--border);
+}
+
+.reader-tools section[aria-label="Example Photos"] ul {
+  max-height: 18rem;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  padding: 2px;
+}
+
+.reader-footer {
+  align-self: start;
+}
+
+.reader-dock {
+  max-width: 72rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 1rem 1rem 0 0;
+  box-shadow: 0 -6px 24px rgb(0 0 0 / 0.08);
+}
+
+/* Keep the active Photo near the top of a phone, including while the browser zooms.
+ * The full introduction remains on the empty reader and on larger screens.
+ */
+@media (max-width: 63.999rem) {
+  .reader-with-photo .reader-title { min-height: 4.5rem; padding-block: 0.25rem; }
+  .reader-with-photo .reader-title h1 { font-size: 1rem; line-height: 1.5rem; }
+  .reader-with-photo .reader-title-description { display: none; }
+  .reader-with-photo .reader-nav-wrap { padding-top: 0.25rem; }
+  .reader-with-photo nav[aria-label="App pages"] { padding-bottom: 0; }
+  .reader-with-photo .reader-layout { padding-top: 0.25rem; }
+  .reader-with-photo .reader-progress { margin-bottom: 0.25rem; }
+  .reader-with-photo .reader-step { gap: 0.5rem; padding: 0.25rem 0.5rem; }
+  .reader-with-photo .reader-step-description { display: none; }
+}
+
+@media (min-width: 64rem) {
+  .reader-layout {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-areas: "photo tools" "footer tools";
+    column-gap: 2rem;
+    row-gap: 1rem;
+  }
+
+  .reader-photo { grid-area: photo; }
+  .reader-tools { grid-area: tools; }
+  .reader-footer { grid-area: footer; }
+  .reader-empty-photo { min-height: 24rem; }
+}

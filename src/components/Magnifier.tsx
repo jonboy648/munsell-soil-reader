@@ -33,7 +33,7 @@ function lensLayout(client: XY) {
   let top: number
   if (y - GAP - LENS >= MARGIN) {
     left = within(x - LENS / 2, size, width)
-    top = y - GAP - LENS
+    top = within(y - GAP - LENS, size, height)
   } else {
     // No room above. Beside it, shrinking the lens rather than letting it back over the finger.
     const toRight = width - x >= x

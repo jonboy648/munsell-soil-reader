@@ -8,6 +8,7 @@ import { ExamplePicker } from "@/components/ExamplePicker"
 import { InstallHint } from "@/components/InstallHint"
 import { LogPanel } from "@/components/LogPanel"
 import { MethodPage } from "@/components/method/MethodPage"
+import { ProjectGuide, ProjectNavigation } from "@/components/ProjectGuide"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
 import { SpotsPanel } from "@/components/SpotsPanel"
@@ -116,18 +117,29 @@ export function App() {
   }
 
   if (page === "method") return <MethodPage />
+  if (page === "guide") return <ProjectGuide />
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-xl flex-col">
-      <header className="relative px-4 pt-[env(safe-area-inset-top)]">
-        <h1 className="py-3 font-heading text-xl font-extrabold tracking-tight [font-stretch:110%]">
+    <div className="reader-workspace mx-auto flex min-h-svh flex-col">
+      <header className="reader-header relative pt-[env(safe-area-inset-top)]">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 py-5">
+        <div>
+        <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
+        <p className="mt-1 text-sm text-muted-foreground">Photo readings and field records</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Photos stay on this device</p>
+        </div>
         <UpdateNotice hasPhoto={session.photo !== null} status={serviceWorker} />
       </header>
+      <div className="px-4 pt-3">
+        <ProjectNavigation page="reader" />
+      </div>
 
-      <main className="flex flex-1 flex-col gap-4 pb-44">
-        <div className="px-4">
+      <main className="reader-layout flex-1">
+        <section className="reader-photo min-w-0" aria-label="Photo workspace">
+        <div className="mb-4">
           <StepIndicator
             step={step}
             cornersTapped={session.corners.length}
@@ -150,8 +162,12 @@ export function App() {
           frame={frameDrawing}
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Keep the Card and soil in the same light. Use the neutral surround to compare colors.</p>
+        </section>
 
-        <div className="grid gap-3 px-4">
+        <aside className="reader-tools min-w-0" aria-label="Reading setup and field records">
+          <section className="reader-tool-section" aria-label="Reading setup">
+          <h2 className="font-heading text-lg font-bold">{session.photo ? "Set up this reading" : "Start with a photo"}</h2>
           {problem && (
             <p role="alert" className="rounded-md border-2 border-foreground p-3 text-sm font-medium">
               {problem}
@@ -178,12 +194,17 @@ export function App() {
           ) : (
             <p className="text-base">Take or choose a Photo with the Card beside the soil.</p>
           )}
+          </section>
+          <div className="reader-tool-section">
           <LogPanel result={result} card={cardOf(session)} spots={session.spots} />
+          </div>
+          <div className="reader-tool-section">
           <ExamplePicker activeId={session.photo?.exampleId} onPick={pickExample} />
-        </div>
+          </div>
+        </aside>
 
         {/* At the bottom of the page, where a thumb reaches it. */}
-        <footer className="grid justify-items-start px-2">
+        <footer className="reader-footer flex flex-wrap items-center gap-1">
           <InstallHint />
           <a
             href={hrefOf("method")}
@@ -197,7 +218,7 @@ export function App() {
         </footer>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 mx-auto max-w-xl">
+      <div className="reader-dock fixed inset-x-0 bottom-0 z-10 mx-auto">
         <ReadingsPanel result={result} card={cardInfo} onAssign={setAssigning} />
         <AssignSheet index={assigning} result={result} card={cardOf(session)} onClose={() => setAssigning(null)} />
         <BottomBar

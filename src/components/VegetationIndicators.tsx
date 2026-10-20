@@ -177,7 +177,7 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
   const answer = vegetation.present
   const { problem, write } = useWrite()
   const nameOf = (id: string) => vegetation.plants.find((p) => p.id === id)?.name ?? id
-  const coverOf = (id: string) => vegetation.plants.find((p) => p.id === id)?.cover ?? 0
+  const coverOf = (id: string) => result.dominance.dominants.find((p) => p.id === id)?.cover ?? 0
   const choose = (id: VegIndicatorId, choice: IndicatorChoice | null) =>
     onChange((v) => {
       const { [id]: _gone, ...rest } = v.indicators ?? {}

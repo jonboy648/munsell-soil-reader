@@ -12,7 +12,7 @@ import { regionOf } from "../regions"
 import type { VegColumn } from "../regions/types"
 import { vegetationOf, type Project, type SamplingPoint } from "../model"
 import { printable, wrap, written } from "../text"
-import { writtenIndex } from "./dominance"
+import { writtenCover, writtenIndex } from "./dominance"
 import { isUnlisted } from "./entry"
 import { hydrophyticVegetation, VEG_INDICATORS, type HydrophyticVegetation, type VegContext, type VegIndicatorId } from "./hydrophytic"
 import { STATUSES, type Status } from "./status"
@@ -73,7 +73,7 @@ export function vegetationFields(
 ): { fields: Record<VegFieldId, string>; warnings: VegWarning[]; analysis: HydrophyticVegetation } {
   const vegetation = vegetationOf(point)
   const analysis = hydrophyticVegetation(vegetation, context)
-  const dominant = new Set(analysis.dominance.dominants.map((d) => d.id))
+  const dominant = new Set(analysis.dominance.dominants.flatMap((d) => d.entryIds))
   const warnings: VegWarning[] = []
   // Text the user typed, made printable; one warning for the page if any of it had to change.
   let changed = false
@@ -92,11 +92,11 @@ export function vegetationFields(
     const plants = vegetation.plants.filter((p) => p.stratum === stratum)
     const capacity = strataCapacity(project, stratum)
     fields[`veg.${stratum}.plotSize`] = clean(vegetation.plotSizes[stratum] ?? (plants.length > 0 ? SUGGESTED_PLOT[stratum] : ""))
-    fields[`veg.${stratum}.total`] = plants.length > 0 ? written(plants.reduce((sum, p) => sum + p.cover, 0)) : ""
+    fields[`veg.${stratum}.total`] = plants.length > 0 ? writtenCover(plants.reduce((sum, p) => sum + p.cover, 0)) : ""
     for (let row = 0; row < capacity; row++) {
       const plant = plants[row]
       fields[vegFieldId(stratum, row, "name")] = plant ? clean(plant.name) : ""
-      fields[vegFieldId(stratum, row, "cover")] = plant ? written(plant.cover) : ""
+      fields[vegFieldId(stratum, row, "cover")] = plant ? writtenCover(plant.cover) : ""
       // A plant with no status to use was not part of the test: its box is left blank, not marked No.
       fields[vegFieldId(stratum, row, "dominant")] = plant && plant.status !== null ? (dominant.has(plant.id) ? "Yes" : "No") : ""
       fields[vegFieldId(stratum, row, "status")] = plant ? (plant.status ?? plant.listed) : ""
@@ -133,11 +133,11 @@ export function vegetationFields(
   const any = prevalence.a > 0
   for (const status of STATUSES) {
     const row = prevalence.rows.find((r) => r.status === status)!
-    fields[`veg.prevalence.${status}.cover`] = any ? written(row.cover) : ""
-    fields[`veg.prevalence.${status}.product`] = any ? written(row.product) : ""
+    fields[`veg.prevalence.${status}.cover`] = any ? writtenCover(row.cover) : ""
+    fields[`veg.prevalence.${status}.product`] = any ? writtenCover(row.product) : ""
   }
-  fields["veg.prevalence.total.a"] = any ? written(prevalence.a) : ""
-  fields["veg.prevalence.total.b"] = any ? written(prevalence.b) : ""
+  fields["veg.prevalence.total.a"] = any ? writtenCover(prevalence.a) : ""
+  fields["veg.prevalence.total.b"] = any ? writtenCover(prevalence.b) : ""
   fields["veg.prevalence.index"] = prevalence.index !== null ? writtenIndex(prevalence.index, prevalence.passes === true) : ""
   if (vegetation.plants.length > 0 && !prevalence.valid) {
     warnings.push({

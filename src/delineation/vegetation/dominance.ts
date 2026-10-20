@@ -20,6 +20,31 @@ export const STRATUM_MINIMUM = 5
 const milli = (cover: number): number => Math.round(cover * 1000)
 const sum = (plants: readonly PlantEntry[]): number => plants.reduce((total, p) => total + milli(p.cover), 0)
 
+/** A cover or weighted cover as printed, preserving the calculation's thousandths. */
+export const writtenCover = (cover: number): string => String(milli(cover) / 1000)
+
+type SpeciesEntry = PlantEntry & { entryIds: string[] }
+
+/** One identified species per stratum, including duplicate rows already saved in the Log. */
+function speciesEntries(plants: readonly PlantEntry[]): SpeciesEntry[] {
+  const species = new Map<string, SpeciesEntry>()
+  for (const plant of plants) {
+    // An unidentified or genus-only row need not describe the same species as another such row.
+    const identity = plant.identified === "species"
+      ? `species:${plant.name.trim().replace(/\s+/g, " ").toLowerCase()}`
+      : `entry:${plant.id}`
+    const key = `${plant.stratum}:${identity}`
+    const existing = species.get(key)
+    if (existing) {
+      existing.cover = (milli(existing.cover) + milli(plant.cover)) / 1000
+      existing.entryIds.push(plant.id)
+    } else {
+      species.set(key, { ...plant, cover: milli(plant.cover) / 1000, entryIds: [plant.id] })
+    }
+  }
+  return [...species.values()]
+}
+
 export interface StratumResult {
   stratum: Stratum
   /** Total cover of the plants the tests can use. */
@@ -31,7 +56,7 @@ export interface StratumResult {
   used: boolean
   /** Why it does not, in words. Empty when it does. */
   note: string
-  /** The ids of its dominant plants, most abundant first. */
+  /** The representative row ids of its dominant species, most abundant first. */
   dominants: string[]
 }
 
@@ -39,7 +64,7 @@ export interface DominanceResult {
   /** The strata that have a plant the tests can use, in the form's order. */
   strata: StratumResult[]
   /** Every dominant, by stratum, in the form's order: a species dominant in two strata is in twice (p. 25). */
-  dominants: { id: string; stratum: Stratum }[]
+  dominants: { id: string; stratum: Stratum; cover: number; entryIds: string[] }[]
   /** A: dominants rated OBL, FACW or FAC. */
   a: number
   /** B: dominants across all strata. */
@@ -79,7 +104,7 @@ function dominantsOf(plants: readonly PlantEntry[]): PlantEntry[] {
  * recorded as, and the caller says it must be identified (p. 26).
  */
 export function dominanceTest(plants: readonly PlantEntry[]): DominanceResult {
-  const usable = plants.filter((p) => p.status !== null)
+  const usable = speciesEntries(plants.filter((p) => p.status !== null))
   const present = STRATA.filter((stratum) => usable.some((p) => p.stratum === stratum))
   const strata = present.map((stratum): StratumResult => {
     const here = usable.filter((p) => p.stratum === stratum)
@@ -95,7 +120,10 @@ export function dominanceTest(plants: readonly PlantEntry[]): DominanceResult {
       dominants: used ? dominantsOf(here).map((p) => p.id) : [],
     }
   })
-  const dominants = strata.flatMap((s) => s.dominants.map((id) => ({ id, stratum: s.stratum })))
+  const dominants = strata.flatMap((s) => s.dominants.map((id) => {
+    const species = usable.find((p) => p.id === id)!
+    return { id, stratum: s.stratum, cover: species.cover, entryIds: species.entryIds }
+  }))
   const statusOf = (id: string) => plants.find((p) => p.id === id)!.status
   const a = dominants.filter((d) => WETLAND_STATUSES.includes(statusOf(d.id)!)).length
   const b = dominants.length

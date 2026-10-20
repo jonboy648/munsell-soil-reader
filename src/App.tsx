@@ -92,10 +92,11 @@ export function App() {
   const cardInfo: CardInfo =
     cardKind === "frame" && !noCard ? { kind: "frame" } : cardKind === "page" && hue ? { kind: "page", hue } : { kind: "colorchecker" }
 
-  // A new Photo is picked from controls below it; bring the Photo back into view.
+  // Photo and Card controls can be below the canvas on a phone. Return to the Photo
+  // after a selection so the next corner tap lands on the visible canvas.
   React.useEffect(() => {
     if (session.photo) window.scrollTo({ top: 0 })
-  }, [session.photo])
+  }, [session.photo, cardKind, hue])
 
   const pickExample = (example: ExamplePhoto) => {
     setProblem(null)
@@ -120,26 +121,26 @@ export function App() {
   if (page === "guide") return <ProjectGuide />
 
   return (
-    <div className="reader-workspace mx-auto flex min-h-svh flex-col">
+    <div className={`reader-workspace mx-auto flex min-h-svh flex-col${session.photo ? " reader-with-photo" : ""}`}>
       <header className="reader-header relative pt-[env(safe-area-inset-top)]">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 py-5">
+        <div className="reader-title flex flex-wrap items-end justify-between gap-x-6 gap-y-2 py-5">
         <div>
         <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl [font-stretch:110%]">
           Munsell Soil Reader
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">Photo readings and field records</p>
+        <p className="reader-title-description mt-1 text-sm text-muted-foreground">Photo readings and field records</p>
         </div>
-        <p className="text-xs text-muted-foreground">Photos stay on this device</p>
+        <p className="reader-title-description text-xs text-muted-foreground">Photos stay on this device</p>
         </div>
         <UpdateNotice hasPhoto={session.photo !== null} status={serviceWorker} />
       </header>
-      <div className="px-4 pt-3">
+      <div className={`reader-nav-wrap px-4 pt-3${session.photo ? " hidden lg:block" : ""}`}>
         <ProjectNavigation page="reader" />
       </div>
 
       <main className="reader-layout flex-1">
         <section className="reader-photo min-w-0" aria-label="Photo workspace">
-        <div className="mb-4">
+        <div className="reader-progress mb-4">
           <StepIndicator
             step={step}
             cornersTapped={session.corners.length}
@@ -163,6 +164,11 @@ export function App() {
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Keep the Card and soil in the same light. Use the neutral surround to compare colors.</p>
+        {session.photo && (
+          <div className="reader-nav-wrap mt-3 lg:hidden">
+            <ProjectNavigation page="reader" />
+          </div>
+        )}
         </section>
 
         <aside className="reader-tools min-w-0" aria-label="Reading setup and field records">

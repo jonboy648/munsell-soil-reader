@@ -51,7 +51,7 @@ export function StepIndicator({ step, cornersTapped, cornerCount, cardKind, fram
           completed={s.done}
           role="listitem"
           aria-current={s.active ? "step" : undefined}
-          className="min-w-0 justify-start gap-3 rounded-xl border border-border bg-card p-3 data-[state=active]:border-foreground/60 data-[state=active]:bg-accent"
+          className="reader-step min-w-0 justify-start gap-3 rounded-xl border border-border bg-card p-3 data-[state=active]:border-foreground/60 data-[state=active]:bg-accent"
         >
           <StepperIndicator className="size-8 font-mono font-semibold">{i + 1}</StepperIndicator>
           <div className="min-w-0">
@@ -59,7 +59,7 @@ export function StepIndicator({ step, cornersTapped, cornerCount, cardKind, fram
               <span className={cn("font-semibold", !s.active && !s.done && "text-muted-foreground")}>{s.label}</span>
               {s.detail && <span className="font-mono text-xs">{s.detail}</span>}
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">{s.description}</p>
+            <p className="reader-step-description mt-0.5 text-xs text-muted-foreground">{s.description}</p>
           </div>
         </StepperItem>
       ))}

@@ -172,6 +172,21 @@
   box-shadow: 0 -6px 24px rgb(0 0 0 / 0.08);
 }
 
+/* Keep the active Photo near the top of a phone, including while the browser zooms.
+ * The full introduction remains on the empty reader and on larger screens.
+ */
+@media (max-width: 63.999rem) {
+  .reader-with-photo .reader-title { min-height: 4.5rem; padding-block: 0.25rem; }
+  .reader-with-photo .reader-title h1 { font-size: 1rem; line-height: 1.5rem; }
+  .reader-with-photo .reader-title-description { display: none; }
+  .reader-with-photo .reader-nav-wrap { padding-top: 0.25rem; }
+  .reader-with-photo nav[aria-label="App pages"] { padding-bottom: 0; }
+  .reader-with-photo .reader-layout { padding-top: 0.25rem; }
+  .reader-with-photo .reader-progress { margin-bottom: 0.25rem; }
+  .reader-with-photo .reader-step { gap: 0.5rem; padding: 0.25rem 0.5rem; }
+  .reader-with-photo .reader-step-description { display: none; }
+}
+
 @media (min-width: 64rem) {
   .reader-layout {
     grid-template-columns: minmax(0, 1fr) 22rem;

@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ChevronLeft } from "lucide-react"
 import { Confirm } from "@/components/Confirm"
+import { DeterminationPanel } from "@/components/DeterminationPanel"
 import { FormExport, slug } from "@/components/FormExport"
 import { HydrologyForm } from "@/components/HydrologyForm"
 import { IndicatorsPanel } from "@/components/IndicatorsPanel"
@@ -15,6 +16,7 @@ import { VegetationIndicators } from "@/components/VegetationIndicators"
 import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
+import { confirmConclusion, type Answer, type ConclusionId } from "@/delineation/determination"
 import { pairOf, topToBottom, withPoint, withVegetation, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
 import type { Vegetation } from "@/delineation/vegetation/entry"
 
@@ -121,9 +123,9 @@ export function PointView({ project, point, change, onBack }: Props) {
         return { ...pt, indicators: choice ? { ...rest, [id]: choice } : rest }
       }),
     )
-  const onHydric = (answer: "yes" | "no" | null) =>
+  const onAnswer = (id: ConclusionId, answer: Answer | null, remark = "") =>
     change(project.id, (p) =>
-      withPoint(p, point.id, ({ hydricSoilPresent: _gone, ...pt }) => (answer ? { ...pt, hydricSoilPresent: answer } : pt)),
+      withPoint(p, point.id, (pt) => confirmConclusion(pt, formFor(p, pt).determination, id, answer, remark)),
     )
 
   return (
@@ -181,17 +183,19 @@ export function PointView({ project, point, change, onBack }: Props) {
 
       <RestrictiveForm key={`restrictive-${point.id}`} project={project} point={point} change={change} />
 
-      <IndicatorsPanel project={project} point={point} form={form} onChoose={onChoose} onHydric={onHydric} />
+      <IndicatorsPanel project={project} point={point} form={form} onChoose={onChoose} onHydric={(answer) => onAnswer("soil", answer)} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Soil page, ENG Form 6116-8</h4>
       <PagePreview page="soil" project={project} point={point} form={form} />
 
-      <HydrologyForm key={`hydrology-${point.id}`} project={project} point={point} change={change} />
+      <HydrologyForm key={`hydrology-${point.id}`} project={project} point={point} change={change} onAnswer={(answer) => onAnswer("hydrology", answer)} />
       <PagePreview page="page1" project={project} point={point} form={form} />
 
       <VegetationEntry key={`vegetation-${point.id}`} project={project} point={point} onChange={changeVegetation} />
-      <VegetationIndicators key={`vegetation-indicators-${point.id}`} point={point} form={form} onChange={changeVegetation} />
+      <VegetationIndicators key={`vegetation-indicators-${point.id}`} point={point} form={form} onChange={changeVegetation} onAnswer={(answer) => onAnswer("vegetation", answer)} />
       <VegetationPreview project={project} point={point} form={form} />
+
+      <DeterminationPanel key={`determination-${point.id}`} determination={form.determination} onAnswer={onAnswer} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">This sampling point's form</h4>
       <p className="text-sm text-muted-foreground">Page 1, the Vegetation page, the Soil page and the Privacy Act page in one file.</p>

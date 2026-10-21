@@ -4,6 +4,7 @@
 // prevalence index was applied where the supplement's order would not apply it.
 import type { PDFDocument } from "pdf-lib"
 import type { Form } from "./formFor"
+import { CONCLUSIONS } from "./determination"
 import type { Project, SamplingPoint } from "./model"
 import { indicatorLabel } from "./rules/suggest"
 import { printable, wrap } from "./text"
@@ -22,6 +23,27 @@ export interface NoteSection {
   heading: string
   intro: string
   items: NoteItem[]
+}
+
+/** Pending conclusions, retained decisions needing review, and complete human explanations. */
+export async function addDeterminationCoverNote(doc: PDFDocument, project: Project, point: SamplingPoint, form: Form) {
+  const { pending, conclusions, remarks } = form.determination
+  const review = CONCLUSIONS.map((id) => conclusions[id]).filter((c) => c.review)
+  const sections: NoteSection[] = []
+  if (pending.length) sections.push({
+    heading: "Unconfirmed conclusions by page",
+    intro: "These conclusions remain blank on the form. Suggestions are not confirmations; missing observations are not No.",
+    items: pending.map((c) => ({ title: `${c.page}: ${c.question}`, lines: [c.because] })),
+  })
+  if (review.length) sections.push({
+    heading: "Retained human confirmations to review", intro: "The stored answers have not been changed by the app.",
+    items: review.map((c) => ({ title: `${c.page}: ${c.question}`, lines: [c.review, c.because] })),
+  })
+  if (remarks.length) sections.push({
+    heading: "Summary Remarks", intro: "The complete explanations, including any text continuing beyond the page 1 Remarks box.",
+    items: [{ title: form.fields["page1.summaryRemarks"], lines: [] }],
+  })
+  if (sections.length) await addCoverNote(doc, "Cover note: wetland determination", `${project.name}, sampling point ${point.name}.`, sections)
 }
 
 /**

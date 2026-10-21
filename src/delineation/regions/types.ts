@@ -320,7 +320,9 @@ export interface Page1 {
   /** The header's lines: the ones that take text and the short blanks that take a letter. */
   fields: Record<Page1Field, Rule>
   /** The Summary of Findings' Remarks box: its text's left and right edges and the baseline of its first line. */
-  summaryRemarks: { left: number; right: number; baseline: number }
+  summaryRemarks: { left: number; right: number; baseline: number; baselines: readonly number[] }
+  /** Summary Yes/No blanks, measured from the official page's drawing. */
+  summary: Record<"vegetation" | "soil" | "hydrology" | "wetland", { yes: TickBlank; no: TickBlank }>
   hydrology: HydrologyPage
 }
 

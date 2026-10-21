@@ -158,6 +158,15 @@ function ManualTick({ project, form, onChoose }: Pick<Props, "project" | "form" 
 }
 
 export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Props) {
+  const [problem, setProblem] = React.useState("")
+  const answerWith = async (answer: "yes" | "no" | null) => {
+    try {
+      await onHydric(answer)
+      setProblem("")
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : "The Log could not be written. Try again.")
+    }
+  }
   const region = regionOf(project.region)
   const sub = project.subregion
   const subregion = sub ? `LRR ${sub.lrr}${sub.mlra && sub.mlra !== "other" ? `, MLRA ${sub.mlra}` : ""}` : null
@@ -206,7 +215,7 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
             className="h-11 flex-1 text-base"
             variant={point.hydricSoilPresent === "yes" ? "default" : "outline"}
             aria-pressed={point.hydricSoilPresent === "yes"}
-            onClick={() => void onHydric(point.hydricSoilPresent === "yes" ? null : "yes")}
+            onClick={() => void answerWith(point.hydricSoilPresent === "yes" ? null : "yes")}
           >
             Yes
           </Button>
@@ -214,7 +223,7 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
             className="h-11 flex-1 text-base"
             variant={point.hydricSoilPresent === "no" ? "default" : "outline"}
             aria-pressed={point.hydricSoilPresent === "no"}
-            onClick={() => void onHydric(point.hydricSoilPresent === "no" ? null : "no")}
+            onClick={() => void answerWith(point.hydricSoilPresent === "no" ? null : "no")}
           >
             No
           </Button>
@@ -222,6 +231,8 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
         <p className="text-xs text-muted-foreground">
           {point.hydricSoilPresent ? `Confirmed: ${point.hydricSoilPresent === "yes" ? "Yes" : "No"}, printed on the Soil page.` : "Your answer prints on the Soil page only once you confirm it."}
         </p>
+        <a href="#determination" className="text-sm underline">Explain or override in Summary of findings</a>
+        {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
       </div>
     </section>
   )

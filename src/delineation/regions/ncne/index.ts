@@ -67,7 +67,15 @@ export const NCNE: Region = {
       problematicHydrology: { left: 216.7, right: 238.9, rule: 220.3 },
     },
     // The Summary of Findings' Remarks box: where its first line of writing starts, under its label.
-    summaryRemarks: { left: 40, right: 571.4, baseline: 311 },
+    summaryRemarks: { left: 40, right: 571.4, baseline: 311, baselines: [311, 321.5, 332, 342.5, 353, 363.5] },
+    // pdfjs text and filled rules from page1.pdf: summary labels at 259.30, 271.67,
+    // 284.03; rules 2.42 points below. Remarks box ends at 375.84.
+    summary: {
+      vegetation: { yes: { column: [216.72, 238.92], rule: 261.72 }, no: { column: [257.76, 279.96], rule: 261.72 } },
+      soil: { yes: { column: [216.72, 238.92], rule: 274.08 }, no: { column: [257.76, 279.96], rule: 274.08 } },
+      hydrology: { yes: { column: [216.72, 238.92], rule: 286.44 }, no: { column: [257.76, 279.96], rule: 286.44 } },
+      wetland: { yes: { column: [443.52, 465.72], rule: 274.08 }, no: { column: [489.36, 511.56], rule: 274.08 } },
+    },
     hydrology: {
       ticks: {
         ...column(["A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B7", "B8"], TICK_LEFT, 431.76),

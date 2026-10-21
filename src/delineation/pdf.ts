@@ -1,7 +1,7 @@
 // A page of the form as a PDF: the official page with each value drawn at its measured position, in
 // the form's own text size. Runs on the device; nothing is uploaded. The drawing list is the same one
 // the on-screen preview uses. Also the forms of a whole Project as one PDF.
-import { addSoilCoverNote, addVegetationCoverNote } from "./coverNote"
+import { addDeterminationCoverNote, addSoilCoverNote, addVegetationCoverNote } from "./coverNote"
 import { formFor, type Form } from "./formFor"
 import type { Project, SamplingPoint } from "./model"
 import { page1Placements } from "./page1"
@@ -41,7 +41,7 @@ export const soilPagePdf = (blank: ArrayBuffer | Uint8Array, project: Project, p
 
 /** `blank` is the official one-page PDF of the region's page 1. */
 export const page1Pdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>
-  drawPage(blank, page1Placements(project, form), title("Page 1", project, point))
+  drawPage(blank, page1Placements(project, form), title("Page 1", project, point), (doc) => addDeterminationCoverNote(doc, project, point, form))
 
 /** The official one-page PDFs of the pages a form is made of. */
 export interface Blanks {
@@ -86,6 +86,7 @@ export async function formsPdf(blanks: Blanks, project: Project, points: readonl
     await addSoilCoverNote(doc, project, point, form)
     if (veg.continued) addPage(continued, veg.continued)
     await addVegetationCoverNote(doc, project, point, form)
+    await addDeterminationCoverNote(doc, project, point, form)
   }
   addPage(privacy, [])
   doc.setTitle(`Wetland Determination Data Form: ${project.name}${points.length === 1 ? `, ${points[0].name}` : ""}`)

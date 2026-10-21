@@ -16,6 +16,7 @@ interface Props {
   point: SamplingPoint
   /** Rejects when the Log could not be written. */
   change: (projectId: string, change: (project: Project) => Project) => Promise<unknown>
+  onAnswer: (answer: "yes" | "no" | null) => Promise<unknown>
 }
 
 const OBSERVATION_LABELS: Record<Observation, string> = {
@@ -42,7 +43,16 @@ function IndicatorRow({ indicator, ticked, onTick }: { indicator: HydrologyIndic
   )
 }
 
-export function HydrologyForm({ project, point, change }: Props) {
+export function HydrologyForm({ project, point, change, onAnswer }: Props) {
+  const [answerProblem, setAnswerProblem] = React.useState("")
+  const answerWith = async (answer: "yes" | "no" | null) => {
+    try {
+      await onAnswer(answer)
+      setAnswerProblem("")
+    } catch (error) {
+      setAnswerProblem(error instanceof Error ? error.message : "The Log could not be written. Try again.")
+    }
+  }
   const region = regionOf(project.region)
   // What the delineator sees changes at once; the Log is written behind it. A change from another tab
   // is taken up when nothing of ours is waiting to be written.
@@ -75,6 +85,7 @@ export function HydrologyForm({ project, point, change }: Props) {
   const primary = region.hydrology.indicators.filter((i) => i.kind === "primary")
   const secondary = region.hydrology.indicators.filter((i) => i.kind === "secondary")
   const suggestion = suggestWetlandHydrology(region, h.ticked)
+  const hasRuleIndicator = region.hydrology.indicators.some((i) => h.ticked.includes(i.id))
 
   return (
     <section aria-label="Hydrology" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -156,7 +167,7 @@ export function HydrologyForm({ project, point, change }: Props) {
       <div className="grid gap-3 rounded-lg border-2 border-foreground p-3">
         <h5 className="font-heading text-base font-bold">Wetland Hydrology Present?</h5>
         <p data-testid="hydrology-suggestion" className="min-w-0 text-sm [overflow-wrap:anywhere]">
-          Suggested. {suggestion.text} <span className="text-muted-foreground">({suggestion.citation})</span>
+          {hasRuleIndicator ? <>Suggested. {suggestion.text} <span className="text-muted-foreground">({suggestion.citation})</span></> : "No rule-based hydrology indicator is recorded. No automatic suggestion; unknown is not No. Other requires human judgment."}
         </p>
         <ToggleGroup
           type="single"
@@ -165,7 +176,7 @@ export function HydrologyForm({ project, point, change }: Props) {
           className="w-full"
           aria-label="Wetland Hydrology Present?"
           value={h.present === null ? "" : h.present ? "yes" : "no"}
-          onValueChange={(value) => void update((x) => ({ ...x, present: value === "" ? null : value === "yes" }))}
+          onValueChange={(value) => void answerWith(value === "" ? null : value === "yes" ? "yes" : "no")}
         >
           <ToggleGroupItem value="yes" className={YES_NO}>Yes</ToggleGroupItem>
           <ToggleGroupItem value="no" className={YES_NO}>No</ToggleGroupItem>
@@ -174,9 +185,9 @@ export function HydrologyForm({ project, point, change }: Props) {
           <p role="status" className="text-sm font-medium">Confirmed: {h.present ? "Yes" : "No"}, printed on the form.</p>
         ) : (
           <>
-            <Button className="h-12 text-base" onClick={() => void update((x) => ({ ...x, present: suggestion.answer }))}>
+            {hasRuleIndicator && <Button className="h-12 text-base" onClick={() => void answerWith(suggestion.answer ? "yes" : "no")}>
               Confirm {suggestion.answer ? "Yes" : "No"}
-            </Button>
+            </Button>}
             <p className="text-sm text-muted-foreground">
               {h.present === null
                 ? "Until you answer, neither Yes nor No is printed."
@@ -184,6 +195,8 @@ export function HydrologyForm({ project, point, change }: Props) {
             </p>
           </>
         )}
+        <a href="#determination" className="text-sm underline">Explain or override in Summary of findings</a>
+        {answerProblem && <p role="alert" className="text-sm font-medium">{answerProblem}</p>}
       </div>
     </section>
   )

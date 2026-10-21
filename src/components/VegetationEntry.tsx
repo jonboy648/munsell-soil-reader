@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { vegetationOf, type Project, type SamplingPoint } from "@/delineation/model"
-import { coverProblem, plantEntryOf, type PlantEntry, type Vegetation } from "@/delineation/vegetation/entry"
+import { coverProblem, isUnlisted, plantEntryOf, plantNote, type PlantEntry, type Vegetation } from "@/delineation/vegetation/entry"
 import { loadPlantList } from "@/delineation/vegetation/loadPlantList"
 import { pickPlant, resolvePlant, type Plant, type PlantList, type Resolution } from "@/delineation/vegetation/plantList"
 import { STRATA, STRATUM_DEFINITION, STRATUM_LABEL, SUGGESTED_PLOT, type Stratum } from "@/delineation/vegetation/strata"
@@ -111,17 +111,35 @@ function DraftField({ stored, onWrite, render }: { stored: string; onWrite: (val
   })
 }
 
-/** One plant's row: its name, status, cover and why. */
-function PlantRow({ plant, onDelete }: { plant: PlantEntry; onDelete: () => Promise<unknown> }) {
+/**
+ * One plant's row: its name, status, cover and why. A plant not on the list can be marked not identified,
+ * which leaves it out of the prevalence index.
+ */
+function PlantRow({ plant, onDelete, onIdentified }: { plant: PlantEntry; onDelete: () => Promise<unknown>; onIdentified: (identified: boolean) => Promise<unknown> }) {
+  const note = plantNote(plant)
+  const notIdentified = plant.identified === "none"
   return (
     <li data-testid="plant" className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-border p-2">
-      <div className="min-w-0 text-sm">
+      <div className="grid min-w-0 gap-1 text-sm">
         <p className="[overflow-wrap:anywhere]">
           <b className="font-semibold">{plant.name}</b>{" "}
           <span className="font-mono">{plant.status ?? plant.listed}</span>{" "}
           <span className="font-mono">{written(plant.cover)}%</span>
         </p>
-        {plant.note && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{plant.note}</p>}
+        {note && <p data-testid="plant-note" className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{note}</p>}
+        {isUnlisted(plant) && (
+          <button
+            type="button"
+            aria-pressed={notIdentified}
+            onClick={() => void onIdentified(notIdentified)}
+            className={cn(
+              "min-h-11 justify-self-start rounded-lg border px-3 text-sm font-medium",
+              notIdentified ? "border-foreground bg-foreground text-background" : "border-border bg-card text-foreground",
+            )}
+          >
+            Not identified
+          </button>
+        )}
       </div>
       <Button variant="outline" size="icon-lg" className="size-11" aria-label={`Remove ${plant.name}`} onClick={() => void onDelete()}>
         <X />
@@ -211,7 +229,19 @@ export function VegetationEntry({ project, point, onChange }: Props) {
             ) : (
               <ul className="grid gap-1.5">
                 {plants.map((plant) => (
-                  <PlantRow key={plant.id} plant={plant} onDelete={() => guard(() => onChange((v) => ({ ...v, plants: v.plants.filter((p) => p.id !== plant.id) })))} />
+                  <PlantRow
+                    key={plant.id}
+                    plant={plant}
+                    onDelete={() => guard(() => onChange((v) => ({ ...v, plants: v.plants.filter((p) => p.id !== plant.id) })))}
+                    onIdentified={(identified) =>
+                      guard(() =>
+                        onChange((v) => ({
+                          ...v,
+                          plants: v.plants.map((p) => (p.id === plant.id ? { ...p, unlisted: true, identified: identified ? "species" : "none" } : p)),
+                        })),
+                      )
+                    }
+                  />
                 ))}
               </ul>
             )}

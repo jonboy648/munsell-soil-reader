@@ -11,6 +11,7 @@ import { PagePreview } from "@/components/PagePreview"
 import { PointDetails, type PointDetailsChange } from "@/components/PointDetails"
 import { RestrictiveForm } from "@/components/RestrictiveForm"
 import { VegetationEntry } from "@/components/VegetationEntry"
+import { VegetationIndicators } from "@/components/VegetationIndicators"
 import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
@@ -189,6 +190,7 @@ export function PointView({ project, point, change, onBack }: Props) {
       <PagePreview page="page1" project={project} point={point} form={form} />
 
       <VegetationEntry key={`vegetation-${point.id}`} project={project} point={point} onChange={changeVegetation} />
+      <VegetationIndicators key={`vegetation-indicators-${point.id}`} point={point} form={form} onChange={changeVegetation} />
       <VegetationPreview project={project} point={point} form={form} />
 
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">This sampling point's form</h4>

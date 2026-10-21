@@ -105,15 +105,36 @@ describe("a project's PDF", () => {
     }))
     const planted: Project = { ...project, points: [withVegetation(project.points[1], (v) => ({ ...v, plants: herbs }))] }
     const pages = await allPages(await formsPdf(blanks, planted, planted.points))
-    // Page 1, the Vegetation page, the Soil page, the Continued page, the Privacy Act page (JF-2 has no layers, so no cover note).
-    expect(pages).toHaveLength(5)
+    // Page 1, the Vegetation page, the Soil page, the Continued page, the vegetation cover note (the dominance test
+    // is satisfied and not confirmed), the Privacy Act page. JF-2 has no layers, so there is no Soil cover note.
+    expect(pages).toHaveLength(6)
     expect(pages[1]).toContain("Carex plant0")
     expect(pages[1]).toContain("Carex plant11") // the 12th, the last row of the Vegetation page
     expect(pages[1]).not.toContain("Carex plant12")
     expect(pages[3]).toContain("Carex plant12") // the Continued page, its first rows
     expect(pages[3]).toContain("Carex plant13")
     expect(pages[3].join(" ")).toContain("Continued")
-    expect(pages[4].join(" ")).toContain("PRIVACY ACT STATEMENT")
+    expect(pages[4].join(" ")).toContain("Cover note: hydrophytic vegetation")
+    expect(pages[5].join(" ")).toContain("PRIVACY ACT STATEMENT")
+  })
+
+  test("with the vegetation indicators confirmed there is no vegetation cover note", async () => {
+    const herbs = Array.from({ length: 14 }, (_, i) => ({
+      id: `h${i}`,
+      stratum: "herb" as const,
+      typed: `Carex ${i}`,
+      name: `Carex plant${i}`,
+      status: "FAC" as const,
+      listed: "FAC",
+      note: "",
+      identified: "species" as const,
+      symbol: "",
+      cover: i + 1,
+    }))
+    const confirmed: Project = { ...project, points: [withVegetation(project.points[1], (v) => ({ ...v, plants: herbs, indicators: { dominance: { state: "confirmed" } } }))] }
+    const pages = await allPages(await formsPdf(blanks, confirmed, confirmed.points))
+    expect(pages).toHaveLength(5)
+    expect(pages.flat().join(" ")).not.toContain("Cover note: hydrophytic vegetation")
   })
 
   test("draws each header value at the place it was given, on the official page", async () => {

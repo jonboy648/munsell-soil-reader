@@ -187,7 +187,7 @@ export type Resolution =
   | { kind: "candidates"; candidates: Plant[] }
   /** Not on the list, but it reads as a scientific name of a genus the list knows: UPL, identified. */
   | { kind: "unlisted"; name: string; note: string }
-  /** Not found at all: UPL, and not identified, since the app cannot tell what it is. */
+  /** Not found at all: UPL, and identified, as a plant the user named; one entered as unknown ("Unknown forb") is not identified (entry.ts). */
   | { kind: "unknown"; name: string; note: string }
 
 const MAX_CANDIDATES = 8
@@ -283,13 +283,13 @@ export function resolvePlant(list: PlantList, typed: string): Resolution {
     if (near.length > 0) return { kind: "candidates", candidates: near.slice(0, MAX_CANDIDATES).map((m) => m.plant) }
   }
 
-  // Not found. A scientific name of a genus the list knows is taken as identified.
+  // Not found. A scientific name of a genus the list knows says so; either way it is a plant not on the list.
   if (sci && /^[A-Z]/.test(text) && list.genera.has(sci.split(" ")[0])) {
     return { kind: "unlisted", name: text, note: "Not on the plant list. Recorded as UPL, as the supplement directs for a plant that is not listed (pp. 22-23). Check the spelling." }
   }
   return {
     kind: "unknown",
     name: text,
-    note: "Not found on the plant list. Recorded as UPL, as the supplement directs for a plant that is not listed (pp. 22-23), and as not identified. Type its scientific name if you know it.",
+    note: "Not found on the plant list. Counted as UPL, as the supplement directs for a plant that is not listed (pp. 22-23). Check the spelling, or mark it not identified if you could not identify it.",
   }
 }

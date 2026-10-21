@@ -86,7 +86,7 @@ test("an ambiguous name shows candidates, and picking one is what is added", asy
   await expect(herb(sheet).getByTestId("plant")).toContainText("Echinochloa muricata OBL 5%")
 })
 
-test("a plant that is not on the list is recorded as UPL with a note, and warned about", async ({ page }) => {
+test("a plant that is not on the list is counted as UPL with a note, and can be marked not identified", async ({ page }) => {
   await page.goto("/")
   const sheet = await createPoint(page, "Pond", "VP-1")
   await sheet.getByLabel("Plant name").fill("Stiff greenthread")
@@ -94,9 +94,19 @@ test("a plant that is not on the list is recorded as UPL with a note, and warned
   await expect(resolution(sheet)).toContainText("Not found on the plant list")
   await sheet.getByLabel("Cover %").fill("1")
   await sheet.getByRole("button", { name: "Add plant" }).click()
-  await expect(herb(sheet).getByTestId("plant")).toContainText("Stiff greenthread UPL 1%")
-  await expect(herb(sheet).getByTestId("plant")).toContainText("pp. 22-23")
-  await expect(sheet.getByTestId("form-warnings")).toContainText("Stiff greenthread: not found on the plant list")
+  const row = herb(sheet).getByTestId("plant")
+  await expect(row).toContainText("Stiff greenthread UPL 1%")
+  await expect(row.getByTestId("plant-note")).toHaveText("Not on the plant list: counted as UPL (supplement pp. 22-23).")
+  await expect(sheet.getByTestId("form-warnings")).toContainText("Stiff greenthread: not on the plant list, so it is counted as UPL")
+  await expect(sheet.locator('[data-field="veg.prevalence.UPL.cover"]')).toHaveText("1")
+
+  const notIdentified = row.getByRole("button", { name: "Not identified" })
+  await expect(notIdentified).toHaveAttribute("aria-pressed", "false")
+  await notIdentified.click()
+  await expect(notIdentified).toHaveAttribute("aria-pressed", "true")
+  await expect(row.getByTestId("plant-note")).toContainText("Not identified: left out of the prevalence index")
+  await expect(sheet.getByTestId("form-warnings")).toContainText("Stiff greenthread: not identified")
+  await expect(sheet.locator('[data-field="veg.prevalence.UPL.cover"]')).toHaveCount(0)
 })
 
 test("a cover that is not a percent is said so in plain words, and a plant can be removed", async ({ page }) => {

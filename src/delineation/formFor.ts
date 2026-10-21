@@ -22,10 +22,11 @@ import {
   type ProfileColumn,
   type SoilPage,
 } from "./regions/types"
-import { hydrologyFor } from "./hydrology"
+import { hydrologyFor, suggestWetlandHydrology } from "./hydrology"
 import { fit, printable, truncate, widthOf, wrap, written } from "./text"
 import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
 import { indicatorLabel, suggest, type Suggestions } from "./rules/suggest"
+import type { HydrophyticVegetation, VegIndicator } from "./vegetation/hydrophytic"
 import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
 type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
@@ -91,6 +92,23 @@ export interface HydricSoil {
   cover: CoverNote
 }
 
+/** The cover note's part for the Vegetation page: what is not on the page, and why. */
+export interface VegetationCover {
+  /** Indicators the app found satisfied that the user has not confirmed: they print blank. */
+  unconfirmed: VegIndicator[]
+  /** Indicators the user ticked on their own observation (morphological adaptations, problematic vegetation), with their remarks. */
+  ticked: VegIndicator[]
+  /** Indicators 1 to 3 the user confirmed that the plants, or the soil and hydrology, no longer satisfy: they print blank. */
+  stale: VegIndicator[]
+  /** Why the prevalence index was applied where the supplement's order would not apply it. Empty when it was not, or when the order applies it anyway. */
+  prevalenceReason: string
+}
+
+/** What the Vegetation page's worksheets and indicators say for one sampling point. */
+export interface VegetationForm extends HydrophyticVegetation {
+  cover: VegetationCover
+}
+
 export interface Form {
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
@@ -100,6 +118,8 @@ export interface Form {
   conclusions: readonly Conclusion[]
   /** The hydric soil indicators of the Soil page: what the layers satisfy, and what the user decided. */
   hydric: HydricSoil
+  /** The Vegetation page's dominance test, prevalence index and hydrophytic vegetation indicators. */
+  vegetation: VegetationForm
   warnings: FormWarning[]
 }
 
@@ -273,7 +293,15 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     warnings.push({ kind: "too-many-rows", text: "A layer has more redox colors than the form has rows. The rest are left off the page." })
   }
 
-  const vegetation = vegetationFields(project, point, name.text)
+  // Whether the sampling point has the hydric soil and wetland hydrology indicators that the prevalence index assumes.
+  // Only the hydric soil list counts: the problematic-soil indicators (A10, S3 and the rest, and "Other") are for
+  // where hydrophytic vegetation is already shown (supplement p. 68, p. 132 step 1), so they cannot open the gate.
+  // They are offered to the user as a reason for applying the index anyway.
+  const soilConfirmed = region.indicators.filter((i) => point.indicators?.[i.id]?.state === "confirmed")
+  const hydricSoil = soilConfirmed.some((i) => i.list === "hydric")
+  const problematicSoil = soilConfirmed.filter((i) => i.list === "problematic" && i.id !== "other").map(indicatorLabel)
+  const hydrologyMet = suggestWetlandHydrology(region, point.hydrology?.ticked ?? []).answer
+  const vegetation = vegetationFields(project, point, name.text, { hydricSoil, hydrology: hydrologyMet, problematicSoil })
   const restrictive = point.restrictive
   const restrictiveType = printable(restrictive?.type ?? "")
   if (restrictiveType.replaced) {
@@ -330,6 +358,15 @@ export function formFor(project: Project, point: SamplingPoint): Form {
       : [],
     conclusions: typeof present === "boolean" ? [{ id: "hydrology.present", answer: present }] : [],
     hydric,
+    vegetation: {
+      ...vegetation.analysis,
+      cover: {
+        unconfirmed: vegetation.analysis.indicators.filter((i) => i.state === "satisfied" && i.decision === "pending"),
+        ticked: vegetation.analysis.indicators.filter((i) => i.ticked && i.state === "yours"),
+        stale: vegetation.analysis.indicators.filter((i) => i.stale),
+        prevalenceReason: vegetation.analysis.overridden ? (point.vegetation?.prevalenceReason ?? "").trim() : "",
+      },
+    },
     warnings,
   }
 }

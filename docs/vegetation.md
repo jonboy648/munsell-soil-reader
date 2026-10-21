@@ -57,11 +57,13 @@ resolves by itself; the user always sees what a name came to before it is added.
 5. A near miss (`fal panicgrass`): candidates, never a guess.
 
 A name that finds nothing is not on the list. The supplement says to assume UPL for a plant that is not
-listed (pp. 22-23), so it is recorded as UPL with a note. If it reads as a scientific name of a genus the
-list knows it counts as identified; otherwise (a common name the list does not have, like *stiff
-greenthread*) it is recorded as typed, as UPL, and as **not identified**, since the supplement leaves
-unidentified plants out of the prevalence index (p. 28) and the app cannot tell what it is. #34 reads
-`identified` on each plant.
+listed (pp. 22-23), so it is recorded as typed, as UPL, with `unlisted` set and a note. A plant the user
+named is identified, whether the name is a binomial the list lacks (*Zea mays*, *Thelesperma filifolium*:
+row crops are not on the list) or a common name it does not have (*stiff greenthread*): the supplement counts
+species "not listed and assumed to be UPL" in the prevalence index and its 80 percent (pp. 27-28). Its row
+has a **Not identified** button that leaves it out instead, as the supplement leaves out species that were
+not identified (p. 28); a name such as "Unknown forb", "Unid. sedge" or one with a "?" starts out not
+identified. #34 reads `identified` on each plant.
 
 ## The status a plant gets (`statusFor`)
 
@@ -82,7 +84,7 @@ in the Northcentral Great Lakes, FACU elsewhere) are not applied: the project ha
 Rows are counted over the whole stratum. The Vegetation page has 7 tree, 7 sapling/shrub, 12 herb and 4
 woody vine rows; the Continued page has the same rows again, numbered on (tree 8-14, herb 13-24, woody vine
 5-8). Plants beyond both are warned about and left off: they go on a separate sheet. Each plant is a row:
-scientific name, cover, the Dominant Species? column (blank: #34 fills it), status. A stratum with plants has
+scientific name, cover, the Dominant Species? column (Yes or No, from the dominance test below), status. A stratum with plants has
 its plot size (the supplement's suggestion, 30 ft radius for trees, 15 ft for sapling/shrub, 5 ft for herbs,
 30 ft for woody vines, unless the user writes another) and its total cover, which the Continued page repeats
 as the official automated data sheet does. The Remarks box takes the vegetation remarks, wrapped to the box.
@@ -93,3 +95,51 @@ that are longer than the Remarks box are cut at its last line, with a warning.
 
 Where each value sits was measured from the official PDF's own drawing (`regions/ncne/index.ts`).
 `vegetationLayout.test.ts` checks every rule a value sits on against the PDF, so a mistyped number shows up.
+
+## The dominance test, the prevalence index and the indicators
+
+The arithmetic is `vegetation/dominance.ts` (pure) and the indicators' order and wording are
+`vegetation/hydrophytic.ts`. The rules are the supplement's, ERDC/EL TR-12-1 (2012): the 50/20 rule pp. 25-26,
+the Dominance Test p. 25, the Prevalence Index pp. 27-29, the order of the tests p. 24, strata under 5 percent
+p. 18. The supplement's worked example (Tables 3 and 4: 5 dominants, 80 percent, A = 164, B = 451, 2.75) is a
+test. Covers are compared in whole thousandths, so floating point never decides a threshold.
+
+- A stratum with plants has a total, a 50 percent line and a 20 percent line. Plants are ranked by cover and
+  taken until the running total is more than half of the total (exactly half is not enough; every plant tied
+  with the one that crosses the line is taken), then any plant that is at least a fifth of the total is added.
+- A stratum under 5 percent is not used, unless it is the only stratum with a plant. If there are several and
+  every one is under 5 percent, none is used and the test cannot be told ("unless it is the only stratum
+  present", read literally).
+- A is the dominants rated OBL, FACW or FAC, B all dominants, across strata, a species dominant in two strata
+  counted in each. More than 50 percent passes: exactly half fails.
+- The prevalence index uses every stratum, whatever its cover. 3.0 or less passes, decided exactly (B ≤ 3A); the
+  index is written to two decimals, or more when that would round an index over 3.0 down to "3.00" (3.004). At least 80 percent of all
+  cover must be identified and rated, or the index is not valid and is left blank.
+- A plant with no status to use (`status` null) is left out of the stratum total, the ranking and the index, and
+  its Dominant box stays blank. A dominant that is not identified to species is kept in the ranking and in B (a
+  plant marked not identified counts as UPL, as recorded) and warned about: dropping it could let the test pass.
+- A named plant that is not on the list counts as UPL in the prevalence index and in the 80 percent. A plant
+  marked not identified is left out of the index and its cover counts against the 80 percent.
+- **Decided by Jon, 2026-10-18: count genus-only plants when all species share a status.** A plant identified
+  to its genus only (`identified: "genus"`: Sonchus spp., every NCNE species FACU) is counted in the prevalence
+  index and in the 80 percent. The supplement says not to include "species that were not identified" (p. 28)
+  and does not say whether a genus is enough. The switch, kept here in case it is ever reversed, is one filter
+  in `prevalenceIndex()`: `counted` is `p.status !== null && p.identified !== "none"`, and
+  `identified === "species"` would leave genus-only plants out. JF-1 (Sow thistle, 2 percent) reads A 85,
+  B 217, 2.55 as it is, and A 83, B 209, 2.52 with the switch; the dominance test is the same either way.
+- The prevalence index is applied only when the dominance test fails and an indicator of the hydric soil list is
+  confirmed (the problematic-soil list, A10, S3 and the rest and "Other", does not count: the supplement uses
+  those where hydrophytic vegetation is already shown, p. 68 and p. 132 step 1; a confirmed one is offered as a
+  reason the user can give for applying the index anyway) and the hydrology ticks meet the rule (one primary or two secondary),
+  or when the user applies it with a reason, which goes on the cover note.
+- The Rapid Test is computed from the dominants (the supplement calls it a visual assessment). Morphological
+  adaptations and Problematic Hydrophytic Vegetation are the user's tick with a reason: the app does not
+  recalculate the tests with a FACU species counted as FAC. Like the prevalence index, morphological adaptations
+  assume hydric soil and wetland hydrology (pp. 24, 30): without them, or the user's reason for applying the index
+  anyway, the tick is printed but does not count towards the suggested Yes, and the card says why. The app suggests Yes when an indicator is satisfied
+  and never suggests No. Indicator ticks and the Yes or No print only when confirmed; what is not confirmed, the
+  user's own ticks and the reason for applying the index go on a cover note after the page.
+- A confirmed Rapid Test, Dominance Test or Prevalence Index is ticked only while it is still satisfied. When the
+  plants, or the soil and hydrology that applied the index, change so that it is not, its box prints blank, its
+  card says "Confirmed earlier, no longer satisfied" with Undo, and the cover note lists it under that heading.
+  The user's Yes or No for Hydrophytic Vegetation Present? is theirs and is not changed.

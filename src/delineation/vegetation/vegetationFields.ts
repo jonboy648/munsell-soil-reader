@@ -92,7 +92,7 @@ export function vegetationFields(
     const plants = vegetation.plants.filter((p) => p.stratum === stratum)
     const capacity = strataCapacity(project, stratum)
     fields[`veg.${stratum}.plotSize`] = clean(vegetation.plotSizes[stratum] ?? (plants.length > 0 ? SUGGESTED_PLOT[stratum] : ""))
-    fields[`veg.${stratum}.total`] = plants.length > 0 ? writtenCover(plants.reduce((sum, p) => sum + p.cover, 0)) : ""
+    fields[`veg.${stratum}.total`] = plants.length > 0 ? writtenCover(plants.reduce((sum, p) => sum + Math.round(p.cover * 1000), 0) / 1000) : ""
     for (let row = 0; row < capacity; row++) {
       const plant = plants[row]
       fields[vegFieldId(stratum, row, "name")] = plant ? clean(plant.name) : ""

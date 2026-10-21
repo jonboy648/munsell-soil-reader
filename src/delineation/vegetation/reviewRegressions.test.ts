@@ -83,6 +83,23 @@ const precisionPoint = () => pointWith([
   plant("cirsium", "Cirsium arvense", "FACU", 0.001),
 ])
 
+test.each([
+  [10.0006, 20.0006, "30.002"],
+  [10.0004, 20.0004, "30"],
+  [0.0006, 0.0006, "0.002"],
+  [10.001, 20.002, "30.003"],
+])("stratum total uses the printed row precision for %s and %s", (first, second, total) => {
+  const form = formFor(JF1_PROJECT, pointWith([
+    plant("first", "Species one", "FAC", first),
+    plant("second", "Species two", "FAC", second),
+  ]))
+  expect(form.fields["veg.herb.total"]).toBe(total)
+  const printedRows = Number(form.fields["veg.herb.0.cover"]) + Number(form.fields["veg.herb.1.cover"])
+  expect(Number(form.fields["veg.herb.total"])).toBeCloseTo(printedRows, 10)
+  expect(form.vegetation.dominance.strata.find((stratum) => stratum.stratum === "herb")?.total).toBe(Number(total))
+  expect(form.fields["veg.prevalence.total.a"]).toBe(total)
+})
+
 test("the worksheet preserves the operands behind an index just over three", () => {
   const form = formFor(JF1_PROJECT, precisionPoint())
   expect(form.fields).toMatchObject({

@@ -234,9 +234,10 @@ export function VegetationIndicators({ point, form, onChange, onAnswer }: Props)
         <p className="text-xs text-muted-foreground">
           {answer ? `Confirmed: ${answer === "yes" ? "Yes" : "No"}, printed on the Vegetation page.` : "Your answer prints on the Vegetation page only once you confirm it."}
         </p>
-        <a href="#determination" className="text-sm underline">Explain or override in Summary of findings</a>
+      <DeterminationLink />
         {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
       </div>
     </section>
   )
 }
+import { DeterminationLink } from "@/components/DeterminationPanel"

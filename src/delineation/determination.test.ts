@@ -168,3 +168,59 @@ test("an old explanation is not attached to a different parameter answer", () =>
   const changed: SamplingPoint = { ...point, hydricSoilPresent: "yes" }
   expect(summary(changed).conclusions.soil.remark).toBe("")
 })
+
+test.each([
+  ["neither prerequisite", false, false],
+  ["only hydric soil", true, false],
+  ["only hydrology", false, true],
+] as const)("confirmed morphology with %s cannot borrow an unconfirmed passing dominance test", (_label, soil, hydrology) => {
+  const point: SamplingPoint = {
+    ...fixture,
+    indicators: soil ? fixture.indicators : {},
+    hydrology: hydrology ? fixture.hydrology : undefined,
+    vegetation: { ...fixture.vegetation!, indicators: { morphological: { state: "confirmed", remark: "Synthetic morphology observation" } } },
+  }
+  const form = formFor(project, point)
+  expect(form.vegetation.indicators.find((i) => i.id === "dominance")).toMatchObject({ state: "satisfied", decision: "pending", ticked: false })
+  expect(form.vegetation.indicators.find((i) => i.id === "morphological")?.ticked).toBe(true)
+  expect(form.vegetation.conclusion.suggested).toBe("yes") // aggregate evidence includes the unticked dominance test
+  expect(form.determination.conclusions.vegetation.suggested).toBeNull()
+})
+
+test.each(["prerequisites", "explicit override"] as const)("confirmed morphology with %s supports its own suggestion", (basis) => {
+  const point: SamplingPoint = {
+    ...fixture,
+    indicators: basis === "prerequisites" ? fixture.indicators : {},
+    hydrology: basis === "prerequisites" ? fixture.hydrology : undefined,
+    vegetation: {
+      ...fixture.vegetation!,
+      indicators: { morphological: { state: "confirmed", remark: "Synthetic morphology observation" } },
+      ...(basis === "explicit override" ? { prevalenceReason: "Synthetic explicit application for this test" } : {}),
+    },
+  }
+  const conclusion = summary(point).conclusions.vegetation
+  expect(conclusion.suggested).toBe("yes")
+  expect(conclusion.because).toContain("Morphological Adaptations")
+  expect(conclusion.because).not.toContain("Dominance Test")
+})
+
+test("the confirmation basis records the region and subregion used to apply the rules", () => {
+  const p: Project = { ...project, subregion: { lrr: "R", mlra: "144A" } }
+  const point = confirm(answered("yes", "yes", "yes"), "wetland", "yes", "", p)
+  expect(JSON.parse(point.determination!.basis)).toMatchObject({ region: "NCNE", subregion: { lrr: "R", mlra: "144A" } })
+})
+
+test.each([
+  { lrr: "M" },
+  { lrr: "R", mlra: "145" },
+])("changing rule applicability to %j flags review without changing the user's decision", (subregion) => {
+  const original: Project = { ...project, subregion: { lrr: "R", mlra: "144A" } }
+  const point = confirm(answered("yes", "yes", "yes"), "wetland", "yes", "", original)
+  const saved = JSON.stringify(point)
+  expect(summary(point, original).conclusions.wetland.review).toBe("")
+  const changed = formFor({ ...original, subregion }, point)
+  expect(changed.determination.conclusions.wetland.review).toContain("changed after confirmation")
+  expect(changed.determination.conclusions.wetland.confirmed).toBe("yes")
+  expect(changed.fields["page1.summary.wetland.yes"]).toBe("X")
+  expect(JSON.stringify(point)).toBe(saved)
+})

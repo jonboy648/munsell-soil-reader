@@ -41,7 +41,7 @@ export async function addDeterminationCoverNote(doc: PDFDocument, project: Proje
   })
   if (remarks.length) sections.push({
     heading: "Summary Remarks", intro: "The complete explanations, including any text continuing beyond the page 1 Remarks box.",
-    items: [{ title: form.fields["page1.summaryRemarks"], lines: [] }],
+    items: [{ title: "User remarks", lines: [form.fields["page1.summaryRemarks"]] }],
   })
   if (sections.length) await addCoverNote(doc, "Cover note: wetland determination", `${project.name}, sampling point ${point.name}.`, sections)
 }
@@ -106,8 +106,8 @@ function soilNote(form: Form): NoteSection[] {
 }
 
 /** Add the Soil page's cover note to `doc`, when something on the Soil page is not ticked. */
-export async function addSoilCoverNote(doc: PDFDocument, project: Project, point: SamplingPoint, form: Form) {
-  const sections = soilNote(form)
+export async function addSoilCoverNote(doc: PDFDocument, project: Project, point: SamplingPoint, form: Form, includeConclusion = false) {
+  const sections = [...soilNote(form), ...(includeConclusion ? pendingParameterNote(form, "soil") : [])]
   if (sections.length === 0) return
   await addCoverNote(
     doc,
@@ -162,8 +162,8 @@ function vegetationNote(form: Form): NoteSection[] {
 
 
 /** Add the Vegetation page's cover note to `doc`, when something on the Vegetation page is not ticked or was applied by the user's choice. */
-export async function addVegetationCoverNote(doc: PDFDocument, project: Project, point: SamplingPoint, form: Form) {
-  const sections = vegetationNote(form)
+export async function addVegetationCoverNote(doc: PDFDocument, project: Project, point: SamplingPoint, form: Form, includeConclusion = false) {
+  const sections = [...vegetationNote(form), ...(includeConclusion ? pendingParameterNote(form, "vegetation") : [])]
   if (sections.length === 0) return
   await addCoverNote(
     doc,
@@ -171,4 +171,15 @@ export async function addVegetationCoverNote(doc: PDFDocument, project: Project,
     `${project.name}, sampling point ${point.name}. This page goes with the Vegetation page of the Wetland Determination Data Form. It lists what is not ticked there, and why.`,
     sections,
   )
+}
+
+/** Standalone sheets need their own pending answer warning; full forms have the summary note. */
+function pendingParameterNote(form: Form, parameter: "soil" | "vegetation"): NoteSection[] {
+  const conclusion = form.determination.conclusions[parameter]
+  if (conclusion.confirmed !== null) return []
+  return [{
+    heading: "Unconfirmed parameter conclusion",
+    intro: "This page's parameter answer has not been confirmed and remains blank.",
+    items: [{ title: conclusion.question, lines: [conclusion.because] }],
+  }]
 }

@@ -72,10 +72,23 @@ function ConclusionCard({ conclusion: c, onAnswer }: { conclusion: SummaryConclu
 /** One place to review and override the answers shared with each individual page. */
 export function DeterminationPanel({ determination, onAnswer }: Props) {
   return (
-    <section id="determination" aria-label="Summary of findings" className="grid min-w-0 gap-3">
+    <section id="determination" tabIndex={-1} aria-label="Summary of findings" className="grid min-w-0 gap-3">
       <h4 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Summary of findings, page 1</h4>
       <p className="text-sm text-muted-foreground">The parameter answers are shared with their pages. Confirm the overall wetland determination separately. Overrides and decisions without a suggestion need a remark.</p>
       {CONCLUSIONS.map((id) => <ConclusionCard key={id} conclusion={determination.conclusions[id]} onAnswer={onAnswer} />)}
     </section>
+  )
+}
+
+/** Stay inside the open point without creating a navigation/history entry. */
+export function DeterminationLink() {
+  return (
+    <button type="button" className="justify-self-start text-left text-sm underline" onClick={() => {
+      const summary = document.getElementById("determination")
+      summary?.scrollIntoView({ block: "start" })
+      summary?.focus({ preventScroll: true })
+    }}>
+      Explain or override in Summary of findings
+    </button>
   )
 }

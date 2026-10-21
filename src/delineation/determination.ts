@@ -54,6 +54,8 @@ export const answerText = (answer: Answer): string => answer === "yes" ? "Yes" :
 /** The evidence that an overall confirmation refers to, excluding that confirmation itself. */
 function basisFor(project: Project, point: SamplingPoint): string {
   return JSON.stringify({
+    region: project.region,
+    subregion: project.subregion ?? null,
     normal: project.header.normalCircumstances,
     disturbed: project.header.disturbed,
     problematic: project.header.problematic,
@@ -74,15 +76,18 @@ export function determinationFor(project: Project, point: SamplingPoint, evidenc
     soil: hydric.conclusion.confirmed ?? null,
     hydrology: typeof point.hydrology?.present === "boolean" ? (point.hydrology.present ? "yes" : "no") : null,
   }
-  const confirmedPlants = vegetation.indicators.filter((i) => i.ticked && i.id !== "problematic")
   const confirmedSoil = regionOf(project.region).indicators.filter((i) => point.indicators?.[i.id]?.state === "confirmed")
   const hasHydrologyIndicator = regionOf(project.region).hydrology.indicators.some((i) => point.hydrology?.ticked.includes(i.id))
   const hydrology = hasHydrologyIndicator ? suggestions.find((s) => s.id === "hydrology.present") : undefined
+  const morphologyApplies = vegetation.overridden ||
+    (confirmedSoil.some((i) => i.list === "hydric") && hydrology?.answer === true)
+  const confirmedPlants = vegetation.indicators.filter((i) =>
+    i.ticked && (i.state === "satisfied" || (i.id === "morphological" && morphologyApplies)))
   const parameterSuggestions: Record<Parameter, { answer: Answer | null; because: string }> = {
     vegetation: {
-      answer: confirmedPlants.length > 0 ? vegetation.conclusion.suggested : null,
+      answer: confirmedPlants.length > 0 ? "yes" : null,
       because: confirmedPlants.length > 0
-        ? `${confirmedPlants.map((i) => i.printed).join(", ")} confirmed. ${vegetation.conclusion.because}`
+        ? `${confirmedPlants.map((i) => i.printed).join(", ")} confirmed and applicable. ${confirmedPlants.map((i) => i.reason).join(" ")}`
         : `No applicable vegetation indicator is confirmed. ${vegetation.conclusion.because}`,
     },
     soil: {

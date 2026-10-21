@@ -1,15 +1,17 @@
 import { readFileSync } from "node:fs"
 import { PDFDocument } from "pdf-lib"
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 import { expect, test } from "vitest"
 import { CONCLUSIONS, PARAMETERS, confirmConclusion } from "./determination"
 import { formFor } from "./formFor"
 import { JF1_DETERMINATION_POINT as fixture, JF1_DETERMINATION_PROJECT as project } from "./fixtures/jf1Determination"
 import type { SamplingPoint } from "./model"
 import { page1Placements } from "./page1"
-import { formsPdf, page1Pdf, type Blanks } from "./pdf"
+import { formsPdf, page1Pdf, soilPagePdf, type Blanks } from "./pdf"
 import { regionOf } from "./regions"
 import { pdfRules } from "./testing/pdfRules"
 import { pdfText } from "./testing/pdfText"
+import { vegetationPdf } from "./vegetation/vegetationPdf"
 
 const read = (name: string) => readFileSync(new URL(`./regions/ncne/${name}.pdf`, import.meta.url))
 const blanks: Blanks = { page1: read("page1"), vegetation: read("vegetation-page"), soil: read("soil-page"), continued: read("vegetation-continued-page"), privacy: read("privacy-page") }
@@ -92,4 +94,41 @@ test("a retained overall confirmation still prints, with a review explanation in
   const bytes = await formsPdf(blanks, project, [point])
   expect((await pdfText(bytes)).find((t) => t.text === "X" && Math.abs(t.x - 451.285) < 0.01 && Math.abs(t.baseline - 272.58) < 0.01)).toBeDefined()
   expect(await allText(bytes)).toContain("Recorded evidence or conditions changed after confirmation")
+})
+
+test.each(["soil", "vegetation"] as const)("the standalone %s PDF reports its pending parameter after indicators are confirmed", async (parameter) => {
+  const make = (point: SamplingPoint) => parameter === "soil"
+    ? soilPagePdf(blanks.soil, project, point, formFor(project, point))
+    : vegetationPdf(blanks, project, point, formFor(project, point))
+  const bytes = await make(fixture)
+  expect((await pdfText(bytes)).filter((t) => t.text === "X")).toHaveLength(parameter === "soil" ? 1 : 2)
+  expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2)
+  const note = (await pdfText(bytes, 2)).map((t) => t.text).join(" ")
+  expect(note).toContain("Unconfirmed parameter conclusion")
+  expect(note).toContain(parameter === "soil" ? "Hydric Soil Present?" : "Hydrophytic Vegetation Present?")
+  expect(note).not.toContain("Is the Sampled Area within a Wetland?")
+  expect(note).not.toContain(parameter === "soil" ? "Hydrophytic Vegetation Present?" : "Hydric Soil Present?")
+  const answered = confirmConclusion(fixture, formFor(project, fixture).determination, parameter, "yes")
+  // Other parameters and the overall determination are still pending, but do not belong on this sheet.
+  expect((await PDFDocument.load(await make(answered))).getPageCount()).toBe(1)
+})
+
+test("long lowercase-l summary remarks stay within actual PDF cover-note bounds and remain complete", async () => {
+  const point = confirmed()
+  const remark = "l".repeat(1400)
+  const overridden = confirmConclusion(point, formFor(project, point).determination, "wetland", "no", remark)
+  const bytes = await formsPdf(blanks, project, [overridden])
+  const doc = await getDocument({ data: new Uint8Array(bytes), useSystemFonts: true, verbosity: 0 }).promise
+  const coverText: string[] = []
+  for (let pageNumber = 4; pageNumber < doc.numPages; pageNumber++) {
+    const page = await doc.getPage(pageNumber)
+    const { items } = await page.getTextContent()
+    for (const item of items) {
+      if (!("str" in item) || !item.str.trim()) continue
+      coverText.push(item.str)
+      expect(item.transform[4]).toBeGreaterThanOrEqual(54 - 0.1)
+      expect(item.transform[4] + item.width, `cover page ${pageNumber} right edge`).toBeLessThanOrEqual(558 + 0.1)
+    }
+  }
+  expect(coverText.join("").replace(/\s/g, "")).toContain(remark)
 })

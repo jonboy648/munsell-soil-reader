@@ -37,7 +37,7 @@ const title = (page: string, project: Project, point: SamplingPoint) =>
 
 /** `blank` is the official one-page PDF of the region's Soil page. A cover note follows it when something is not on it. */
 export const soilPagePdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>
-  drawPage(blank, soilPlacements(project, form), title("Soil", project, point), (doc) => addSoilCoverNote(doc, project, point, form))
+  drawPage(blank, soilPlacements(project, form), title("Soil", project, point), (doc) => addSoilCoverNote(doc, project, point, form, true))
 
 /** `blank` is the official one-page PDF of the region's page 1. */
 export const page1Pdf = (blank: ArrayBuffer | Uint8Array, project: Project, point: SamplingPoint, form: Form) =>

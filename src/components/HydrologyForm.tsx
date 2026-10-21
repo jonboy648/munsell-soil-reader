@@ -195,9 +195,10 @@ export function HydrologyForm({ project, point, change, onAnswer }: Props) {
             </p>
           </>
         )}
-        <a href="#determination" className="text-sm underline">Explain or override in Summary of findings</a>
+      <DeterminationLink />
         {answerProblem && <p role="alert" className="text-sm font-medium">{answerProblem}</p>}
       </div>
     </section>
   )
 }
+import { DeterminationLink } from "@/components/DeterminationPanel"

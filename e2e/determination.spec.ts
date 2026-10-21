@@ -229,3 +229,20 @@ test("disturbed conditions require an explicit human decision even with three co
   expectSummaryTicks(exported.pages[0], ["yes", "yes", "yes", "yes"])
   expect(exported.text).toContain("Synthetic disturbed-soil exception; acceptance test only")
 })
+
+for (const parameter of ["soil", "vegetation", "hydrology"] as const) {
+  test(`${parameter} summary shortcut focuses the summary without closing Projects or changing history`, async ({ page }) => {
+    const sheet = await openFixture(page, { ...JF1_DETERMINATION_PROJECT, points: [JF1_DETERMINATION_POINT] })
+    const source = parameter === "hydrology"
+      ? sheet.getByRole("region", { name: "Hydrology", exact: true })
+      : sheet.getByTestId(parameter === "soil" ? "hydric-present" : "veg-present")
+    const url = page.url()
+    const historyLength = await page.evaluate(() => history.length)
+    await source.getByText("Explain or override in Summary of findings", { exact: true }).click()
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByRole("heading", { name: "Sampling point JF-1", exact: true })).toBeVisible()
+    await expect(page).toHaveURL(url)
+    expect(await page.evaluate(() => history.length)).toBe(historyLength)
+    await expect(sheet.getByRole("region", { name: "Summary of findings", exact: true })).toBeFocused()
+  })
+}

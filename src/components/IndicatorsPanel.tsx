@@ -231,9 +231,10 @@ export function IndicatorsPanel({ project, point, form, onChoose, onHydric }: Pr
         <p className="text-xs text-muted-foreground">
           {point.hydricSoilPresent ? `Confirmed: ${point.hydricSoilPresent === "yes" ? "Yes" : "No"}, printed on the Soil page.` : "Your answer prints on the Soil page only once you confirm it."}
         </p>
-        <a href="#determination" className="text-sm underline">Explain or override in Summary of findings</a>
+      <DeterminationLink />
         {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
       </div>
     </section>
   )
 }
+import { DeterminationLink } from "@/components/DeterminationPanel"

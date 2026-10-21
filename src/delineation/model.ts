@@ -2,6 +2,7 @@
 // Log on the device. Depths are inches everywhere.
 import type { SavedReading } from "@/lib/log"
 import type { RegionId } from "./regions"
+import type { Answer, DeterminationChoice, Parameter } from "./determination"
 import { emptyVegetation, type Vegetation } from "./vegetation/entry"
 
 /** The form's own codes for a redox feature: Concentration, Depletion, Reduced Matrix, Masked Sand grains. */
@@ -117,6 +118,10 @@ export interface SamplingPoint {
   hydricSoilPresent?: "yes" | "no"
   /** Absent until something is recorded for the Hydrology section. */
   hydrology?: Hydrology
+  /** Human-confirmed overall determination; absent on older points and until confirmed. */
+  determination?: DeterminationChoice
+  /** Explanations for shared parameter answers. The answer prevents reusing a remark for a different answer. */
+  conclusionRemarks?: Partial<Record<Parameter, { answer: Answer; remark: string }>>
   /** The restrictive layer, if one was observed. */
   restrictive?: Restrictive
 }

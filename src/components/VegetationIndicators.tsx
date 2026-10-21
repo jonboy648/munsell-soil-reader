@@ -19,6 +19,7 @@ interface Props {
   form: Form
   /** Rejects when the Log could not be written. */
   onChange: (change: (vegetation: Vegetation) => Vegetation) => Promise<unknown>
+  onAnswer: (answer: "yes" | "no" | null) => Promise<unknown>
 }
 
 const SHORT: Record<VegIndicatorId, string> = {
@@ -45,8 +46,8 @@ function useWrite() {
     try {
       await action()
       setProblem(null)
-    } catch {
-      setProblem(WRITE_PROBLEM)
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : WRITE_PROBLEM)
     }
   }
   return { problem, write, clear: () => setProblem(null), fail: (text: string) => setProblem(text) }
@@ -171,7 +172,7 @@ function ApplyAnyway({ reason, overridden = true, offered = "", onChange }: { re
   )
 }
 
-export function VegetationIndicators({ point, form, onChange }: Props) {
+export function VegetationIndicators({ point, form, onChange, onAnswer }: Props) {
   const vegetation = vegetationOf(point)
   const result = form.vegetation
   const answer = vegetation.present
@@ -183,7 +184,7 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
       const { [id]: _gone, ...rest } = v.indicators ?? {}
       return { ...v, indicators: choice ? { ...rest, [id]: choice } : rest }
     })
-  const answerWith = (value: "yes" | "no" | null) => write(() => onChange(({ present: _gone, ...v }) => (value ? { ...v, present: value } : v)))
+  const answerWith = (value: "yes" | "no" | null) => write(() => onAnswer(value))
   // With no plants there is nothing to suggest, but a decision or an answer already stored stays in reach.
   const storedReason = (vegetation.prevalenceReason ?? "").trim()
   const stored = Object.keys(vegetation.indicators ?? {}).length > 0 || answer !== undefined || storedReason !== ""
@@ -233,8 +234,10 @@ export function VegetationIndicators({ point, form, onChange }: Props) {
         <p className="text-xs text-muted-foreground">
           {answer ? `Confirmed: ${answer === "yes" ? "Yes" : "No"}, printed on the Vegetation page.` : "Your answer prints on the Vegetation page only once you confirm it."}
         </p>
+      <DeterminationLink />
         {problem && <p role="alert" className="text-sm font-medium">{problem}</p>}
       </div>
     </section>
   )
 }
+import { DeterminationLink } from "@/components/DeterminationPanel"

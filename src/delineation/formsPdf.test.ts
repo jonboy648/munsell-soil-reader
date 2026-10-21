@@ -37,12 +37,12 @@ const pageCount = async (bytes: Uint8Array) => {
 /** The text of every page of the PDF. */
 const allPages = async (bytes: Uint8Array) =>
   Promise.all(Array.from({ length: await pageCount(bytes) }, async (_, i) => (await pdfText(bytes, i + 1)).map((d) => d.text)))
-/** How many cover note pages a point's form has: the engine's own say on whether there is anything for one. */
+/** Soil indicator covers, plus one determination cover per fixture: all have pending conclusions. */
 const covers = (p: Project, points: readonly SamplingPoint[]) =>
   points.filter((pt) => {
     const { cover } = formFor(p, pt).hydric
     return cover.unconfirmed.length > 0 || cover.ticked.length > 0
-  }).length
+  }).length + points.length
 
 describe("the official page 1 and the measured header", () => {
   test("every line of the header is a rule on the official page, where the region package says", async () => {
@@ -106,8 +106,8 @@ describe("a project's PDF", () => {
     const planted: Project = { ...project, points: [withVegetation(project.points[1], (v) => ({ ...v, plants: herbs }))] }
     const pages = await allPages(await formsPdf(blanks, planted, planted.points))
     // Page 1, the Vegetation page, the Soil page, the Continued page, the vegetation cover note (the dominance test
-    // is satisfied and not confirmed), the Privacy Act page. JF-2 has no layers, so there is no Soil cover note.
-    expect(pages).toHaveLength(6)
+    // is satisfied and not confirmed), the determination cover, the Privacy Act page. JF-2 has no layers.
+    expect(pages).toHaveLength(7)
     expect(pages[1]).toContain("Carex plant0")
     expect(pages[1]).toContain("Carex plant11") // the 12th, the last row of the Vegetation page
     expect(pages[1]).not.toContain("Carex plant12")
@@ -115,7 +115,8 @@ describe("a project's PDF", () => {
     expect(pages[3]).toContain("Carex plant13")
     expect(pages[3].join(" ")).toContain("Continued")
     expect(pages[4].join(" ")).toContain("Cover note: hydrophytic vegetation")
-    expect(pages[5].join(" ")).toContain("PRIVACY ACT STATEMENT")
+    expect(pages[5].join(" ")).toContain("Unconfirmed conclusions by page")
+    expect(pages[6].join(" ")).toContain("PRIVACY ACT STATEMENT")
   })
 
   test("with the vegetation indicators confirmed there is no vegetation cover note", async () => {
@@ -133,7 +134,7 @@ describe("a project's PDF", () => {
     }))
     const confirmed: Project = { ...project, points: [withVegetation(project.points[1], (v) => ({ ...v, plants: herbs, indicators: { dominance: { state: "confirmed" } } }))] }
     const pages = await allPages(await formsPdf(blanks, confirmed, confirmed.points))
-    expect(pages).toHaveLength(5)
+    expect(pages).toHaveLength(6)
     expect(pages.flat().join(" ")).not.toContain("Cover note: hydrophytic vegetation")
   })
 

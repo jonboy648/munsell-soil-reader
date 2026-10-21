@@ -12,6 +12,7 @@
 // confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left unconfirmed go on the
 // cover note.
 import { PROJECT_FIELDS, POINT_FIELDS, subregionText, writtenDate } from "./headerFields"
+import { CONCLUSIONS, determinationFor, type ConclusionId, type Determination } from "./determination"
 import { regionOf } from "./regions"
 import {
   PAGE1_MARK_FIELDS,
@@ -39,6 +40,7 @@ export type FieldId =
   | `soil.hydric.${"yes" | "no"}`
   | Page1Id
   | `page1.hydrology.${string}`
+  | `page1.summary.${ConclusionId}.${"yes" | "no"}`
   | VegFieldId
 
 export interface FormWarning {
@@ -53,6 +55,7 @@ export interface FormWarning {
     | "field-cut"
     | "hydrology-observation"
     | "hydrology-answer"
+    | "determination-review"
     | VegWarning["kind"]
     | "color-not-a-chip"
   /** The Layer it is about, counting from 0 down from the surface. */
@@ -110,6 +113,8 @@ export interface VegetationForm extends HydrophyticVegetation {
 }
 
 export interface Form {
+  /** Shared parameter answers and the separately confirmed overall determination. */
+  determination: Determination
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
   /** What the recorded data suggests for the Hydrology section, with the rule it used, for the user to confirm. */
@@ -351,7 +356,7 @@ export function formFor(project: Project, point: SamplingPoint): Form {
   Object.assign(fields, hydrology.fields)
   warnings.push(...hydrology.warnings, ...vegetation.warnings)
   const present = point.hydrology?.present
-  return {
+  const form: Omit<Form, "determination"> = {
     fields,
     suggestions: hydrology.suggestion
       ? [{ id: "hydrology.present", answer: hydrology.suggestion.answer, text: hydrology.suggestion.text, citation: hydrology.suggestion.citation }]
@@ -369,4 +374,20 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     },
     warnings,
   }
+  const determination = determinationFor(project, point, form)
+  for (const id of CONCLUSIONS) {
+    const { confirmed } = determination.conclusions[id]
+    fields[`page1.summary.${id}.yes`] = confirmed === "yes" ? "X" : ""
+    fields[`page1.summary.${id}.no`] = confirmed === "no" ? "X" : ""
+  }
+  const remarks = printable([fields["page1.summaryRemarks"], ...determination.remarks].filter(Boolean).join(" "))
+  fields["page1.summaryRemarks"] = remarks.text
+  if (remarks.replaced) warnings.push({ kind: "text-changed", text: "Summary remarks: some characters cannot be printed and were replaced." })
+  const box = region.page1.summaryRemarks
+  const lines = wrap(remarks.text, box.right - box.left, region.page1.fontSize)
+  if (lines.length > box.baselines.length) {
+    warnings.push({ kind: "remarks-cut", text: "Summary remarks continue on the determination cover note." })
+  }
+  if (determination.conclusions.wetland.review) warnings.push({ kind: "determination-review", text: determination.conclusions.wetland.review })
+  return { ...form, determination }
 }

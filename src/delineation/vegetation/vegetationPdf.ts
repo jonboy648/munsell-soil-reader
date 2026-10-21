@@ -32,7 +32,7 @@ export async function vegetationPdf(
     const [continued] = await doc.copyPages(await PDFDocument.load(blank.continued), [0])
     draw(doc.addPage(continued), placements.continued)
   }
-  await addVegetationCoverNote(doc, project, point, form)
+  await addVegetationCoverNote(doc, project, point, form, true)
   doc.setTitle(`Wetland Determination Data Form, Vegetation: ${project.name}, ${point.name}`)
   doc.setProducer("Munsell Soil Reader")
   doc.setCreator("Munsell Soil Reader")

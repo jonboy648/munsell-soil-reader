@@ -187,17 +187,20 @@ describe("the Vegetation PDF", () => {
     expect(placed.map((p) => p.text)).toEqual(expect.arrayContaining(["Panicum dichotomiflorum", "50", "FACW", "Phalaris arundinacea", "85", "5 ft radius", "Bare ground - 10%", "JF-1"]))
   })
 
-  test("nine plants are one page; more than a stratum's rows are two", async () => {
-    // JF-1's indicators confirmed, so no cover note follows the page (see hydrophytic.test.ts and the cover note tests).
+  test("vegetation and continued pages are followed by a note for the pending parameter", async () => {
+    // Confirmed indicators do not confirm the parameter answer.
     const confirmed = withVegetation(point, (v) => ({ ...v, indicators: { rapid: { state: "confirmed" }, dominance: { state: "confirmed" } } }))
-    expect(await pageCount(await vegetationPdf(blank, JF1_PROJECT, confirmed, formFor(JF1_PROJECT, confirmed)))).toBe(1)
+    const confirmedBytes = await vegetationPdf(blank, JF1_PROJECT, confirmed, formFor(JF1_PROJECT, confirmed))
+    expect(await pageCount(confirmedBytes)).toBe(2)
+    expect((await pdfText(confirmedBytes, 2)).map((t) => t.text).join(" ")).toContain("Hydrophytic Vegetation Present?")
     const many = withPlants(Array.from({ length: 14 }, (_, i) => plant("Carex nonexistentus", 2, "herb", `h${i}`)))
     const bytes = await vegetationPdf(blank, JF1_PROJECT, many, formFor(JF1_PROJECT, many))
-    expect(await pageCount(bytes)).toBe(2)
+    expect(await pageCount(bytes)).toBe(3)
     const second = await pdfText(bytes, 2)
     expect(second.some((d) => d.text.includes("VEGETATION Continued"))).toBe(true)
     expect(second.filter((d) => d.text === "Carex nonexistentus")).toHaveLength(2) // plants 13 and 14
     expect(second.some((d) => d.text === "28")).toBe(true) // the herb total, repeated
+    expect((await pdfText(bytes, 3)).map((t) => t.text).join(" ")).toContain("Hydrophytic Vegetation Present?")
   })
 
   test("a point with no plants is the blank page with its name on it", async () => {

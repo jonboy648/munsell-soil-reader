@@ -123,10 +123,14 @@ export function PointView({ project, point, change, onBack }: Props) {
         return { ...pt, indicators: choice ? { ...rest, [id]: choice } : rest }
       }),
     )
-  const onAnswer = (id: ConclusionId, answer: Answer | null, remark = "") =>
-    change(project.id, (p) =>
+  const onAnswer = async (id: ConclusionId, answer: Answer | null, remark = "") => {
+    // Explain invalid decisions before opening an IndexedDB transaction, whose abort would mask
+    // the validation error. Recheck against the latest point inside the atomic write as well.
+    confirmConclusion(point, form.determination, id, answer, remark)
+    return change(project.id, (p) =>
       withPoint(p, point.id, (pt) => confirmConclusion(pt, formFor(p, pt).determination, id, answer, remark)),
     )
+  }
 
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">

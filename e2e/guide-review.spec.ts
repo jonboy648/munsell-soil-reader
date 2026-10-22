@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
-const BUILD = "soil-guide-20261021-v2"
+const BUILD = "soil-guide-20261022-v3"
 const ANSWERS = [
   {
     tab: "Workflow",
@@ -52,6 +52,44 @@ async function expectPhoneFit(page: Page): Promise<void> {
       - document.documentElement.clientWidth,
   )).toBeLessThanOrEqual(1)
 }
+
+test("live determination status separates synthetic acceptance from field validation and older captures", async ({ page }) => {
+  await openGuide(page)
+  const guide = page.getByTestId("project-guide")
+  const progress = guide.getByRole("region", { name: "What's ready. What's not.", exact: true })
+  const group = (name: string) => progress.getByRole("article")
+    .filter({ has: page.getByRole("heading", { name, exact: true }) })
+  const live = group("Available live")
+  await expect(live.getByRole("link", { name: "Complete determination", exact: true }))
+    .toHaveAttribute("href", "https://github.com/jonboy648/munsell-soil-reader/pull/85")
+  await expect(live).toContainText("Explicit human confirmation of vegetation, soil and hydrology answers and the overall wetland summary")
+  await expect(live).toContainText("printed consistently in the NCNE PDF")
+  await expect(live).toContainText("Pending answers stay blank and are listed in cover notes")
+  await expect(group("Still being built").getByRole("link", { name: "Complete determination", exact: true })).toHaveCount(0)
+  for (const [status, links] of [
+    ["Awaiting release", ["pull/75"]],
+    ["Still being built", ["pull/68", "issues/40", "issues/44", "issues/43"]],
+    ["Needs field validation", ["issues/16", "issues/45", "issues/50"]],
+  ] as const) {
+    for (const link of links) {
+      await expect(group(status).locator(`a[href="https://github.com/jonboy648/munsell-soil-reader/${link}"]`)).toBeVisible()
+    }
+  }
+  await expect(progress.locator("time")).toHaveAttribute("datetime", "2026-10-22")
+  await expect(progress.locator("time")).toHaveText("October 22, 2026")
+  await expect(guide.getByText(`Guide build: ${BUILD} / screen-capture source: 1eb9292`, { exact: true })).toBeVisible()
+  const example = guide.getByRole("region", { name: "Follow JF-1 through the paperwork.", exact: true })
+  await expect(example).toContainText("end-to-end software acceptance uses synthetic inputs, including simulated hydrology")
+  await expect(example).toContainText("not real-field conditions, calibration or a regulatory conclusion")
+  await expect(example.getByRole("link", { name: "issue #45", exact: true }))
+    .toHaveAttribute("href", "https://github.com/jonboy648/munsell-soil-reader/issues/45")
+  const workflow = guide.getByRole("region", { name: "One record, from the field to the form.", exact: true })
+  await expect(workflow.locator("figcaption")).toContainText("App capture from source 1eb9292, October 20, 2026")
+  await expect(workflow.locator("figcaption")).toContainText("has not been recaptured")
+  await workflow.getByRole("button", { name: "Confirm indicators", exact: true }).click()
+  await expect(workflow).toContainText("Parameter answers and the overall wetland summary require explicit human confirmation")
+  await expect(workflow).not.toContainText("complete combined wetland determination is unfinished")
+})
 
 test("answers and comments persist, but approval must be chosen again after reload", async ({ page }) => {
   const review = await openGuide(page)
@@ -110,7 +148,7 @@ test("download contains the complete review and copying is explicitly not sendin
   const response = await review.getByRole("textbox", { name: "Your complete review", exact: true }).inputValue()
   expect(response).toContain(`Build: ${BUILD}`)
   expect(response).toContain("Screen-capture source: 1eb9292 (capture provenance; guide build above identifies this review)")
-  expect(response).toContain("Guide snapshot: 2026-10-21")
+  expect(response).toContain("Guide snapshot: 2026-10-22")
   expect(response).toContain(`Page: ${page.url()}`)
   expect(new URL(page.url()).hash).toBe("#guide")
   expect(response).toContain("Reviewer: Guide test reviewer")

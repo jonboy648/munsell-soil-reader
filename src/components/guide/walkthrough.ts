@@ -1,5 +1,5 @@
-export const GUIDE_DATE = "2026-10-21"
-export const GUIDE_BUILD = "soil-guide-20261021-v2"
+export const GUIDE_DATE = "2026-10-22"
+export const GUIDE_BUILD = "soil-guide-20261022-v3"
 export const APP_SOURCE = "1eb9292"
 
 export const WORKFLOW = [
@@ -9,7 +9,7 @@ export const WORKFLOW = [
   { title: "Soil layers", heading: "Put each Reading where it belongs.", image: "layers", input: "Enter depths in inches, matrix and redox percentages, texture, redox details and remarks. Assign photo Readings, or type a book color.", app: "Lists layers from the surface down, fills profile fields and flags recorded-data problems. Supported soil indicators have rules and evidence to review.", form: "Depths, matrix and redox colors, percentages, texture and remarks fill the profile description.", boundary: "The photo supplies color. It does not measure depth, determine texture or invent redox observations.", alt: "Actual JF-1 layer cards with depths, matrix colors, redox colors and edit controls." },
   { title: "Vegetation", heading: "Record cover. Let the worksheet do the arithmetic.", image: "vegetation", input: "Enter plant names and absolute percent cover in each stratum. Choose from candidates when a name is ambiguous.", app: "Looks up regional plant statuses. Computes dominants, the Dominance Test and Prevalence Index.", form: "Names, statuses and cover fill the Vegetation page. The worksheets use those same entries.", boundary: "Calculations support the recorded observations; a suggestion still needs your confirmation.", alt: "Actual JF-1 vegetation screen with recorded plants and cover percentages." },
   { title: "Hydrology", heading: "Record what the water evidence actually shows.", image: "hydrology", input: "Record primary and secondary indicators, water depths and field notes from what you observed.", app: "Applies the supported one-primary-or-two-secondary rule and keeps your observations beside the other evidence.", form: "Hydrology indicators, depths and notes fill the Hydrology section of page 1.", boundary: "A soil photo cannot establish hydrology. Missing observations stay missing until recorded.", alt: "Actual hydrology entry screen without invented water observations." },
-  { title: "Confirm indicators", heading: "Read the reason before ticking the box.", image: "indicators", input: "Compare suggestions with the field evidence. Confirm or reject them; add a reason for your own observation or an override.", app: "Explains the rule and evidence. An old vegetation confirmation stops printing if the recorded data no longer satisfies it.", form: "Only confirmed ticks and answers print. Cover notes explain pending suggestions and applicable user reasons.", boundary: "Suggestions are not regulatory decisions. The complete combined wetland determination is unfinished.", alt: "Actual indicator cards with citations, Confirm and Reject controls and the prevalence explanation." },
+  { title: "Confirm indicators", heading: "Read the reason before ticking the box.", image: "indicators", input: "Compare suggestions with the field evidence. Confirm or reject indicators, then explicitly confirm the three parameter answers and overall wetland summary. Add a remark for an override.", app: "Explains the rule and evidence. An old vegetation confirmation stops printing if the recorded data no longer satisfies it.", form: "Only confirmed ticks and answers print in the NCNE PDF, including the three parameters and overall summary. Cover notes explain pending answers and applicable user reasons.", boundary: "Suggestions are not regulatory decisions. Parameter answers and the overall wetland summary require explicit human confirmation; pending answers stay blank and are listed in cover notes.", alt: "Actual indicator cards with citations, Confirm and Reject controls and the prevalence explanation." },
   { title: "Preview & export", heading: "Check the official page, then take it with you.", image: "form", input: "Compare the preview with your observations and correct the record before exporting.", app: "Draws official NCNE pages from the same field values used by the preview. Produces point or project PDFs on the device.", form: "Download or share the PDF. Color-reading CSV is separate; the official Excel workbook is still planned.", boundary: "This is an actual app-rendered preview, not a completed regulatory determination. Blank and unconfirmed fields still need attention.", alt: "Actual NCNE Vegetation page for JF-1, with calculated worksheets and unconfirmed boxes blank." },
 ] as const
 
@@ -19,13 +19,13 @@ export const PROGRESS = [
     { title: "Field observations", text: "Plant entry and statuses, hydrology entry, and supported soil-indicator review." },
     { title: "NCNE documents", text: "Preview and on-device PDF export, plus CSV export of color readings." },
     { title: "Vegetation calculations", text: "Dominants, Dominance Test and Prevalence Index worksheets, with confirmation before indicator ticks print.", href: "pull/74" },
+    { title: "Complete determination", text: "Explicit human confirmation of vegetation, soil and hydrology answers and the overall wetland summary, printed consistently in the NCNE PDF. Pending answers stay blank and are listed in cover notes.", href: "pull/85" },
   ] },
   { title: "Awaiting release", description: "Present in development, not promised as live.", items: [
     { title: "Location lookups", text: "PR #75: optional header lookups remain open and need final review.", href: "pull/75" },
   ] },
   { title: "Still being built", description: "Remaining work, not available features.", items: [
     { title: "Offline browser hardening", text: "PR #68 is a draft reliability change; core offline use already exists.", href: "pull/68" },
-    { title: "Complete determination", text: "Combined conclusions and a full point-to-paperwork acceptance flow.", href: "issues/37" },
     { title: "Official Excel output", text: "Populate the automated data sheet without breaking formulas or macros.", href: "issues/40" },
     { title: "Midwest region", text: "A separate regional form and rule package.", href: "issues/44" },
     { title: "Optional plant-photo identification", text: "A future opt-in online service, not an offline capability.", href: "issues/43" },

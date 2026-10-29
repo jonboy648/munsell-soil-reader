@@ -151,7 +151,7 @@ test("download contains the complete review and copying is explicitly not sendin
   const response = await review.getByRole("textbox", { name: "Your complete review", exact: true }).inputValue()
   expect(response).toContain(`Build: ${BUILD}`)
   expect(response).toContain("Screen-capture source: 1eb9292 (capture provenance; guide build above identifies this review)")
-  expect(response).toContain("Guide snapshot: 2026-10-22")
+  expect(response).toContain("Guide snapshot: 2026-10-29")
   expect(response).toContain(`Page: ${page.url()}`)
   expect(new URL(page.url()).hash).toBe("#guide")
   expect(response).toContain("Reviewer: Guide test reviewer")

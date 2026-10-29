@@ -162,6 +162,53 @@ test("two tabs append feedback to the same reading without losing either respons
   expect(await originals(page)).toEqual([project])
 })
 
+test("feedback follows a live reading assigned through the layer form without an orphan snapshot", async ({ page }) => {
+  await seed(page)
+  await page.goto("/")
+  await page.getByRole("button", { name: /Warm shop light/ }).click()
+  for (const point of [...SIM_CORNERS, SIM_SPOT]) {
+    await page.evaluate(() => window.scrollTo(0, 0))
+    const box = await page.getByTestId("photo").boundingBox()
+    if (!box) throw new Error("Missing photo")
+    await page.touchscreen.tap(box.x + point.x * box.width / SIM_WIDTH, box.y + point.y * box.height / SIM_HEIGHT)
+  }
+  await page.getByRole("region", { name: "Quick reading feedback" }).getByRole("button", { name: "Off", exact: true }).click()
+  await expect(page.getByText("Feedback saved on this device", { exact: true })).toBeVisible()
+  const feedback = () => page.evaluate(() => new Promise<{ id: string }[]>((resolve, reject) => {
+    const request = indexedDB.open("munsell-reading-feedback")
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const db = request.result
+      const tx = db.transaction("readings", "readonly")
+      const get = tx.objectStore("readings").getAll()
+      tx.oncomplete = () => { db.close(); resolve(get.result) }
+      tx.onabort = () => reject(tx.error)
+    }
+  }))
+  const before = await feedback()
+  expect(before).toHaveLength(1)
+  await page.getByRole("button", { name: "Open Readings" }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "Assign to a layer" }).click()
+  const assign = page.getByRole("dialog", { name: "Assign to a layer", exact: true })
+  await assign.getByLabel("Percent of the layer").fill("90")
+  await assign.getByRole("button", { name: "Assign to layer", exact: true }).click()
+  await expect(assign.getByRole("status")).toContainText("10YR 4/3 is now the matrix color of JF-1")
+  await assign.getByRole("button", { name: "Done", exact: true }).click()
+  const stored = await originals(page) as Project[]
+  expect(stored[0].points[0].layers[0].matrix!.reading!.id).toBe(before[0].id)
+  expect(await feedback()).toEqual(before)
+  await page.goto("/#history")
+  await page.reload()
+  await page.getByLabel("Sample point or Log sample").selectOption({ label: "Field trial / JF-1" })
+  await expect(page.getByRole("article")).toHaveCount(1)
+  await expect(page.getByRole("article")).toContainText("Matrix · 90%")
+  await expect(page.getByRole("article")).toContainText("10YR 4/3")
+  await expect(page.getByRole("list", { name: "Previous feedback" }).getByRole("listitem")).toHaveCount(1)
+  await expect(page.getByRole("list", { name: "Previous feedback" })).toContainText("Off")
+  await expect(page.getByRole("option", { name: /Not linked to a saved point/ })).toHaveCount(0)
+  expect(await feedback()).toEqual(before)
+})
+
 test("an empty history explains how to save readings and needs no network", async ({ page, context }) => {
   await page.goto("/")
   await context.setOffline(true)

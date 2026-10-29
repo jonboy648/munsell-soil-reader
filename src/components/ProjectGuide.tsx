@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils"
 import { GuidedReview } from "./guide/GuidedReview"
 import { APP_SOURCE, GUIDE_BUILD, GUIDE_DATE, PROGRESS, WORKFLOW } from "./guide/walkthrough"
 
-export function ProjectNavigation({ page }: { page: "reader" | "guide" }) {
+export function ProjectNavigation({ page }: { page: "reader" | "guide" | "history" }) {
   return (
     <nav aria-label="App pages" className="flex gap-1 overflow-x-auto pb-3">
-      {([["reader", "Soil reader"], ["guide", "About & progress"]] as const).map(([id, label]) => (
+      {([["reader", "Soil reader"], ["history", "Sample History"], ["guide", "About & progress"]] as const).map(([id, label]) => (
         <a key={id} href={hrefOf(id)} aria-current={page === id ? "page" : undefined} className={cn(
           "flex min-h-11 shrink-0 items-center rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
           page === id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -109,7 +109,7 @@ export function ProjectGuide() {
           <div id="frame" className="mt-7 grid gap-4 rounded-xl border border-border bg-card p-5 sm:p-6 md:grid-cols-[minmax(0,1fr)_14rem]"><div><h3 className="font-heading text-xl font-bold">The frame model already exists.</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">Prototype 1 has a soil window, gray and soil-color patches, and four corner markers. The app implements its geometry and marker detection. A real print batch needs measured patch colors before it can provide corrected Readings; an unmeasured batch is refused. Intended filament colors are not measurements.</p></div><p className="border-l-2 border-foreground pl-4 text-sm leading-relaxed"><strong>Still required:</strong><br />Measure a real batch, then validate it against real soils. The demonstration frame uses simulated reference colors.</p></div>
         </section>
         <section id="progress" aria-labelledby="progress-title" className="scroll-mt-24">
-          <div className="flex flex-wrap items-end justify-between gap-3"><h2 id="progress-title" className="font-heading text-3xl font-bold tracking-tight">What's ready. What's not.</h2><p className="text-xs text-muted-foreground">Snapshot: <time dateTime={GUIDE_DATE}>October 22, 2026</time></p></div>
+          <div className="flex flex-wrap items-end justify-between gap-3"><h2 id="progress-title" className="font-heading text-3xl font-bold tracking-tight">What's ready. What's not.</h2><p className="text-xs text-muted-foreground">Snapshot: <time dateTime={GUIDE_DATE}>October 29, 2026</time></p></div>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">This release includes the vegetation worksheets and explicitly human-confirmed parameter and overall summaries in NCNE PDFs. Pending answers stay blank and are warned about in cover notes. Unreleased work and real-field validation remain separate below; development records may change after this snapshot.</p>
           <div className="mt-6 grid gap-6 sm:grid-cols-2">{PROGRESS.map((group, i) => <article key={group.title} className="rounded-xl border border-border bg-card p-5 sm:p-6"><div className="flex items-center gap-3"><span aria-hidden="true" className={cn("size-2.5 rounded-full", i === 0 ? "bg-foreground" : i === 1 ? "border-2 border-foreground" : "border border-muted-foreground")} /><h3 className="font-heading text-xl font-bold">{group.title}</h3></div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{group.description}</p><ul className="mt-5 grid gap-4">{group.items.map((item) => <li key={item.title}>{"href" in item ? <a href={"https://github.com/jonboy648/munsell-soil-reader/" + item.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-2 text-sm font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{item.title}<ExternalLink className="size-3.5" aria-hidden="true" /></a> : <h4 className="text-sm font-semibold">{item.title}</h4>}<p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.text}</p></li>)}</ul></article>)}</div>
         </section>

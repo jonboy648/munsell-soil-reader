@@ -3,9 +3,9 @@
 // no network and the back button returns to the Photo.
 import * as React from "react"
 
-export type Page = "reader" | "method" | "guide"
+export type Page = "reader" | "method" | "guide" | "history"
 
-const PAGES: Page[] = ["reader", "method", "guide"]
+const PAGES: Page[] = ["reader", "method", "guide", "history"]
 
 const pageOf = (hash: string): Page => {
   const name = hash.replace(/^#/, "")

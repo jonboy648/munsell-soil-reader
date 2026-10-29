@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { Card, ReadPhotoResult } from "@/engine"
 import { percentProblem, topToBottom, withPoint, type LayerColor } from "@/delineation/model"
-import { savedReadings } from "@/lib/log"
+import type { SavedReading } from "@/lib/log"
 import { useBackClosesSheet } from "@/lib/sheetHistory"
 import { useProjects } from "@/lib/useProjects"
 import { shownReading } from "@/lib/verdict"
@@ -18,13 +18,14 @@ interface Props {
   index: number | null
   result: ReadPhotoResult | null
   card: Card | null
+  readings: SavedReading[]
   onClose: () => void
 }
 
 const SELECT =
   "h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
 
-function AssignForm({ index, result, card, onClose }: { index: number; result: ReadPhotoResult; card: Card; onClose: () => void }) {
+function AssignForm({ index, result, saved, onClose }: { index: number; result: ReadPhotoResult; saved: SavedReading; onClose: () => void }) {
   const { projects, change } = useProjects()
   const [projectId, setProjectId] = React.useState("")
   const [pointId, setPointId] = React.useState("")
@@ -46,7 +47,7 @@ function AssignForm({ index, result, card, onClose }: { index: number; result: R
     const bad = percentProblem(value)
     if (bad) return setProblem(bad)
     setProblem(null)
-    const color: LayerColor = { notation: main.chip.notation, percent: value, reading: savedReadings(result, card, [index])[0] }
+    const color: LayerColor = { notation: main.chip.notation, percent: value, reading: { ...saved, savedAt: Date.now() } }
     try {
       await change(project.id, (p) =>
         withPoint(p, point.id, (pt) => ({
@@ -145,7 +146,7 @@ function AssignForm({ index, result, card, onClose }: { index: number; result: R
   )
 }
 
-export function AssignSheet({ index, result, card, onClose }: Props) {
+export function AssignSheet({ index, result, card, readings, onClose }: Props) {
   const open = index !== null && !!result && !!card
   const setOpen = React.useCallback((next: boolean) => { if (!next) onClose() }, [onClose])
   useBackClosesSheet(open, setOpen)
@@ -156,7 +157,7 @@ export function AssignSheet({ index, result, card, onClose }: Props) {
           <SheetTitle>Assign to a layer</SheetTitle>
           <SheetDescription>Spot {index === null ? "" : index + 1}: use this Reading as a color of a layer in a sampling point.</SheetDescription>
         </SheetHeader>
-        {index !== null && result && card && <AssignForm index={index} result={result} card={card} onClose={onClose} />}
+        {index !== null && result && card && readings[index] && <AssignForm index={index} result={result} saved={readings[index]} onClose={onClose} />}
       </SheetContent>
     </Sheet>
   )

@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 
-const BUILD = "soil-guide-20261022-v3"
+const BUILD = "soil-guide-20261029-history-v1"
 const ANSWERS = [
   {
     tab: "Workflow",
@@ -75,8 +75,11 @@ test("live determination status separates synthetic acceptance from field valida
       await expect(group(status).locator(`a[href="https://github.com/jonboy648/munsell-soil-reader/${link}"]`)).toBeVisible()
     }
   }
-  await expect(progress.locator("time")).toHaveAttribute("datetime", "2026-10-22")
-  await expect(progress.locator("time")).toHaveText("October 22, 2026")
+  await expect(progress.locator("time")).toHaveAttribute("datetime", "2026-10-29")
+  await expect(progress.locator("time")).toHaveText("October 29, 2026")
+  await expect(live).toContainText("Sample History & quick feedback")
+  await expect(live).toContainText("without changing the original measurement")
+  await expect(live).toContainText("not sent to Spark")
   await expect(guide.getByText(`Guide build: ${BUILD} / screen-capture source: 1eb9292`, { exact: true })).toBeVisible()
   const example = guide.getByRole("region", { name: "Follow JF-1 through the paperwork.", exact: true })
   await expect(example).toContainText("end-to-end software acceptance uses synthetic inputs, including simulated hydrology")
@@ -148,7 +151,7 @@ test("download contains the complete review and copying is explicitly not sendin
   const response = await review.getByRole("textbox", { name: "Your complete review", exact: true }).inputValue()
   expect(response).toContain(`Build: ${BUILD}`)
   expect(response).toContain("Screen-capture source: 1eb9292 (capture provenance; guide build above identifies this review)")
-  expect(response).toContain("Guide snapshot: 2026-10-22")
+  expect(response).toContain("Guide snapshot: 2026-10-29")
   expect(response).toContain(`Page: ${page.url()}`)
   expect(new URL(page.url()).hash).toBe("#guide")
   expect(response).toContain("Reviewer: Guide test reviewer")

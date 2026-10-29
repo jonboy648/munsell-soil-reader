@@ -15,6 +15,9 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer"
 import { shownReading, type CardInfo } from "@/lib/verdict"
+import type { SavedReading } from "@/lib/log"
+import { ReadingBookPage } from "./ReadingBookPage"
+import { ReadingFeedback } from "./ReadingFeedback"
 
 const css = (rgb: RgbTriple) => `rgb(${rgb.join(",")})`
 const fmt = (n: number) => n.toFixed(1)
@@ -52,7 +55,7 @@ function ReadingRow({ label, reading }: { label: string; reading: ChipReading })
   )
 }
 
-function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResult; index: number; card: CardInfo; onAssign: () => void }) {
+function SpotReading({ result, index, card, saved, onAssign }: { result: ReadPhotoResult; index: number; card: CardInfo; saved: SavedReading; onAssign: () => void }) {
   const reading = result.readings[index]
   const { verdict, main, beside, why } = shownReading(reading, result.cardCheck, cardWarnings(result.quality), result.offCard, card)
   const corrected = verdict === "good" || verdict === "caution"
@@ -69,7 +72,7 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
             {main.chip.notation}
           </p>
           <p data-testid="drawer-name" className="mt-1 text-base">{main.chip.name}</p>
-          <p className="mt-2 font-mono text-sm text-muted-foreground">exact {main.exact}</p>
+          <ReadingBookPage chip={main.chip} />
         </div>
         <div className="flex shrink-0 gap-2">
           <ColorBlock rgb={main.rgb} label={corrected ? "Corrected" : "Raw"} />
@@ -105,13 +108,14 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
         </p>
       )}
       <QualityWarnings warnings={warningsFor(result.quality, index)} />
-      <table className="w-full text-sm">
+      <p className="text-sm text-muted-foreground">The matched Chip above is in the soil book. The calculated estimate below is not a printed chip; its hue can fall between pages. Compare the Chip with your book before confirming it.</p>
+      <div className="overflow-x-auto"><table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
             <th scope="col" className="pb-1 text-left font-medium">Reading</th>
             <th scope="col" className="pb-1" />
             <th scope="col" className="pb-1 text-left font-medium">Chip</th>
-            <th scope="col" className="pb-1 text-left font-medium">Exact</th>
+            <th scope="col" className="pb-1 text-left font-medium">Calculated estimate</th>
             <th scope="col" className="pb-1 text-right font-medium">Off by</th>
           </tr>
         </thead>
@@ -121,7 +125,7 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
             <ReadingRow label={verdict === "failed" ? "Corrected (not trusted)" : "Corrected"} reading={reading.corrected} />
           )}
         </tbody>
-      </table>
+      </table></div>
       <div>
         <p className="mb-1 text-xs text-muted-foreground">Top 3 Chips</p>
         <ol aria-label="Top 3 Chips" className="flex flex-wrap gap-2">
@@ -136,6 +140,7 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
       <Button variant="outline" className="h-11 text-base" onClick={onAssign}>
         Assign to a layer
       </Button>
+      <ReadingFeedback key={saved.id} reading={saved} />
     </section>
   )
 }
@@ -143,10 +148,12 @@ function SpotReading({ result, index, card, onAssign }: { result: ReadPhotoResul
 export function ReadingsPanel({
   result,
   card,
+  readings,
   onAssign,
 }: {
   result: ReadPhotoResult | null
   card: CardInfo
+  readings: SavedReading[]
   /** Called with the Spot's index; the panel closes first so the sheet can open over the page. */
   onAssign: (index: number) => void
 }) {
@@ -188,6 +195,7 @@ export function ReadingsPanel({
               result={result}
               index={i}
               card={card}
+              saved={readings[i]}
               onAssign={() => {
                 setOpen(false)
                 onAssign(i)

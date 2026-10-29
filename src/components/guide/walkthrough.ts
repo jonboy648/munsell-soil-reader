@@ -1,5 +1,5 @@
-export const GUIDE_DATE = "2026-10-22"
-export const GUIDE_BUILD = "soil-guide-20261022-v3"
+export const GUIDE_DATE = "2026-10-29"
+export const GUIDE_BUILD = "soil-guide-20261029-history-v1"
 export const APP_SOURCE = "1eb9292"
 
 export const WORKFLOW = [
@@ -16,6 +16,8 @@ export const WORKFLOW = [
 export const PROGRESS = [
   { title: "Available live", description: "The existing working app, not a proposal.", items: [
     { title: "Read and record", text: "Photo correction, Munsell Readings, Card checks, projects, points and layers." },
+    { title: "Sample History & quick feedback", text: "Select a saved sampling point or Log sample to review dated readings. Add Good, Off or Not sure feedback without changing the original measurement. Notes stay in this browser on this device; they are not sent to Spark." },
+    { title: "Soil-book page labels", text: "Matched Chips show their catalog page, including Gley pages. Calculated estimates are labelled separately and are not printed Chips. Compare the matched Chip with your own book." },
     { title: "Field observations", text: "Plant entry and statuses, hydrology entry, and supported soil-indicator review." },
     { title: "NCNE documents", text: "Preview and on-device PDF export, plus CSV export of color readings." },
     { title: "Vegetation calculations", text: "Dominants, Dominance Test and Prevalence Index worksheets, with confirmation before indicator ticks print.", href: "pull/74" },

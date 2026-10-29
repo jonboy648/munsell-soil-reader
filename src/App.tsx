@@ -11,6 +11,9 @@ import { MethodPage } from "@/components/method/MethodPage"
 import { ProjectGuide, ProjectNavigation } from "@/components/ProjectGuide"
 import { PhotoView } from "@/components/PhotoView"
 import { ReadingsPanel } from "@/components/ReadingsPanel"
+import { SampleHistory } from "@/components/SampleHistory"
+import { ReadingFeedback } from "@/components/ReadingFeedback"
+import { readingSnapshots } from "@/lib/readingSnapshots"
 import { SpotsPanel } from "@/components/SpotsPanel"
 import { StepIndicator } from "@/components/StepIndicator"
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -50,6 +53,8 @@ export function App() {
       ? readPhoto({ pixels: photo.pixels, card, spots })
       : null
   }, [photo, noCard, cardKind, hue, corners, spots, frame])
+  const [snapshots] = React.useState(readingSnapshots)
+  const readings = React.useMemo(() => snapshots(result, cardOf(session), spots), [snapshots, result, session, spots])
 
   // The frame is the Card: look for it in the Photo. The finder (and js-aruco2) is loaded only
   // now, so users who never choose the frame never download it.
@@ -119,6 +124,7 @@ export function App() {
 
   if (page === "method") return <MethodPage />
   if (page === "guide") return <ProjectGuide />
+  if (page === "history") return <SampleHistory />
 
   return (
     <div className={`reader-workspace mx-auto flex min-h-svh flex-col${session.photo ? " reader-with-photo" : ""}`}>
@@ -202,7 +208,8 @@ export function App() {
           )}
           </section>
           <div className="reader-tool-section">
-          <LogPanel result={result} card={cardOf(session)} spots={session.spots} />
+          {readings.length > 0 && <div className="mb-4"><ReadingFeedback key={readings.at(-1)!.id} reading={readings.at(-1)!} compact /></div>}
+          <LogPanel result={result} card={cardOf(session)} spots={session.spots} readings={readings} />
           </div>
           <div className="reader-tool-section">
           <ExamplePicker activeId={session.photo?.exampleId} onPick={pickExample} />
@@ -225,8 +232,8 @@ export function App() {
       </main>
 
       <div className="reader-dock fixed inset-x-0 bottom-0 z-10 mx-auto">
-        <ReadingsPanel result={result} card={cardInfo} onAssign={setAssigning} />
-        <AssignSheet index={assigning} result={result} card={cardOf(session)} onClose={() => setAssigning(null)} />
+        <ReadingsPanel result={result} card={cardInfo} readings={readings} onAssign={setAssigning} />
+        <AssignSheet index={assigning} result={result} card={cardOf(session)} readings={readings} onClose={() => setAssigning(null)} />
         <BottomBar
           onFile={pickFile}
           onUndo={() => dispatch({ type: "undo" })}

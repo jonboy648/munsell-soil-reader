@@ -82,9 +82,13 @@ describe("ticks and the cover note", () => {
     expect(note).not.toContain("Ticked by the user")
   })
 
-  test("a confirmed suggestion is on the page and off the cover note: one page", async () => {
+  test("a confirmed suggestion is ticked but the pending parameter still has a cover note", async () => {
     const bytes = await made(choose({ A12: { state: "confirmed" } }))
-    expect(await pages(bytes)).toBe(1)
+    expect(await pages(bytes)).toBe(2)
+    const note = (await pdfText(bytes, 2)).map((t) => t.text).join(" ")
+    expect(note).toContain("Unconfirmed parameter conclusion")
+    expect(note).toContain("Hydric Soil Present?")
+    expect(note).not.toContain("Suggested by the app, not confirmed")
   })
 
   test("a tick the app did not suggest is drawn, and the cover note carries the user's remark", async () => {
@@ -97,10 +101,14 @@ describe("ticks and the cover note", () => {
     expect(note).not.toContain("Suggested by the app, not confirmed")
   })
 
-  test("a rejected suggestion leaves no tick and no cover note", async () => {
+  test("a rejected suggestion leaves no tick while the pending parameter remains on the cover note", async () => {
     const bytes = await made(choose({ A12: { state: "rejected" } }))
     expect(await ticksOf(bytes)).toEqual([])
-    expect(await pages(bytes)).toBe(1)
+    expect(await pages(bytes)).toBe(2)
+    const note = (await pdfText(bytes, 2)).map((t) => t.text).join(" ")
+    expect(note).toContain("Unconfirmed parameter conclusion")
+    expect(note).toContain("Hydric Soil Present?")
+    expect(note).not.toContain("Suggested by the app, not confirmed")
   })
 
   test("No is ticked on its own blank", async () => {

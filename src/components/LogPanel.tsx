@@ -7,7 +7,7 @@ import { LogScreen } from "@/components/LogScreen"
 import { ProjectsSheet } from "@/components/ProjectsSheet"
 import { SaveToLogSheet, type SaveTarget } from "@/components/SaveToLogSheet"
 import { Button } from "@/components/ui/button"
-import { currentLocation, savedReadings, type Sample } from "@/lib/log"
+import { currentLocation, type Sample, type SavedReading } from "@/lib/log"
 import {
   addReadings,
   addSample,
@@ -27,6 +27,7 @@ interface Props {
   card: Card | null
   /** The Spots `result` was read from, in the same order. */
   spots: XY[]
+  readings: SavedReading[]
 }
 
 /** A save that is waiting on the location or on the write. */
@@ -49,7 +50,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 // Photo, Start over and No Card all make new Spot objects, so nothing ever needs clearing.
 const readingOfSpot = new WeakMap<XY, string>()
 
-export function LogPanel({ result, card, spots }: Props) {
+export function LogPanel({ result, card, spots, readings: snapshots }: Props) {
   const [samples, setSamples] = React.useState<Sample[]>([]) // oldest first
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [logOpen, setLogOpen] = React.useState(false)
@@ -111,7 +112,7 @@ export function LogPanel({ result, card, spots }: Props) {
   const save = async (target: SaveTarget, withLocation: boolean): Promise<string | void> => {
     if (!result || !card) return
     const chosen = newSpots.map((i) => spots[i])
-    const readings = savedReadings(result, card, newSpots)
+    const readings = newSpots.map((i) => ({ ...snapshots[i], savedAt: Date.now() }))
     const attempt: Attempt = { spots: chosen, cancelled: false, writing: false }
     saving.current = attempt
     setInFlight((all) => [...all, ...chosen]) // before the first await

@@ -6,7 +6,7 @@ import type { Project } from "./model"
 import { regionOf } from "./regions"
 import { PAGE1_MARK_FIELDS, PAGE1_TEXT_FIELDS } from "./regions/types"
 import type { Placement } from "./soilPage"
-import { fit, widthOf } from "./text"
+import { fit, truncate, widthOf, wrap } from "./text"
 
 /** The non-blank values of page 1's header, top to bottom, left to right. */
 export function headerPlacements(project: Project, form: Form): Placement[] {
@@ -38,10 +38,15 @@ export function headerPlacements(project: Project, form: Form): Placement[] {
     })
   }
   if (value("page1.summaryRemarks")) {
-    const { left, right, baseline } = page1.summaryRemarks
+    const { left, right, baselines } = page1.summaryRemarks
     const maxWidth = right - left
-    const { text, size } = fit(value("page1.summaryRemarks"), maxWidth, page1.fontSize)
-    placements.push({ id: "page1.summaryRemarks", text, x: left, baseline, size, maxWidth })
+    const lines = wrap(value("page1.summaryRemarks"), maxWidth, page1.fontSize)
+    if (lines.length > baselines.length) {
+      lines.length = baselines.length
+      const note = " See cover note."
+      lines[lines.length - 1] = truncate(lines.at(-1)!, maxWidth - widthOf(note, page1.fontSize), page1.fontSize) + note
+    }
+    lines.forEach((text, i) => placements.push({ id: "page1.summaryRemarks", text, x: left, baseline: baselines[i], size: page1.fontSize, maxWidth }))
   }
   return placements
 }

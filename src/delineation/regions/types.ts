@@ -2,6 +2,9 @@
 // form version, where each printed field sits on the official page, and room for the indicators,
 // rules and plant list that later tickets fill. No assets are named here, so the engine that reads
 // it stays pure; the page files are in each region's own assets module.
+import type { VegIndicatorId } from "../vegetation/hydrophytic"
+import type { Status } from "../vegetation/status"
+import type { Stratum } from "../vegetation/strata"
 
 /** The columns of the Soil page's profile description table, left to right. */
 export const PROFILE_COLUMNS = [
@@ -88,6 +91,57 @@ export interface Rule {
   left: number
   right: number
   rule: number
+}
+
+
+/** The columns of a Vegetation page's rows, left to right. "dominant" is the form's Dominant Species? column. */
+export const VEG_COLUMNS = ["name", "cover", "dominant", "status"] as const
+export type VegColumn = (typeof VEG_COLUMNS)[number]
+
+/**
+ * Where the Vegetation page, and its Continued page, take values. The two pages have the same rows at
+ * the same places, so the Continued page's rows are the Vegetation page's rows again, numbered on
+ * from them. Points, from the top left of the page, as for the Soil page.
+ */
+export interface VegetationPage {
+  size: { width: number; height: number }
+  /** The pages of the official form, counting from 1. */
+  pageNumber: number
+  continuedPageNumber: number
+  fontSize: number
+  inset: number
+  aboveRule: number
+  /** The left and right ends of each column's rule. */
+  columns: Record<VegColumn, readonly [number, number]>
+  strata: Record<Stratum, {
+    /** The top of the rule each row's values sit on, first row first. */
+    rowRules: readonly number[]
+    /** The rule of the stratum's total cover, under the cover column. */
+    totalRule: number
+    /** The Plot size rule, on the Vegetation page only. */
+    plotSize: { rule: number; span: readonly [number, number] }
+  }>
+  /** The Sampling Point rule at the top right. */
+  samplingPoint: { rule: number; span: readonly [number, number] }
+  /** The Remarks box of the Vegetation page: the text's left end, the right end it wraps at, the baselines of the first and last lines. */
+  remarks: { left: number; right: number; firstBaseline: number; lastBaseline: number; leading: number }
+  /** The worksheets, the indicators and the conclusion at the right of the Vegetation page. The Continued page has none. */
+  worksheets: {
+    /** The Dominance Test worksheet: dominants that are OBL, FACW or FAC (A), all dominants (B), and A/B. */
+    dominance: { a: Box; b: Box; percent: Box }
+    /** The Prevalence Index worksheet: each status's total cover and its product with the weight, the column totals, and B/A. */
+    prevalence: {
+      rows: Record<Status, { cover: Box; product: Box }>
+      totals: { a: Box; b: Box }
+      index: Box
+    }
+    /** The blank before each Hydrophytic Vegetation Indicator. */
+    indicators: Record<VegIndicatorId, Box>
+    /** The blanks after "Yes" and "No" of "Hydrophytic Vegetation Present?". */
+    present: { yes: Box; no: Box }
+    /** Where a tick (an X) sits on its blank: its size, and the gap from the line up to its baseline. */
+    tick: { size: number; aboveRule: number }
+  }
 }
 
 /** The blank line printed before an indicator's label on the Soil page, where its tick goes. Points, as above. */
@@ -266,7 +320,9 @@ export interface Page1 {
   /** The header's lines: the ones that take text and the short blanks that take a letter. */
   fields: Record<Page1Field, Rule>
   /** The Summary of Findings' Remarks box: its text's left and right edges and the baseline of its first line. */
-  summaryRemarks: { left: number; right: number; baseline: number }
+  summaryRemarks: { left: number; right: number; baseline: number; baselines: readonly number[] }
+  /** Summary Yes/No blanks, measured from the official page's drawing. */
+  summary: Record<"vegetation" | "soil" | "hydrology" | "wetland", { yes: TickBlank; no: TickBlank }>
   hydrology: HydrologyPage
 }
 
@@ -277,6 +333,7 @@ export interface Region {
   form: { name: string; version: string }
   page1: Page1
   soil: SoilPage
+  vegetation: VegetationPage
   indicators: readonly Indicator[]
   /** The subregions a project can be in, which decide which indicators apply. */
   subregions: readonly Lrr[]

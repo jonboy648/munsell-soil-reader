@@ -24,6 +24,8 @@ export interface Location {
 
 export interface SavedReading {
   id: string
+  /** When this result was first calculated, not the Photo's capture time; absent from older entries. */
+  measuredAt?: number
   /** Milliseconds since 1970: when this Reading was saved, which can be long after its Sample was made. */
   savedAt: number
   /** Exactly what the engine returned for the Spot, raw and corrected. */

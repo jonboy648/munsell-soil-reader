@@ -5,8 +5,9 @@ import type { Form } from "./formFor"
 import type { Project } from "./model"
 import { headerPlacements } from "./page1Header"
 import { hydrologyPlacements } from "./page1Hydrology"
+import { summaryPlacements } from "./page1Summary"
 import type { Placement } from "./soilPage"
 
 export function page1Placements(project: Project, form: Form): Placement[] {
-  return [...headerPlacements(project, form), ...hydrologyPlacements(project, form)]
+  return [...headerPlacements(project, form), ...summaryPlacements(project, form), ...hydrologyPlacements(project, form)]
 }

@@ -5,7 +5,7 @@ import { Download, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Project, SamplingPoint } from "@/delineation/model"
 import { formsPdf } from "@/delineation/pdf"
-import { page1Assets, privacyPageAssets, soilPageAssets } from "@/delineation/regions/assets"
+import { page1Assets, privacyPageAssets, soilPageAssets, vegetationPageAssets } from "@/delineation/regions/assets"
 import { canShareFile, downloadBlob, shareFile } from "@/lib/download"
 
 interface Props {
@@ -23,16 +23,17 @@ export const slug = (text: string) => text.trim().replace(/[^A-Za-z0-9]+/g, "-")
 export function FormExport({ project, points, label, filename, title }: Props) {
   const [busy, setBusy] = React.useState(false)
   const [problem, setProblem] = React.useState<string | null>(null)
-  const urls = [page1Assets, soilPageAssets, privacyPageAssets].map((assets) => assets[project.region].pdf)
+  const { vegetation, continued } = vegetationPageAssets[project.region]
+  const urls = [page1Assets[project.region].pdf, vegetation.pdf, soilPageAssets[project.region].pdf, continued.pdf, privacyPageAssets[project.region].pdf]
 
   const make = async (then: (blob: Blob) => Promise<void> | void) => {
     setBusy(true)
     setProblem(null)
     try {
-      const [page1, soil, privacy] = await Promise.all(
+      const [page1, vegetation, soil, continued, privacy] = await Promise.all(
         urls.map(async (url) => (await fetch(url)).arrayBuffer()),
       )
-      const bytes = await formsPdf({ page1, soil, privacy }, project, points)
+      const bytes = await formsPdf({ page1, vegetation, soil, continued, privacy }, project, points)
       await then(new Blob([bytes.slice().buffer], { type: "application/pdf" }))
     } catch {
       setProblem("The PDF could not be made on this device. Try again.")

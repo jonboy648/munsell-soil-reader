@@ -104,7 +104,7 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
 test("lists every credit with its license", async ({ page }) => {
   await openMethodPage(page)
   const credits = page.getByTestId("credit")
-  await expect(credits).toHaveCount(10)
+  await expect(credits).toHaveCount(11)
   const expected: [string, string][] = [
     ["Munsell Soil Reader", "MIT"],
     ["munsell.js", "MPL-2.0"],
@@ -115,6 +115,7 @@ test("lists every credit with its license", async ({ page }) => {
     ["ReUI components, from 21st.dev", "MIT"],
     ["js-aruco2", "MIT"],
     ["ENG Form 6116-8", "public domain"],
+    ["2022 National Wetland Plant List", "public domain"],
     ["Regional Supplement", "public domain"],
   ]
   for (const [name, license] of expected) {
@@ -187,6 +188,27 @@ test("opens the full license text of each credit that has one", async ({ page })
   const chips = page.getByTestId("credit").filter({ hasText: "Soil-book Chip list" })
   await expect(chips.getByTestId("license-text")).toHaveCount(0)
   await expect(chips.getByRole("link", { name: "CC0 1.0 legal code" })).toBeVisible()
+})
+
+test("says how a plant's status is found, and that the order of the neighbouring regions is an assumption", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("2022 National Wetland Plant List")
+  await expect(notes).toContainText("The 2022 list has no NI or NO ratings.")
+  await expect(notes).toContainText("Midwest, then the Eastern Mountains and Piedmont, then the Atlantic and Gulf Coastal Plain, then the Great Plains")
+  await expect(notes).toContainText("the order is an assumption")
+})
+
+test("says how the dominant species are chosen, when the prevalence index is applied, and that a plant identified only to its genus counts", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("50/20 rule")
+  await expect(notes).toContainText("A stratum under 5 percent cover is recorded and not used, unless it is the only one.")
+  await expect(notes).toContainText("applied only when the dominance test fails and hydric soil and wetland hydrology indicators are present")
+  await expect(notes).toContainText("nothing is ticked on the form until you confirm it")
+  await expect(notes).toContainText("Decided on 2026-10-18: a plant identified only to its genus")
+  await expect(notes).toContainText("the 80 percent of cover that must be identified and rated")
+  await expect(notes).toContainText("A plant you mark as not identified is left out of the index and counts against the 80 percent. A named plant that is not on the list counts as UPL.")
 })
 
 test("says the 20-soil test has not been run, and marks what is not in this version", async ({ page }) => {

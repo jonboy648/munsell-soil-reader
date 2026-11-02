@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { PDFDocument } from "pdf-lib"
 import { JF1_ROWS } from "../src/delineation/fixtures/jf1"
-import { pdfRules, pdfText } from "../src/delineation/testing/pdfText"
+import { pdfRules } from "../src/delineation/testing/pdfRules"
+import { pdfText } from "../src/delineation/testing/pdfText"
 import { addLayer, createPoint, openProjects, recordJf1 } from "./projects"
 
 // The Sampling Point box at the top of the page is drawn first, then the profile rows.
@@ -83,7 +84,7 @@ test("JF-1 suggests A12 with its rule and layers; confirmed, it and Yes are Xs o
   const blanks = await pdfRules(made.bytes)
   for (const t of ticks) {
     const centre = t.x + 3
-    expect(blanks.some((b) => centre > b.x[0] && centre < b.x[1] && b.top > t.baseline - 0.1 && b.top - t.baseline < 3), `an X at ${t.x}, ${t.baseline}`).toBe(true)
+    expect(blanks.some((b) => centre > b.left && centre < b.right && b.top > t.baseline - 0.1 && b.top - t.baseline < 3), `an X at ${t.x}, ${t.baseline}`).toBe(true)
   }
   // The preview and the PDF put them in the same place.
   const shown = await preview.evaluateAll((nodes) => nodes.slice(-2).map((n) => ({ x: Number(n.getAttribute("x")), baseline: Number(n.getAttribute("y")) })))
@@ -102,7 +103,7 @@ test("JF-1 suggests A12 with its rule and layers; confirmed, it and Yes are Xs o
   await expect(again.getByTestId("soil-preview-text")).toHaveText([...JF1_VALUES, "X", "X"])
 })
 
-test("a rejected suggestion leaves no tick and no cover note; one the user ticks needs a remark and goes on the cover note", async ({ page }) => {
+  test("a rejected suggestion leaves no tick but the parameter stays pending; a manual tick needs a remark on the cover note", async ({ page }) => {
   await page.goto("/")
   const sheet = await createPoint(page, "Pond", "JF-1")
   await recordJf1(sheet)
@@ -113,7 +114,7 @@ test("a rejected suggestion leaves no tick and no cover note; one the user ticks
   await expect(suggestion).toHaveAttribute("data-decision", "rejected")
   await expect(suggestion.getByTestId("suggestion-state")).toContainText("Rejected: not ticked.")
   const rejected = await download(page, sheet)
-  expect(rejected.pages).toBe(1)
+    expect(rejected.pages).toBe(2) // The parameter answer is still pending after rejecting an indicator.
   expect(await pdfText(rejected.bytes)).not.toContainEqual(expect.objectContaining({ text: "X" }))
   await suggestion.getByRole("button", { name: "Undo A12" }).click()
   await expect(suggestion).toHaveAttribute("data-decision", "pending")

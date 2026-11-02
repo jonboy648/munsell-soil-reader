@@ -105,7 +105,7 @@ export const CREDITS: Credit[] = [
     name: "ENG Form 6116-8, Wetland Determination Data Form (Northcentral and Northeast)",
     license: "US government work, public domain",
     by: "U.S. Army Corps of Engineers",
-    used: "The official Soil page (September 2024), unchanged, that a sampling point's profile is drawn onto for the PDF and the preview.",
+    used: "The official Page 1, Soil, Vegetation and Vegetation Continued pages (September 2024), unchanged, that a sampling point's values are drawn onto for the PDF and the preview.",
     links: [{ label: "Regulatory Program", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/" }],
   },
   {
@@ -114,6 +114,16 @@ export const CREDITS: Credit[] = [
     by: "U.S. Army Corps of Engineers",
     used: "The definitions of the wetland hydrology indicators, quoted word for word with their pages, and the rule that one primary or two secondary indicators show wetland hydrology.",
     links: [{ label: "Regional supplements", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/reg_supp/" }],
+  },
+  {
+    name: "2022 National Wetland Plant List and USDA PLANTS checklist",
+    license: "US government data, public domain",
+    by: "U.S. Army Corps of Engineers (the list, version 3.6) and USDA NRCS (PLANTS)",
+    used: "The wetland indicator status of each plant, and the common names, USDA symbols and synonyms used to find a plant you type. Cut down to what the app needs and bundled, so the lookup works with no network.",
+    links: [
+      { label: "National Wetland Plant List", href: "https://wetland-plants.sec.usace.army.mil/" },
+      { label: "USDA PLANTS", href: "https://plants.usda.gov/" },
+    ],
   },
 ]
 

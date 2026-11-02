@@ -17,6 +17,7 @@ import {
 } from "@/lib/log"
 import { downloadCsv } from "@/lib/logCsv"
 import { shownReading } from "@/lib/verdict"
+import { ReadingBookPage } from "./ReadingBookPage"
 
 interface Props {
   open: boolean
@@ -69,7 +70,8 @@ function ReadingItem({
             {main.chip.notation}
           </p>
           {main.chip.name && <p className="mt-1">{main.chip.name}</p>}
-          <p className="mt-1 font-mono text-xs text-muted-foreground">exact {main.exact}</p>
+          <ReadingBookPage chip={main.chip} />
+          <p className="mt-1 text-xs text-muted-foreground">Calculated estimate: <span className="font-mono">{main.exact}</span> — not a printed chip.</p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Swatch rgb={main.rgb} label="Soil color" />

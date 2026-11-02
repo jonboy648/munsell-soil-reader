@@ -57,7 +57,7 @@ test("two secondary indicators are ticked, the rule suggests yes, the user confi
 
   // Confirm the suggestion: now Yes is printed.
   await sheet.getByRole("button", { name: "Confirm Yes" }).click()
-  await expect(sheet.getByRole("status")).toContainText("Confirmed: Yes, printed on the form.")
+  await expect(hydrology.getByRole("status")).toContainText("Confirmed: Yes, printed on the form.")
   await expect(printed).toHaveText(["X", "X", "X", "14", "X", "Monitoring well MW-3 read 14 in. on 12 Oct.", "Seasonally flooded depression."])
 
   // The PDF holds the same values at the same places as the preview.
@@ -94,6 +94,12 @@ test("a primary indicator alone is a yes, and an answer that differs from the ru
   await tick(sheet, "Water Marks (B1)").uncheck()
   await tick(sheet, "Surface Soil Cracks (B6)").check()
   await sheet.getByRole("radiogroup", { name: "Wetland Hydrology Present?" }).getByRole("radio", { name: "Yes" }).click()
+  await expect(sheet.getByRole("region", { name: "Hydrology", exact: true }).getByRole("alert")).toContainText("Add a remark")
+  const summary = sheet.getByTestId("summary-hydrology")
+  await summary.getByRole("button", { name: "Override or decide" }).click()
+  await summary.getByLabel("Your answer", { exact: true }).selectOption("yes")
+  await summary.getByLabel("Remark explaining your decision").fill("Synthetic hydrology override for this browser test")
+  await summary.getByRole("button", { name: "Confirm answer with remark" }).click()
   await expect(sheet.getByTestId("form-warnings")).toContainText("Wetland Hydrology Present? is Yes, but the ticked indicators give a different answer")
   await expect(sheet.locator('[data-testid="page1-preview-text"][data-field="page1.hydrology.present.yes"]')).toHaveText("X")
 })

@@ -5,11 +5,14 @@
 // (`soil.profile.<row>.<column>`, rows from 0), a tick for each confirmed hydric soil indicator
 // (`soil.indicator.<id>`), and the answer to "Hydric Soil Present?" once the user has confirmed it
 // (`soil.hydric.yes` or `.no`). Page 1: the header (`page1.<line>`, and `page1.summaryRemarks` for the
-// note of a pair) and the Hydrology section (`page1.hydrology.*`). Every field is in `fields`, blank
-// when unknown, and every value is already text the PDF's font can print. Nothing is ticked that the
-// user has not confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left
-// unconfirmed go on the cover note.
+// note of a pair) and the Hydrology section (`page1.hydrology.*`). The Vegetation pages are filled from
+// the plants (vegetation/vegetationFields.ts): `veg.<stratum>.<row>.<column>`, the stratum's `plotSize`
+// and `total`, `veg.samplingPoint` and `veg.remarks`. Every field is in `fields`, blank when unknown,
+// and every value is already text the PDF's font can print. Nothing is ticked that the user has not
+// confirmed: the app's hydric soil suggestions are in `hydric`, and the ones left unconfirmed go on the
+// cover note.
 import { PROJECT_FIELDS, POINT_FIELDS, subregionText, writtenDate } from "./headerFields"
+import { CONCLUSIONS, determinationFor, type ConclusionId, type Determination } from "./determination"
 import { regionOf } from "./regions"
 import {
   PAGE1_MARK_FIELDS,
@@ -20,10 +23,12 @@ import {
   type ProfileColumn,
   type SoilPage,
 } from "./regions/types"
-import { hydrologyFor } from "./hydrology"
+import { hydrologyFor, suggestWetlandHydrology } from "./hydrology"
 import { fit, printable, truncate, widthOf, wrap, written } from "./text"
 import { pairOf, topToBottom, type LayerColor, type Project, type ProjectHeader, type SamplingPoint, type YesNo } from "./model"
 import { indicatorLabel, suggest, type Suggestions } from "./rules/suggest"
+import type { HydrophyticVegetation, VegIndicator } from "./vegetation/hydrophytic"
+import { vegetationFields, type VegFieldId, type VegWarning } from "./vegetation/vegetationFields"
 
 type Page1Id = `page1.${Page1Field}` | "page1.summaryRemarks"
 export type FieldId =
@@ -35,6 +40,8 @@ export type FieldId =
   | `soil.hydric.${"yes" | "no"}`
   | Page1Id
   | `page1.hydrology.${string}`
+  | `page1.summary.${ConclusionId}.${"yes" | "no"}`
+  | VegFieldId
 
 export interface FormWarning {
   kind:
@@ -48,6 +55,8 @@ export interface FormWarning {
     | "field-cut"
     | "hydrology-observation"
     | "hydrology-answer"
+    | "determination-review"
+    | VegWarning["kind"]
     | "color-not-a-chip"
   /** The Layer it is about, counting from 0 down from the surface. */
   layer?: number
@@ -86,7 +95,26 @@ export interface HydricSoil {
   cover: CoverNote
 }
 
+/** The cover note's part for the Vegetation page: what is not on the page, and why. */
+export interface VegetationCover {
+  /** Indicators the app found satisfied that the user has not confirmed: they print blank. */
+  unconfirmed: VegIndicator[]
+  /** Indicators the user ticked on their own observation (morphological adaptations, problematic vegetation), with their remarks. */
+  ticked: VegIndicator[]
+  /** Indicators 1 to 3 the user confirmed that the plants, or the soil and hydrology, no longer satisfy: they print blank. */
+  stale: VegIndicator[]
+  /** Why the prevalence index was applied where the supplement's order would not apply it. Empty when it was not, or when the order applies it anyway. */
+  prevalenceReason: string
+}
+
+/** What the Vegetation page's worksheets and indicators say for one sampling point. */
+export interface VegetationForm extends HydrophyticVegetation {
+  cover: VegetationCover
+}
+
 export interface Form {
+  /** Shared parameter answers and the separately confirmed overall determination. */
+  determination: Determination
   /** Every printed field, as the text printed in it. Blank when unknown. */
   fields: Record<FieldId, string>
   /** What the recorded data suggests for the Hydrology section, with the rule it used, for the user to confirm. */
@@ -95,6 +123,8 @@ export interface Form {
   conclusions: readonly Conclusion[]
   /** The hydric soil indicators of the Soil page: what the layers satisfy, and what the user decided. */
   hydric: HydricSoil
+  /** The Vegetation page's dominance test, prevalence index and hydrophytic vegetation indicators. */
+  vegetation: VegetationForm
   warnings: FormWarning[]
 }
 
@@ -270,12 +300,22 @@ export function formFor(project: Project, point: SamplingPoint): Form {
     warnings.push({ kind: "too-many-rows", text: "A layer has more redox colors than the form has rows. The rest are left off the page." })
   }
 
+  // Whether the sampling point has the hydric soil and wetland hydrology indicators that the prevalence index assumes.
+  // Only the hydric soil list counts: the problematic-soil indicators (A10, S3 and the rest, and "Other") are for
+  // where hydrophytic vegetation is already shown (supplement p. 68, p. 132 step 1), so they cannot open the gate.
+  // They are offered to the user as a reason for applying the index anyway.
+  const soilConfirmed = region.indicators.filter((i) => point.indicators?.[i.id]?.state === "confirmed")
+  const hydricSoil = soilConfirmed.some((i) => i.list === "hydric")
+  const problematicSoil = soilConfirmed.filter((i) => i.list === "problematic" && i.id !== "other").map(indicatorLabel)
+  const hydrologyMet = suggestWetlandHydrology(region, point.hydrology?.ticked ?? []).answer
+  const vegetation = vegetationFields(project, point, name.text, { hydricSoil, hydrology: hydrologyMet, problematicSoil })
   const restrictive = point.restrictive
   const restrictiveType = printable(restrictive?.type ?? "")
   if (restrictiveType.replaced) {
     warnings.push({ kind: "text-changed", text: "The restrictive layer type has characters the form cannot print; they were replaced." })
   }
   const fields = {
+    ...vegetation.fields,
     ...page1Fields(project, point, warnings),
     "soil.samplingPoint": name.text,
     "soil.restrictive.type": restrictiveType.text,
@@ -316,15 +356,40 @@ export function formFor(project: Project, point: SamplingPoint): Form {
 
   const hydrology = hydrologyFor(regionOf(project.region), point.hydrology)
   Object.assign(fields, hydrology.fields)
-  warnings.push(...hydrology.warnings)
+  warnings.push(...hydrology.warnings, ...vegetation.warnings)
   const present = point.hydrology?.present
-  return {
+  const form: Omit<Form, "determination"> = {
     fields,
     suggestions: hydrology.suggestion
       ? [{ id: "hydrology.present", answer: hydrology.suggestion.answer, text: hydrology.suggestion.text, citation: hydrology.suggestion.citation }]
       : [],
     conclusions: typeof present === "boolean" ? [{ id: "hydrology.present", answer: present }] : [],
     hydric,
+    vegetation: {
+      ...vegetation.analysis,
+      cover: {
+        unconfirmed: vegetation.analysis.indicators.filter((i) => i.state === "satisfied" && i.decision === "pending"),
+        ticked: vegetation.analysis.indicators.filter((i) => i.ticked && i.state === "yours"),
+        stale: vegetation.analysis.indicators.filter((i) => i.stale),
+        prevalenceReason: vegetation.analysis.overridden ? (point.vegetation?.prevalenceReason ?? "").trim() : "",
+      },
+    },
     warnings,
   }
+  const determination = determinationFor(project, point, form)
+  for (const id of CONCLUSIONS) {
+    const { confirmed } = determination.conclusions[id]
+    fields[`page1.summary.${id}.yes`] = confirmed === "yes" ? "X" : ""
+    fields[`page1.summary.${id}.no`] = confirmed === "no" ? "X" : ""
+  }
+  const remarks = printable([fields["page1.summaryRemarks"], ...determination.remarks].filter(Boolean).join(" "))
+  fields["page1.summaryRemarks"] = remarks.text
+  if (remarks.replaced) warnings.push({ kind: "text-changed", text: "Summary remarks: some characters cannot be printed and were replaced." })
+  const box = region.page1.summaryRemarks
+  const lines = wrap(remarks.text, box.right - box.left, region.page1.fontSize)
+  if (lines.length > box.baselines.length) {
+    warnings.push({ kind: "remarks-cut", text: "Summary remarks continue on the determination cover note." })
+  }
+  if (determination.conclusions.wetland.review) warnings.push({ kind: "determination-review", text: determination.conclusions.wetland.review })
+  return { ...form, determination }
 }

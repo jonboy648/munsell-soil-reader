@@ -1,11 +1,11 @@
 // Where each filled-in value of the Soil page is drawn. The PDF and the on-screen preview both
 // take this list, so they cannot disagree.
 import { regionOf } from "./regions"
-import { PROFILE_COLUMNS } from "./regions/types"
+import { PROFILE_COLUMNS, type Box } from "./regions/types"
 import { columnRoom, fieldId, indicatorFieldId, type Form } from "./formFor"
 import type { Project } from "./model"
 import { textureCode } from "./texture"
-import { fit } from "./text"
+import { fit, widthOf } from "./text"
 
 /** A texture term as the column can hold it: the full term when it reads at 6.5 points or more, else the Field Book's code. */
 export function printedTexture(term: string, room: number, size: number): string {
@@ -51,18 +51,8 @@ export function soilPlacements(project: Project, form: Form): Placement[] {
   ] as const) {
     place(id, form.fields[id], blank.column[0] + soil.inset, blank.rule, blank.column[1] - blank.column[0] - 2 * soil.inset)
   }
-  // A tick is an X drawn on the printed blank, centered on it and sitting just above its line.
-  const tick = (id: Placement["id"], box: { x: readonly [number, number]; rule: number }) => {
-    if (!form.fields[id as keyof typeof form.fields]) return
-    const width = X_WIDTH * soil.tick.size
-    placements.push({
-      id,
-      text: "X",
-      x: (box.x[0] + box.x[1]) / 2 - width / 2,
-      baseline: box.rule - soil.tick.aboveRule,
-      size: soil.tick.size,
-      maxWidth: width,
-    })
+  const tick = (id: Placement["id"], box: Box) => {
+    if (form.fields[id as keyof typeof form.fields]) placements.push(tickPlacement(id, box, soil.tick.size, soil.tick.aboveRule))
   }
   for (const indicator of regionOf(project.region).indicators) tick(indicatorFieldId(indicator.id), indicator.box)
   tick("soil.hydric.yes", soil.hydricPresent.yes)
@@ -70,5 +60,8 @@ export function soilPlacements(project: Project, form: Form): Placement[] {
   return placements
 }
 
-/** The width of a capital X in Helvetica, in ems. */
-const X_WIDTH = 0.667
+/** A tick: an X drawn on a printed blank, centered on it and sitting just above its line. */
+export function tickPlacement(id: string, box: Box, size: number, aboveRule: number): Placement {
+  const width = widthOf("X", size)
+  return { id, text: "X", x: (box.x[0] + box.x[1]) / 2 - width / 2, baseline: box.rule - aboveRule, size, maxWidth: width }
+}

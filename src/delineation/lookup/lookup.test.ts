@@ -52,6 +52,9 @@ describe("NWI", () => {
 })
 
 describe("Soil Data Access", () => {
+  test("parses the public synthetic-point response recorded from USDA on November 2", () => {
+    expect(parseSda(fixture("sda-hit.live-20261102.json"))).toBe("Ladoga silt loam, dissected till plain, 5 to 9 percent slopes, eroded")
+  })
   test("posts a JSON body: the map unit name at the point (longitude first) in the JSON+COLUMNNAME format", () => {
     const body = JSON.parse(sdaBody(WHERE))
     expect(body.format).toBe("JSON+COLUMNNAME")

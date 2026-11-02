@@ -17,6 +17,7 @@ import { VegetationIndicators } from "@/components/VegetationIndicators"
 import { VegetationPreview } from "@/components/VegetationPreview"
 import { Button } from "@/components/ui/button"
 import { formFor } from "@/delineation/formFor"
+import { describeClearedLookups, withoutStaleLookups, type LookupKey } from "@/delineation/lookup"
 import { confirmConclusion, type Answer, type ConclusionId } from "@/delineation/determination"
 import { pairOf, topToBottom, withPoint, withVegetation, type IndicatorChoice, type Layer, type Project, type SamplingPoint } from "@/delineation/model"
 import type { Vegetation } from "@/delineation/vegetation/entry"
@@ -101,21 +102,28 @@ export function PointView({ project, point, change, onBack }: Props) {
   const [editingDetails, setEditingDetails] = React.useState(false)
   // The details form saves a whole snapshot of the point, so it waits for a look-up that is writing into it.
   const [lookingUp, setLookingUp] = React.useState(false)
+  const [detailsNotes, setDetailsNotes] = React.useState<string[]>([])
   const form = React.useMemo(() => formFor(project, point), [project, point])
   const layers = topToBottom(point.layers)
 
   // The pair is kept on this point; a pair another point recorded with this one is replaced by it.
   const saveDetails = async ({ lat, long, datum, soilMapUnit, nwi, pair }: PointDetailsChange) => {
+    let cleared: LookupKey[] = []
     await change(project.id, (p) => ({
       ...p,
-      points: p.points.map((pt) =>
-        pt.id === point.id
-          ? { ...pt, lat, long, datum, soilMapUnit: soilMapUnit.trim() || undefined, nwi: nwi.trim() || undefined, pair: pair ?? undefined }
-          : pt.pair?.with === point.id
-            ? { ...pt, pair: undefined }
-            : pt,
-      ),
+      points: p.points.map((pt) => {
+        if (pt.id === point.id) {
+          const edited = { ...pt, lat, long, datum, soilMapUnit: soilMapUnit.trim() || undefined, nwi: nwi.trim() || undefined, pair: pair ?? undefined }
+          const moved = pt.lat.trim() !== lat.trim() || pt.long.trim() !== long.trim() || pt.datum.trim() !== datum.trim()
+          if (!moved) return edited
+          const applied = withoutStaleLookups(edited)
+          cleared = applied.cleared
+          return applied.point
+        }
+        return pt.pair?.with === point.id ? { ...pt, pair: undefined } : pt
+      }),
     }))
+    setDetailsNotes(describeClearedLookups(cleared))
     setEditingDetails(false)
   }
 
@@ -156,7 +164,13 @@ export function PointView({ project, point, change, onBack }: Props) {
       ) : (
         <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
           <DetailsSummary project={project} point={point} />
-          <LocationLookup project={project} point={point} change={change} onBusy={setLookingUp} />
+          <LocationLookup project={project} point={point} change={change} onBusy={(busy) => {
+            setLookingUp(busy)
+            if (busy) setDetailsNotes([])
+          }} />
+          {detailsNotes.length > 0 && (
+            <p role="status" data-testid="location-details-note" className="text-sm">{detailsNotes.join(" ")}</p>
+          )}
           <Button variant="outline" className="h-11 text-base" disabled={lookingUp} onClick={() => setEditingDetails(true)}>
             Edit location and pair
           </Button>

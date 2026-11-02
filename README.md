@@ -94,9 +94,12 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   never replaced, and one an earlier look-up wrote is removed when the position moves to a place with
   none. Turning the setting off, or leaving the point, aborts a look-up under way and writes nothing.
   With the setting off nothing in a project reads the position and no request is made; browser tests
-  hold that with spies. The NWI fixtures were recorded live; the Soil Data Access fixture
-  (`lookup/fixtures/sda-hit.from-docs.json`) has its shape from the service's documentation and is not
-  yet recorded live, and whether that service answers a browser on the app's origin is unconfirmed.
+  hold that with spies. Both services now have live-recorded response fixtures. Soil Data Access's
+  `lookup/fixtures/sda-hit.live-20261102.json` was captured at the synthetic test position on November 2;
+  a fresh Chromium context at the app's HTTPS origin received HTTP 200 with browser CORS enforced.
+  Our workstation DNS failed, so that diagnostic used per-request/browser resolution with normal
+  TLS verification, not a system setting or an app override. Devices still need working DNS/network;
+  failures leave the fields editable. The older from-docs fixture remains a synthetic test example.
 - `e2e/`: the browser tests.
 - Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
   against a ColorChecker and exports the batch file the frame card reads. It is a separate

@@ -77,6 +77,10 @@ export type LookupKey = "soilMapUnit" | "nwi"
 const KEYS: readonly LookupKey[] = ["soilMapUnit", "nwi"]
 const WHAT: Record<LookupKey, string> = { soilMapUnit: "soil map unit", nwi: "NWI class" }
 
+/** Explains which automatic values were removed when the point moved. */
+export const describeClearedLookups = (cleared: readonly LookupKey[]): string[] =>
+  cleared.map((key) => `Cleared the ${WHAT[key]} that came from the earlier position.`)
+
 interface Notable {
   /** Found answers left out because the user's own value is there. */
   kept?: readonly LookupKey[]
@@ -106,9 +110,7 @@ export function describeLookups(lookups: Lookups | null, { kept = [], cleared = 
     }
   }
   // A value an earlier look-up wrote belongs to the old position, so it goes unless this one wrote it again.
-  for (const key of cleared) {
-    if (lookups?.[key].state !== "found") notes.push(`Cleared the ${WHAT[key]} that came from the earlier position.`)
-  }
+  notes.push(...describeClearedLookups(cleared.filter((key) => lookups?.[key].state !== "found")))
   return notes
 }
 

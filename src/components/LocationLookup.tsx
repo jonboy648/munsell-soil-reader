@@ -40,10 +40,10 @@ export function LocationLookup({ project, point, change, onBusy }: Props) {
   const typed = typedPosition(point.lat, point.long)
 
   /** Writes into the point, but only while the project still has location on. False when it no longer does. */
-  const write = async (work: (pt: SamplingPoint) => SamplingPoint): Promise<boolean> => {
+  const write = async (work: (pt: SamplingPoint) => SamplingPoint, signal: AbortSignal): Promise<boolean> => {
     let wrote = false
     await change(project.id, (p) => {
-      if (!p.location) return p
+      if (signal.aborted || !p.location) return p
       wrote = true
       return withPoint(p, point.id, work)
     })
@@ -69,7 +69,7 @@ export function LocationLookup({ project, point, change, onBusy }: Props) {
           const stale = withoutStaleLookups({ ...pt, lat: written(here.lat), long: written(here.long), datum: "WGS84" })
           cleared = stale.cleared
           return stale.point
-        })
+        }, stop.signal)
         if (!wrote) return
       }
       if (!where || stop.signal.aborted) return
@@ -85,7 +85,7 @@ export function LocationLookup({ project, point, change, onBusy }: Props) {
           kept = applied.kept
           cleared = [...new Set([...cleared, ...applied.cleared])]
           return applied.point
-        })
+        }, stop.signal)
         if (!wrote) return
       }
       setNotes(describeLookups(lookups, { kept, cleared }))

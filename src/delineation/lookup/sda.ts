@@ -1,9 +1,11 @@
 // The soil map unit of a point, from the USDA NRCS Soil Data Access web service: public and keyless.
 //
-// The request and response shapes here come from the service's own documentation, not from a live
-// call. NOT YET RECORDED LIVE: the host could not be reached from the machine this was written on, so
-// the fixture is named `sda-hit.from-docs.json` and whether the service answers a browser on
-// soil.joncackler.com (CORS) is unconfirmed. A failed call degrades to the "lookup unavailable" note.
+// Recorded live on 2026-11-02 at the synthetic test point (-93.6, 41.5):
+// fixtures/sda-hit.live-20261102.json. A fresh Chromium context at the app's HTTPS origin received
+// a real CORS response (HTTP 200). The workstation resolver failed, so that diagnostic used a
+// per-request/browser DNS mapping with normal TLS verification; the app has no such override.
+// A failed call still degrades to the "lookup unavailable" note. The earlier from-docs fixture
+// remains a synthetic parser/test example, not evidence of a field measurement.
 //   Web service help: https://sdmdataaccess.sc.egov.usda.gov/webservicehelp.aspx
 //     the Tabular REST endpoint is POST https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest with a
 //     JSON body of `query` (SQL) and `format`; with "JSON+COLUMNNAME" the first row returned holds the

@@ -81,6 +81,75 @@ function watchOutside(page: Page, baseURL: string | undefined) {
 const projectsSheet = (page: Page) => page.getByRole("dialog", { name: "Projects", exact: true })
 const LOCATION = /Use this phone's location in this project/
 
+test("manually moving a point clears lookup values from the old position", async ({ page, context }) => {
+  await watchPosition(context)
+  await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toContainText("Clarion loam")
+  await editDetails(sheet, { Lat: "40", Long: "-95" })
+  await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
+  await expect(printed(sheet, "soilMapUnit")).toHaveCount(0)
+  await expect(printed(sheet, "nwi")).toHaveCount(0)
+})
+
+test("moving a point keeps lookup fields the user edits in the same save", async ({ page, context }) => {
+  await watchPosition(context)
+  await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(sheet.getByTestId("point-lookups")).toContainText("Clarion loam")
+  await editDetails(sheet, { Lat: "40", Long: "-95", "Soil Map Unit Name": "Field soil note", "NWI classification": "Field NWI note" })
+  await expect(printed(sheet, "soilMapUnit")).toHaveText("Field soil note")
+  await expect(printed(sheet, "nwi")).toHaveText("Field NWI note")
+})
+
+test("leaving a point cancels a location write queued behind another transaction", async ({ page, context }) => {
+  await watchPosition(context)
+  const asked = await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await page.evaluate(async () => {
+    const w = window as unknown as { releaseLocationWrite: () => void; queuedLocationWrite: boolean; locationWriteDrained: Promise<void> }
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("munsell-soil-reader")
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    let held = true
+    const blocker = db.transaction("projects", "readwrite")
+    const store = blocker.objectStore("projects")
+    const keepAlive = () => {
+      if (held) store.count().onsuccess = keepAlive
+    }
+    keepAlive()
+    blocker.oncomplete = () => db.close()
+    w.releaseLocationWrite = () => { held = false }
+    w.queuedLocationWrite = false
+    const original = IDBDatabase.prototype.transaction
+    IDBDatabase.prototype.transaction = function (...args: Parameters<IDBDatabase["transaction"]>) {
+      const transaction = original.apply(this, args)
+      if (args[0] === "projects" && args[1] === "readwrite") {
+        w.queuedLocationWrite = true
+        w.locationWriteDrained = new Promise<void>((resolve) => transaction.addEventListener("complete", () => resolve(), { once: true }))
+        IDBDatabase.prototype.transaction = original
+      }
+      return transaction
+    }
+  })
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect.poll(() => page.evaluate(() => (window as unknown as { queuedLocationWrite: boolean }).queuedLocationWrite)).toBe(true)
+  await sheet.getByRole("button", { name: "Cedar Creek", exact: true }).click()
+  await page.evaluate(async () => {
+    const w = window as unknown as { releaseLocationWrite: () => void; locationWriteDrained: Promise<void> }
+    w.releaseLocationWrite()
+    await w.locationWriteDrained
+  })
+  await sheet.getByRole("button", { name: "Open point" }).click()
+  await expect(printed(sheet, "lat")).toHaveCount(0)
+  await expect(printed(sheet, "long")).toHaveCount(0)
+  expect(asked).toEqual([])
+})
+
 /** A project (with location turned on or not), a sampling point, and the point open. */
 async function openPoint(page: Page, { locationOn }: { locationOn: boolean }) {
   await page.goto("/")
@@ -255,8 +324,10 @@ test("looking up a typed position that has no wetland and no map unit clears wha
   await expect(sheet.getByTestId("point-lookups")).toContainText("NWI: PEM1A")
 
   await editDetails(sheet, { Lat: String(BARE.latitude), Long: String(BARE.longitude) })
+  await expect(sheet.getByTestId("location-details-note")).toContainText("Cleared the NWI class that came from the earlier position.")
+  await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
   await sheet.getByRole("button", { name: "Look up this position" }).click()
-  await expect(sheet.getByTestId("location-note")).toContainText("Cleared the NWI class that came from the earlier position.")
+  await expect(sheet.getByTestId("location-note")).toContainText("No NWI wetland is mapped at this position.")
   await expect(sheet.getByTestId("point-lookups")).toHaveCount(0)
 })
 

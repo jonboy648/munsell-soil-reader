@@ -63,12 +63,23 @@ jobs:
       # Builds the production bundle, serves it with vite preview, and drives it in this engine.
       # A test that passes only on its retry fails the run (see failOnFlakyTests).
       - name: Browser tests (Playwright)
-        run: npm run test:e2e -- --project=${{ matrix.engine }}
+        run: npm run test:e2e -- --project="${{ matrix.engine }}*"
 
       # Passed, skipped (with each reason), flaky and failed, on the run's summary page.
       - name: Summarize
         if: always()
         run: node scripts/e2e-summary.mjs e2e-results.json ${{ matrix.engine }} >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Repeat WebKit offline acceptance without retries
+        id: webkit_repeat
+        if: success() && matrix.engine == 'webkit'
+        env:
+          E2E_RESULTS: webkit-offline-results.json
+        run: npm run test:e2e -- e2e/offline.spec.ts --project=webkit-sw --repeat-each=10 --retries=0
+
+      - name: Summarize WebKit offline repeats
+        if: always() && matrix.engine == 'webkit' && steps.webkit_repeat.outcome != 'skipped'
+        run: node scripts/e2e-summary.mjs webkit-offline-results.json webkit-offline >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the Playwright report when a test fails
         if: failure()
@@ -78,4 +89,6 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            e2e-results.json
+            webkit-offline-results.json
           retention-days: 7

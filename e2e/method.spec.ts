@@ -40,9 +40,10 @@ test("explains the steps, the Card check line and each warning with its number",
   await expect(warnings).toContainText("more than 0.3 stops")
 
   const correction = page.locator("#correction")
-  await expect(correction).toContainText("Five corrections were compared")
-  await expect(correction.getByRole("row")).toHaveCount(6) // the header and five corrections
-  await expect(correction).toContainText("Straighten the tone curve with a smooth curve, then 3x3 (used)")
+  await expect(correction).toContainText("Six corrections were compared")
+  await expect(correction.getByRole("row")).toHaveCount(7) // the header and six corrections
+  await expect(correction).toContainText("a smooth curve per channel, then 3x3 (used for a Page)")
+  await expect(correction).toContainText("one curve shared by the channels, then 3x3 (used for a ColorChecker)")
   await expect(correction).toContainText("Root-polynomial")
 })
 
@@ -79,11 +80,11 @@ test("explains how a Page is used, how dirty Chips are handled, and what has not
 test("says the Card check line is provisional and that a pass is not a promise", async ({ page }) => {
   await openMethodPage(page)
   const correction = page.locator("#correction")
-  await expect(correction).toContainText("The line is 2, and it is provisional.")
-  await expect(correction).toContainText("one or two dirty patches 0.9 to 16")
+  await expect(correction).toContainText("The lines are 2 and 3.5, and they are provisional.")
+  await expect(correction).toContainText("scored 3.56 or more")
   await expect(correction).toContainText("A pass is not a promise that the Reading is within one Chip.")
-  await expect(correction).toContainText("A dirty or tinted gray patch can pass.")
-  await expect(correction).toContainText("14 of 24")
+  await expect(correction).toContainText("A real camera's clean Card is mostly caution.")
+  await expect(correction).toContainText("Caution,")
   // Claims that were not true, and are gone.
   await expect(correction).not.toContainText("3.7 or more")
   await expect(correction).not.toContainText("half the lowest")
@@ -103,7 +104,7 @@ test("explains the Page against ColorChecker trade and the faded-book limit", as
 test("lists every credit with its license", async ({ page }) => {
   await openMethodPage(page)
   const credits = page.getByTestId("credit")
-  await expect(credits).toHaveCount(7)
+  await expect(credits).toHaveCount(11)
   const expected: [string, string][] = [
     ["Munsell Soil Reader", "MIT"],
     ["munsell.js", "MPL-2.0"],
@@ -111,7 +112,11 @@ test("lists every credit with its license", async ({ page }) => {
     ["X-Rite ColorChecker Classic reference values", "BSD-3-Clause"],
     ["colour-science root-polynomial correction", "BSD-3-Clause"],
     ["Archivo, Public Sans and IBM Plex Mono", "SIL OFL 1.1"],
+    ["ReUI components, from 21st.dev", "MIT"],
     ["js-aruco2", "MIT"],
+    ["ENG Form 6116-8", "public domain"],
+    ["2022 National Wetland Plant List", "public domain"],
+    ["Regional Supplement", "public domain"],
   ]
   for (const [name, license] of expected) {
     const credit = credits.filter({ hasText: name })
@@ -163,6 +168,7 @@ test("opens the full license text of each credit that has one", async ({ page })
     ["X-Rite ColorChecker Classic reference values", "Redistribution and use in source and binary forms"],
     ["colour-science root-polynomial correction", "Copyright 2013 Colour Developers"],
     ["js-aruco2", "Copyright (c) 2020 Damiano Falcioni"],
+    ["ReUI components, from 21st.dev", "Copyright (c) 2025 Keenthemes Inc"],
   ]
   for (const [name, snippet] of texts) {
     const credit = page.getByTestId("credit").filter({ hasText: name })
@@ -182,6 +188,27 @@ test("opens the full license text of each credit that has one", async ({ page })
   const chips = page.getByTestId("credit").filter({ hasText: "Soil-book Chip list" })
   await expect(chips.getByTestId("license-text")).toHaveCount(0)
   await expect(chips.getByRole("link", { name: "CC0 1.0 legal code" })).toBeVisible()
+})
+
+test("says how a plant's status is found, and that the order of the neighbouring regions is an assumption", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("2022 National Wetland Plant List")
+  await expect(notes).toContainText("The 2022 list has no NI or NO ratings.")
+  await expect(notes).toContainText("Midwest, then the Eastern Mountains and Piedmont, then the Atlantic and Gulf Coastal Plain, then the Great Plains")
+  await expect(notes).toContainText("the order is an assumption")
+})
+
+test("says how the dominant species are chosen, when the prevalence index is applied, and that a plant identified only to its genus counts", async ({ page }) => {
+  await openMethodPage(page)
+  const notes = page.getByTestId("vegetation-notes")
+  await expect(notes).toContainText("50/20 rule")
+  await expect(notes).toContainText("A stratum under 5 percent cover is recorded and not used, unless it is the only one.")
+  await expect(notes).toContainText("applied only when the dominance test fails and hydric soil and wetland hydrology indicators are present")
+  await expect(notes).toContainText("nothing is ticked on the form until you confirm it")
+  await expect(notes).toContainText("Decided on 2026-10-18: a plant identified only to its genus")
+  await expect(notes).toContainText("the 80 percent of cover that must be identified and rated")
+  await expect(notes).toContainText("A plant you mark as not identified is left out of the index and counts against the 80 percent. A named plant that is not on the list counts as UPL.")
 })
 
 test("says the 20-soil test has not been run, and marks what is not in this version", async ({ page }) => {

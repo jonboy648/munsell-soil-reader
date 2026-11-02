@@ -173,7 +173,7 @@ test("a batch that has not been measured is refused, with the reason", async ({ 
     "base64",
   )
   await page.getByTestId("choose-input").setInputFiles({ name: "soil.png", mimeType: "image/png", buffer: onePixelPng })
-  await page.getByRole("button", { name: "Frame", exact: true }).click()
+  await page.getByRole("radio", { name: "Frame", exact: true }).click()
   await expect(page.getByTestId("batch-status")).toHaveAttribute("data-state", "none")
 
   await page.getByTestId("batch-code").fill("lot-a1")
@@ -199,7 +199,7 @@ test("the frame finder is loaded only once the frame is chosen", async ({ page }
   expect(finderLoaded()).toBe(false)
 
   // Choosing the frame for this Photo loads the finder, which finds no frame in a ColorChecker Photo.
-  await page.getByRole("button", { name: "Frame", exact: true }).click()
+  await page.getByRole("radio", { name: "Frame", exact: true }).click()
   await expect(frameStatus(page)).toHaveAttribute("data-state", "missing")
   expect(finderLoaded()).toBe(true)
 })

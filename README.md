@@ -49,7 +49,7 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   call is `readPhoto({ pixels, card, spots })`.
 - `src/components/`: one component per feature area (`PhotoView`, `CardPanel`, `SpotsPanel`,
   `ReadingsPanel`), plus the step indicator, example picker, bottom bar and theme toggle.
-  `src/components/ui/` is shadcn/ui.
+  `src/components/ui/` is shadcn/ui and four components from 21st.dev (see below).
 - `src/components/method/`: the accuracy and method page (how a Reading is made, the warnings and
   their numbers, the correction, limits, what leaves the phone, credits and license texts). It
   reads its numbers from the engine's constants and its license texts from `LICENSE` and
@@ -65,6 +65,26 @@ same domain. The old `gh-pages` branch is no longer deployed from and is kept on
   name or note that it could mistake for a formula, number, time, date or TRUE/FALSE (`=1+1`, `001`,
   `1 A`, `Mar 5`) is shown with a leading apostrophe: the export adds it on purpose, so that
   Excel keeps the text as typed. It is not corruption.
+- `src/delineation/`: the wetland form. A Project holds a header (the lines at the top of page 1, entered
+  once and printed on every point's form) and Sampling points, which hold their own lines (name, lat,
+  long, datum, the wetland or upland pair), Layers (inches) and Hydrology. `formFor(project, point)` is
+  the pure form engine: every printed field of page 1's header and Hydrology section and the Soil page's
+  profile table, suggestions, conclusions and warnings. The region package (`regions/ncne/`) is data:
+  the official ENG Form 6116-8 pages, as PDFs and images, and where each field sits on them, measured
+  from the PDF. A point's PDF is its page 1, Vegetation page, Soil page (and the Vegetation Continued page when a
+  stratum overflows) and Privacy Act page, each the official page with the values drawn on it (pdf-lib, on the device); the project PDF is those for every point in
+  order, with each official page embedded once. The on-screen previews draw the same lists of placed
+  values. Text is made printable and fitted to its line in `text.ts`, with a warning when it is cut.
+  Page 1's Hydrology section (the 29 indicators with the supplement's definitions and pages,
+  `regions/ncne/hydrology-rules.md`, the one-primary-or-two-secondary rule, depths and notes) is drawn
+  on the same page the same way.
+  The Vegetation pages are filled from the plants a point holds: a plant is typed by common name,
+  scientific name or abbreviation and resolved against the 2022 National Wetland Plant List for the region,
+  a chunk that loads when the entry opens and works offline. How, and the rules it follows:
+  [docs/vegetation.md](docs/vegetation.md).
+  A layer also takes a texture from the NRCS Field Book's classes (`texture.ts`: the 21 classes, the
+  mucky modifier, muck, mucky peat and peat), the form's redox type and location codes, and colors typed
+  by hand, which are checked against the Chip list (`colorCheck.ts`).
 - `e2e/`: the browser tests.
 - Measurement mode, at `/?measure`: a maker tool that measures a filament lot's swatches
   against a ColorChecker and exports the batch file the frame card reads. It is a separate
@@ -146,13 +166,16 @@ loads only when the frame is chosen; `src/engine/frame.test.ts` checks the main 
 without it.
 
 How a Reading is made: the median of the tapped pixels, then a correction fitted to the 24 Card
-patches (ColorChecker "after November 2014" reference values): each channel is linearized along
-the six gray patches, undoing the camera's tone curve, and a 3x3 matrix is fitted to all 24. Then
-a conversion to Munsell with [munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0),
-then the nearest Chip by CIEDE2000. The Card check is the mean CIEDE2000 over the Card's
-patches, each corrected by a fit made without it (leave one out); below 2 is good. Why this
-correction and this threshold, and how it compares with a plain 3x3 and root-polynomial
-correction: [docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
+patches (ColorChecker "after November 2014" reference values): one tone curve, shared by the three
+channels, is drawn through the six gray patches and undone, which removes the camera's tone curve,
+and a 3x3 matrix is fitted to all 24. (A Page draws a curve for each channel, through its /1 column.) A gray that looks dirty is named and left out. Then a conversion to Munsell with
+[munsell.js](https://github.com/privet-kitty/munsell.js) (MPL-2.0), then the nearest Chip by
+CIEDE2000. The Card check is the mean CIEDE2000 over the Card's patches, each corrected by a fit made
+without it (leave one out): below 2 is good, up to 3.5 is caution (the corrected Reading is still the
+answer, with the raw one beside it) and above that it has failed. Both limits are provisional until
+a real Photo has been run. Why this correction and these limits, and how it compares with a plain
+3x3, root-polynomial correction and a curve per channel:
+[docs/correction-comparison.md](docs/correction-comparison.md). The engine knows 359 Chips with their color names, gley, neutral and
 the WHITE Page included: the CC0 list by tomax31 (`src/engine/chipList.ts`, 315 Chips) plus
 what a physical soil book showed it lacks or has stale (`src/engine/bookCorrections.ts`). That
 list is only as complete as the checking, which is against one copy (Soil-Color Charts, 2009
@@ -161,6 +184,36 @@ Gley 2 and WHITE. Chips checked, names pending: 2.5Y and 5Y. Not checked: 10R, w
 binder's tabs do not show (they start at 2.5YR). Not known: whether the book has 5R or 7.5R Pages.
 Each Chip's color is computed from its notation, matching happens in Lab, and only the
 on-screen swatch is clamped to sRGB.
+
+## Adding 21st.dev components
+
+The step indicator, the Card picker and the Readings sheet are built on components from the
+[21st.dev](https://21st.dev) registry, copied into `src/components/ui/` and restyled to the
+interface's neutral grays. The registry wants an API key. `components.json` names it as
+`${API_KEY_21ST}` and never holds its value, so building, testing and CI need no key: the
+components are in the source.
+
+To add another, put the key in your shell first. It is a Windows user environment variable, which
+a new shell does not inherit; in bash:
+
+```sh
+export API_KEY_21ST="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('API_KEY_21ST','User')" | tr -d '\r')"
+npx shadcn add @21st/<author>/<component> -p src/components/ui
+```
+
+Things to know:
+
+- The registry's answers repeat the key in the addresses of a component's own dependencies
+  (`?api_key=...`). Do not paste, save or commit raw output from the registry or the CLI, and do
+  not run `shadcn view`; filter any output you share.
+- A registry component can bring files you do not want (its own button, new color variables in
+  `src/index.css`). Keep only what the app uses, and check `git diff` for a stray value in
+  `package.json`, `components.json` or the stylesheet.
+- Check the license of the component and of its upstream repository before you use it (the
+  registry's "License" line is the author's word), keep the gray tokens, and give it a header
+  comment (its address, its license, what you changed), a credit in `src/lib/credits.ts` and its
+  license text in `THIRD_PARTY_NOTICES.md`. The generated package list does not see it: it is
+  source, not a package.
 
 ## Tests
 
@@ -200,17 +253,16 @@ one fails. A test that passes only on its retry counts as a failure in CI: it is
 ticketed, not retried away. Each job's summary page lists passed, skipped, flaky and failed
 (`scripts/e2e-summary.mjs`).
 
-**Why the service worker specs have a browser of their own.** In CI, WebKit's service worker
-install sometimes never started: the registration exists, no worker (installing, waiting or
-active) ever appears, `navigator.serviceWorker.ready` never resolves, and the test times out.
-The page and `sw.js` load normally. Nothing recovers it: not waiting 30 seconds, `update()`,
-registering again or reloading. Measured with a loop of fresh-context installs on the macOS
-runner: 0 stalls in 600 installs in a fresh browser, and 13 in about 2,800 after other specs
-had run in the same browser (about one in a hundred after the whole suite; one in 360 after the
-log spec or the magnifier spec alone, none in 360 after the measurement spec alone). No CPU or memory pressure made it
-happen. It is not slow installs, not contention between workers (the job had one), and not the
-app. Cause inside WebKit not known; the stall only appears in a browser that has run other
-tests, so the service worker specs get a browser of their own.
+**Why the service worker specs have a browser of their own.** Historical macOS CI diagnostics
+observed registrations with no installing, waiting or active worker after other specs had run
+in the browser: 13 stalls in approximately 2,800 installs, versus none in 600 fresh-browser
+installs. The internal cause was not established. The separate service-worker project is a
+test-isolation candidate, not proof that every Safari offline failure is resolved.
+On November 2, a Windows WebKit loop completed 100 installs after opening a practice Photo;
+the earlier macOS hang was not reproduced locally. CI runs the full engine suite and then
+ten offline-spec repeats on WebKit with zero retries. Both commands propagate failures;
+their JSON reports are separate. No timeout or assertion was relaxed. The approximately
+six-minute WebKit target in #66 still requires measurement on the macOS runner.
 
 A test that only one engine can run is skipped on the others, with the reason, so it shows as
 skipped and is counted rather than passing without running. A test that drives touch through the
@@ -239,7 +291,7 @@ shift (ADR 0001). The ColorChecker stays supported as the independent reference.
 hue, which is why the Reading suggests the Page the soil belongs on.
 
 The examples use a simulated camera, so real Photos will do worse: phones add tone curves, HDR
-and local processing that no per-channel curve and 3x3 correction can undo. A Card in the shot, in the same light as
+and local processing that no curve per channel and 3x3 correction can undo. A Card in the shot, in the same light as
 the soil, is needed for a corrected Reading.
 
 Offline on iPhone and iPad: an app added to the Home Screen has its own storage, separate from

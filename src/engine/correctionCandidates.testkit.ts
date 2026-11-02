@@ -94,3 +94,61 @@ export const piecewiseLinear: CurveFit = (points) => {
     return p[k].y + slope * (x - p[k].x)
   }
 }
+
+// ---- other ways to draw the curve through the ladder ----
+// The shipped curve is PCHIP, which passes exactly through every gray. These fit a smooth
+// curve to the grays instead, so no single gray can own a stretch of the curve.
+
+const straightOn = (f: (x: number) => number, lo: number, hi: number): ((x: number) => number) => {
+  const h = 1e-6
+  return (x) => {
+    if (x < lo) return f(lo) + ((f(lo + h) - f(lo)) / h) * (x - lo)
+    if (x > hi) return f(hi) + ((f(hi) - f(hi - h)) / h) * (x - hi)
+    return f(x)
+  }
+}
+
+/** Least-squares polynomial of the given degree, straight on past the first and last gray. */
+export const leastSquaresPolynomial =
+  (degree: number): CurveFit =>
+  (points) => {
+    if (points.length <= degree) return (x) => x
+    const A = points.map((p) => Array.from({ length: degree + 1 }, (_, k) => p.x ** k))
+    const coef = leastSquares(A, points.map((p) => [p.y, 0, 0] as Vec3)).map((row) => row[0])
+    const xs = points.map((p) => p.x)
+    return straightOn((x) => coef.reduce((s, c, k) => s + c * x ** k, 0), Math.min(...xs), Math.max(...xs))
+  }
+
+/** As above, but a gray far from the curve loses weight (Huber), so one dirty gray bends it less. */
+export const robustPolynomial =
+  (degree: number): CurveFit =>
+  (points) => {
+    if (points.length <= degree) return (x) => x
+    const A = points.map((p) => Array.from({ length: degree + 1 }, (_, k) => p.x ** k))
+    let weights = points.map(() => 1)
+    let coef: number[] = []
+    for (let pass = 0; pass < 8; pass++) {
+      const W = A.map((row, i) => row.map((v) => v * Math.sqrt(weights[i])))
+      const B = points.map((p, i) => [p.y * Math.sqrt(weights[i]), 0, 0] as Vec3)
+      coef = leastSquares(W, B).map((row) => row[0])
+      const resid = points.map((p, i) => Math.abs(p.y - A[i].reduce((s, v, k) => s + v * coef[k], 0)))
+      const scale = Math.max(1e-4, 1.4826 * [...resid].sort((a, b) => a - b)[Math.floor(resid.length / 2)])
+      weights = resid.map((r) => (r <= 1.345 * scale ? 1 : (1.345 * scale) / r))
+    }
+    const xs = points.map((p) => p.x)
+    return straightOn((x) => coef.reduce((s, c, k) => s + c * x ** k, 0), Math.min(...xs), Math.max(...xs))
+  }
+
+/** A gamma curve with a gain and an offset, y = a * x^g + b: three numbers per channel. */
+export const gammaCurve: CurveFit = (points) => {
+  if (points.length < 3) return (x) => x
+  let best = { sse: Infinity, g: 1, a: 1, b: 0 }
+  for (let g = 0.3; g <= 4; g += 0.02) {
+    const A = points.map((p) => [Math.max(p.x, 0) ** g, 1])
+    const [[a], [b]] = leastSquares(A, points.map((p) => [p.y, 0, 0] as Vec3)).map((row) => [row[0]])
+    const sse = points.reduce((s, p) => s + (p.y - (a * Math.max(p.x, 0) ** g + b)) ** 2, 0)
+    if (sse < best.sse) best = { sse, g, a, b }
+  }
+  const xs = points.map((p) => p.x)
+  return straightOn((x) => best.a * Math.max(x, 0) ** best.g + best.b, Math.min(...xs), Math.max(...xs))
+}

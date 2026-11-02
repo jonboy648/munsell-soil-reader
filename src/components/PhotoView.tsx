@@ -1,6 +1,7 @@
 // The Photo: shows it full width and turns taps into Photo coordinates. It also draws
 // what the user has marked (Card corners, the patch or Chip positions, Spots) over the Photo.
 import * as React from "react"
+import { ImagePlus } from "lucide-react"
 import {
   framePatchSites,
   frameWindow,
@@ -166,8 +167,14 @@ export function PhotoView({ pixels, corners, spots, spotRadii, spotLabels, cardK
 
   if (!pixels) {
     return (
-      <div className="grid aspect-[8/5] w-full place-items-center bg-muted px-6 text-center text-sm text-muted-foreground">
-        No Photo yet. Take or choose one below, or practice with an example.
+      <div className="reader-empty-photo grid aspect-[8/5] w-full place-items-center rounded-2xl border border-border bg-muted px-6 py-10 text-center text-sm text-muted-foreground">
+        <div className="grid max-w-xs justify-items-center gap-4">
+          <span className="grid size-16 place-items-center rounded-2xl border border-border bg-card" aria-hidden="true">
+            <ImagePlus className="size-7" strokeWidth={1.5} />
+          </span>
+          <p className="font-heading text-xl font-bold text-foreground">Your photo goes here</p>
+          <p className="leading-relaxed">No Photo yet. Take or choose one below, or practice with an example.</p>
+        </div>
       </div>
     )
   }

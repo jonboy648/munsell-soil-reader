@@ -1,0 +1,111 @@
+// The middle column of the Soil page's hydric soil indicators: the rest of the sandy ones, then the
+// loamy and clayey ones. See indicatorsLeft.ts for the sources.
+import type { Indicator } from "../types"
+import { FIELD, MASKED, MIDDLE, box, entry, field, fi, supplement, texture } from "./indicatorKit"
+
+export const MIDDLE_COLUMN: readonly Indicator[] = [
+  entry({
+    id: "S7", code: "S7", name: "Dark Surface", list: "hydric", printed: "Dark Surface (S7)",
+    needs: [MASKED],
+    criteria: FIELD,
+    quote: "A layer 10 cm (4 inches) or more thick, starting at a depth of 15 cm (6 inches) or less from the soil surface, with a matrix value of 3 or less and chroma of 1 or less. At least 70 percent of the visible soil particles must be masked with organic material when viewed through a 10x or 15x hand lens. The matrix color of the layer directly below the dark layer must have the same colors as described above or any color with a chroma of 2 or less.",
+    citations: [fi("p. 23"), supplement("p. 56-57")],
+    box: box(MIDDLE, 340.4),
+  }),
+  entry({
+    id: "S8", code: "S8", name: "Polyvalue Below Surface", list: "hydric", printed: "Polyvalue Below Surface (S8) (LRR R, MLRA 149B)",
+    scope: { lrr: ["R"], mlra: ["149B"] },
+    needs: [MASKED, field("Where the spodic horizon begins, if it is above 12 in.")],
+    criteria: FIELD,
+    quote: "A layer with a value of 3 or less and chroma of 1 or less starting at a depth of 15 cm (6 inches) or less from the soil surface. At least 70 percent of the visible soil particles must be masked with organic material when viewed through a 10x or 15x hand lens. Directly below this layer, 5 percent or more of the soil volume has a value of 3 or less and chroma of 1 or less, and the remainder of the soil volume has value of 4 or more and chroma of 1 or less to a depth of 30 cm (12 inches) or to the spodic horizon.",
+    citations: [fi("p. 23-24"), supplement("p. 57")],
+    box: box(MIDDLE, 352.8),
+  }),
+  entry({
+    id: "S9", code: "S9", name: "Thin Dark Surface", list: "hydric", printed: "Thin Dark Surface (S9) (LRR R, MLRA 149B)",
+    scope: { lrr: ["R"], mlra: ["149B"] },
+    needs: [MASKED, field("Where the spodic horizon begins, if it is above 12 in.")],
+    criteria: FIELD,
+    quote: "A layer 5 cm (2 inches) or more thick, starting at a depth of 15 cm (6 inches) or less from the soil surface, with value of 3 or less and chroma of 1 or less. At least 70 percent of the visible soil particles must be masked with organic material when viewed through a 10x or 15x hand lens. This layer is underlain by a layer or layers with value of 4 or less and chroma of 1 or less to a depth of 30 cm or a spodic horizon.",
+    citations: [fi("p. 24"), supplement("p. 59")],
+    box: box(MIDDLE, 377.5),
+  }),
+  entry({
+    id: "S11", code: "S11", name: "High Chroma Sands", list: "hydric", printed: "High Chroma Sands (S11) (LRR K, L)",
+    scope: { lrr: ["K", "L"] },
+    needs: [field("That the soil is on a Great Lakes shoreline, in a coastal zone or a dune-and-swale complex.")],
+    criteria: FIELD,
+    quote: "In coastal zones and dune-and-swale complexes, a layer 5 cm (2 inches) or more thick starting at a depth of 10 cm (4 inches) or less from the soil surface with chroma of 4 or less and 2 percent or more distinct or prominent redox concentrations.",
+    citations: [fi("p. 24")],
+    box: box(MIDDLE, 389.8),
+  }),
+  entry({
+    id: "F1", code: "F1", name: "Loamy Mucky Mineral", list: "hydric", printed: "Loamy Mucky Mineral (F1) (LRR K, L)",
+    scope: { lrr: ["K", "L"] },
+    needs: [texture("The layer's texture recorded with the mucky modifier (mucky silt loam).")],
+    criteria: { kind: "mucky", texture: "loamy", thickness: 4, startsWithin: 6 },
+    quote: "A layer of mucky modified loamy or clayey soil material 10 cm (4 inches) or more thick starting at a depth of 15 cm (6 inches) or less from the soil surface.",
+    citations: [fi("p. 25"), supplement("p. 61")],
+    box: box(MIDDLE, 402.2),
+  }),
+  entry({
+    id: "F2", code: "F2", name: "Loamy Gleyed Matrix", list: "hydric", printed: "Loamy Gleyed Matrix (F2)",
+    criteria: { kind: "gleyed", texture: "loamy", startsWithin: 12, share: 60 },
+    quote: "A gleyed matrix that occupies 60 percent or more of a layer starting at a depth of 30 cm (12 inches) or less from the soil surface (fig. 29).",
+    citations: [fi("p. 25"), supplement("p. 61-62")],
+    box: box(MIDDLE, 414.6),
+  }),
+  entry({
+    id: "F3", code: "F3", name: "Depleted Matrix", list: "hydric", printed: "Depleted Matrix (F3)",
+    criteria: { kind: "depleted", texture: "loamy", share: 60, variants: [{ thickness: 2, startsWithin: 4 }, { thickness: 6, startsWithin: 10 }] },
+    quote: "A layer that has a depleted matrix with 60 percent or more chroma of 2 or less and that has a minimum thickness of either 1. 5 cm (2 inches), starting at a depth of 10 cm (4 inches) or less from the soil surface, or 2. 15 cm (6 inches), starting at a depth of 25 cm (10 inches) or less from the soil surface.",
+    citations: [fi("p. 26"), supplement("p. 63")],
+    box: box(MIDDLE, 426.9),
+  }),
+  entry({
+    id: "F6", code: "F6", name: "Redox Dark Surface", list: "hydric", printed: "Redox Dark Surface (F6)",
+    criteria: {
+      kind: "darkRedox", texture: "loamy", feature: "concentration", startsWithin: 8, thickness: 4, valueMax: 3,
+      variants: [{ chromaMax: 1, redox: 2 }, { chromaMax: 2, redox: 5 }],
+    },
+    quote: "A layer that is 10 cm (4 inches) or more thick, starting at a depth of 20 cm (8 inches) or less from the mineral soil surface, and has 1. matrix value of 3 or less and chroma of 1 or less and 2 percent or more distinct or prominent redox concentrations occurring as soft masses or pore linings, or 2. matrix value of 3 or less and chroma of 2 or less and 5 percent or more distinct or prominent redox concentrations occurring as soft masses or pore linings.",
+    citations: [fi("p. 27"), supplement("p. 64-65")],
+    box: box(MIDDLE, 439.3),
+  }),
+  entry({
+    id: "F7", code: "F7", name: "Depleted Dark Surface", list: "hydric", printed: "Depleted Dark Surface (F7)",
+    criteria: {
+      kind: "darkRedox", texture: "loamy", feature: "depletion", startsWithin: 8, thickness: 4, valueMax: 3,
+      variants: [{ chromaMax: 1, redox: 10 }, { chromaMax: 2, redox: 20 }],
+    },
+    quote: "Redox depletions with value of 5 or more and chroma of 2 or less in a layer that is 10 cm (4 inches) or more thick, starting at a depth of 20 cm (8 inches) or less from the mineral soil surface, and has 1. matrix value of 3 or less and chroma of 1 or less and 10 percent or more redox depletions, or 2. matrix value of 3 or less and chroma of 2 or less and 20 percent or more redox depletions.",
+    citations: [fi("p. 28"), supplement("p. 66-67")],
+    box: box(MIDDLE, 451.6),
+  }),
+  entry({
+    id: "F8", code: "F8", name: "Redox Depressions", list: "hydric", printed: "Redox Depressions (F8)",
+    needs: [field("That the soil is in a closed depression subject to ponding (not a solitary microdepression, and not a convex or planar slope).")],
+    criteria: FIELD,
+    quote: "In closed depressions subject to ponding, 5 percent or more distinct or prominent redox concentrations occurring as soft masses or pore linings in a layer that is 5 cm (2 inches) or more thick and starts at 10 cm (4 inches) or less from the soil surface.",
+    citations: [fi("p. 28"), supplement("p. 67-68")],
+    box: box(MIDDLE, 464.0),
+  }),
+  entry({
+    id: "F10", code: "F10", name: "Marl", list: "hydric", printed: "Marl (F10) (LRR K, L)",
+    scope: { lrr: ["K", "L"] },
+    needs: [field("That the layer is marl: a limnic material that reacts with dilute hydrochloric acid to give off carbon dioxide.")],
+    criteria: FIELD,
+    quote: "A layer of marl with value of 5 or more and chroma of 2 or less starting at a depth of 10 cm (4 inches) or less from the soil surface (fig. 36).",
+    citations: [fi("p. 28")],
+    box: box(MIDDLE, 476.4),
+  }),
+  entry({
+    id: "F21-MLRA-145", code: "F21", name: "Red Parent Material", list: "hydric", printed: "Red Parent Material (F21) (MLRA 145)",
+    scope: { mlra: ["145"] },
+    needs: [field("That the layer is derived from red parent material (a Color Change Propensity Index below 30).")],
+    criteria: FIELD,
+    quote: "A layer derived from red parent materials (see glossary) that is at least 10 cm (4 inches) thick, starting within 25 cm (10 inches) of the soil surface with a hue of 7.5YR or redder. The matrix has a value and chroma greater than 2 and less than or equal to 4. The layer must contain 10 percent or more depletions and/or distinct or prominent redox concentrations occurring as soft masses or pore linings.",
+    citations: [fi("p. 31-32"), supplement("p. 73-74")],
+    box: box(MIDDLE, 488.7),
+  }),
+]

@@ -136,9 +136,9 @@ export function PageCard() {
           the end of it. Its check is 2.98.
         </li>
         <li>
-          After leaving Chips out, 2.5Y read 2.84 and 5Y read 1.83. With the line at{" "}
-          {CARD_CHECK_GOOD}, three of the four real Pages would show "failed". That is the
-          provisional line (issue #28), not the Pages.
+          After leaving Chips out, 2.5Y read 2.84 and 5Y read 1.83. With the good line at{" "}
+          {CARD_CHECK_GOOD}, 10YR (2.79) and 2.5Y show caution (the corrected Reading with the
+          uncorrected one beside it), 5Y shows good, and only 7.5YR fails, on its row guard.
         </li>
         <li>
           <b>What is not caught.</b> A mild film (2 to 5%) on both dark gray steps makes the app

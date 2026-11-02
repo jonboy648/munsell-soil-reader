@@ -30,7 +30,11 @@ test("a Reading shows the Chip's color name, three candidates and the two swatch
   // The nearest Chip: its notation and its name in the soil book.
   await expect(sheet.getByTestId("drawer-notation")).toHaveText("10YR 4/3")
   await expect(sheet.getByTestId("drawer-name")).toHaveText("brown")
-  await expect(sheet.getByText(/^exact \d/)).toBeVisible()
+  await expect(sheet.getByRole("columnheader", { name: "Calculated estimate", exact: true })).toBeVisible()
+  const estimate = sheet.getByRole("row", { name: /^Corrected / }).getByRole("cell").nth(2)
+  await expect(estimate).toBeVisible()
+  await expect(estimate).toHaveText(/^\d+(?:\.\d+)?[A-Z]+ \d+(?:\.\d+)?\/\d+(?:\.\d+)?$/)
+  await expect(sheet.getByText(/The calculated estimate below is not a printed chip;/)).toBeVisible()
 
   // Three candidates, nearest first, each with its name and distance.
   const candidates = sheet.getByRole("list", { name: "Top 3 Chips" }).getByRole("listitem")

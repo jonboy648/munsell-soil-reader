@@ -80,12 +80,50 @@ export const CREDITS: Credit[] = [
     notice: "Fonts (SIL Open Font License 1.1)",
   },
   {
+    name: "ReUI components, from 21st.dev",
+    license: "MIT",
+    by: "Keenthemes Inc (ReUI, by Sean Hello), through the 21st.dev registry",
+    used: "The step indicator, the Card picker and the Readings sheet are built from four ReUI components copied into the app's source and restyled in neutral grays.",
+    links: [
+      { label: "Stepper", href: "https://21st.dev/@sean0205/components/stepper" },
+      { label: "Toggle group", href: "https://21st.dev/@sean0205/components/toggle-group-1" },
+      { label: "Toggle", href: "https://21st.dev/@sean0205/components/toggle-1" },
+      { label: "Drawer", href: "https://21st.dev/@sean0205/components/drawer" },
+      { label: "ReUI", href: "https://github.com/keenthemes/reui" },
+    ],
+    notice: "21st.dev components (ReUI, MIT)",
+  },
+  {
     name: "js-aruco2",
     license: "MIT",
     by: "Damiano Falcioni, from js-aruco by Juan Mellado",
     used: "Reads the markers of the printed frame. The frame finder is built and tested but not switched on, so js-aruco2 is not in the app you are using.",
     links: [{ label: "Source", href: "https://github.com/damianofalcioni/js-aruco2" }],
     notice: "js-aruco2 (MIT)",
+  },
+  {
+    name: "ENG Form 6116-8, Wetland Determination Data Form (Northcentral and Northeast)",
+    license: "US government work, public domain",
+    by: "U.S. Army Corps of Engineers",
+    used: "The official Page 1, Soil, Vegetation and Vegetation Continued pages (September 2024), unchanged, that a sampling point's values are drawn onto for the PDF and the preview.",
+    links: [{ label: "Regulatory Program", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/" }],
+  },
+  {
+    name: "Regional Supplement, Northcentral and Northeast Region (ERDC/EL TR-12-1)",
+    license: "US government work, public domain",
+    by: "U.S. Army Corps of Engineers",
+    used: "The definitions of the wetland hydrology indicators, quoted word for word with their pages, and the rule that one primary or two secondary indicators show wetland hydrology.",
+    links: [{ label: "Regional supplements", href: "https://www.usace.army.mil/Missions/Civil-Works/Regulatory-Program-and-Permits/reg_supp/" }],
+  },
+  {
+    name: "2022 National Wetland Plant List and USDA PLANTS checklist",
+    license: "US government data, public domain",
+    by: "U.S. Army Corps of Engineers (the list, version 3.6) and USDA NRCS (PLANTS)",
+    used: "The wetland indicator status of each plant, and the common names, USDA symbols and synonyms used to find a plant you type. Cut down to what the app needs and bundled, so the lookup works with no network.",
+    links: [
+      { label: "National Wetland Plant List", href: "https://wetland-plants.sec.usace.army.mil/" },
+      { label: "USDA PLANTS", href: "https://plants.usda.gov/" },
+    ],
   },
 ]
 

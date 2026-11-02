@@ -1,8 +1,9 @@
 // Which correction the app uses and why, and what the Card check threshold means and does not
 // mean. The numbers are from docs/correction-comparison.md (ticket #4), measured on 160 simulated
-// Photos, and from the open follow-up (issue #28) that found where the check is too kind or too
-// strict. This page says both, because it is the page that says how far to trust a Reading.
-import { CARD_CHECK_GOOD } from "@/engine"
+// Photos, and from the follow-up (issue #28) that found where the check is too kind or too
+// strict and gave it a caution band. This page says both, because it is the page that says how far
+// to trust a Reading.
+import { CARD_CHECK_CAUTION, CARD_CHECK_GOOD } from "@/engine"
 import { Section, Sub, Table } from "./parts"
 
 export function CorrectionSection() {
@@ -10,25 +11,34 @@ export function CorrectionSection() {
     <Section id="correction" title="Which correction, and why">
       <p>
         The app straightens the camera's tone curve along the Card's gray patches, then fits a 3x3
-        color matrix. (A Page of your book uses the same curves and a matrix held near one gain per
-        channel, for a reason given under the Card.) Five corrections were compared on 160 simulated Photos (8 soils, 5 lights, 4
-        strengths of phone tone curve), each scored on how close it brought the soil to its true
-        color. The soil is never part of the fit, so it is an honest test of the correction.
+        color matrix. A ColorChecker's six grays are neutral, so it draws one tone curve and shares it
+        between the three channels. A Page of your book has a ladder that is slightly tinted, and on
+        real Pages the channels do not share a curve, so a Page draws a curve for each channel and
+        uses a matrix held near one gain per channel (a reason given under the Card). Six corrections
+        were compared on 160 simulated Photos (8 soils, 5 lights, 4 strengths of phone tone curve),
+        each scored on how close it brought the soil to its true color. The soil is never part of the
+        fit, so it is an honest test of the correction.
       </p>
       <Table
         head={["Correction", "Soil off by (CIEDE2000, average)", "Within one Chip"]}
         rows={[
-          ["3x3 matrix alone", "3.00", "144 of 160"],
-          ["Root-polynomial", "3.26", "145 of 160"],
-          ["Straighten the tone curve with straight lines, then 3x3", "0.65", "159 of 160"],
-          ["Straighten the tone curve with a smooth curve, then 3x3 (used)", "0.55", "159 of 160"],
+          ["3x3 matrix alone", "3.00", "125 of 160"],
+          ["Root-polynomial", "3.26", "124 of 160"],
+          ["Straighten the tone curve with straight lines, one per channel, then 3x3", "0.65", "159 of 160"],
+          ["Straighten the tone curve with a smooth curve per channel, then 3x3 (used for a Page)", "0.55", "159 of 160"],
+          ["Straighten the tone curve with one curve shared by the channels, then 3x3 (used for a ColorChecker)", "0.63", "160 of 160"],
           ["Straighten the tone curve, then root-polynomial", "0.63", "158 of 160"],
         ]}
       />
       <p>
         Phones brighten shadows and squeeze highlights. A matrix alone cannot undo that, so its error
         grows with the strength of the curve. Straightening the curve first keeps the error near 0.6
-        however strong the curve is. Root-polynomial correction, a published method that adds
+        however strong the curve is. A shared curve gives up 0.08 against a curve per channel on a
+        simulated camera, and wins on a simulated real sensor, whose channels disagree a little (Readings
+        are off by 2.3 instead of 3.1 on average, and 7 of 132 are more than a Chip off instead of
+        25). On Jon's real Pages the order flips: the shared curve fits their gray
+        ladders worse and cannot find the smudged steps, so a Page keeps a curve per channel.
+        No real ColorChecker Photo has been tried yet. Root-polynomial correction, a published method that adds
         nonlinear terms to the matrix, was no better than the plain matrix, and no better after the
         curve was straightened, so the app does not use it.
       </p>
@@ -49,43 +59,69 @@ export function CorrectionSection() {
         The Card check is the average CIEDE2000 distance between each Card patch and its corrected
         color, when that patch was left out of the fit. Leaving it out is the point: a fit that is
         too flexible can match the patches it was given and still be wrong about anything else,
-        including your soil.
-      </p>
-      <p>
-        <b>The line is {CARD_CHECK_GOOD}, and it is provisional.</b> It was set on a simulated
-        ColorChecker with clean gray patches, from 840 simulated Photos, from fine to broken:
+        including your soil. It has three answers.
       </p>
       <ul className="grid list-disc gap-1 pl-5">
-        <li>Photos with a well-formed Card scored 1.04 or less.</li>
         <li>
-          Photos that break the fit scored higher: corners in the wrong order 24 to 56, a shadow
-          over half the Card 3.8 to 15, glare on a patch 6 to 22, and one or two dirty patches 0.9
-          to 16. The low end of that last range is below the line.
+          <b>Good,</b> below {CARD_CHECK_GOOD}. The corrected Reading is the answer.
+        </li>
+        <li>
+          <b>Caution,</b> from {CARD_CHECK_GOOD} up to {CARD_CHECK_CAUTION}, or when a gray step was
+          left out as dirty. The corrected Reading is still the answer, the uncorrected one is shown
+          beside it, and the words name uneven light or the dirty gray step, never the corner order.
+          If the two differ by a Chip or more, wipe the Card or retake the Photo in even light.
+        </li>
+        <li>
+          <b>Failed,</b> above {CARD_CHECK_CAUTION}, or when a row of a Page had to lose two Chips.
+          The uncorrected Reading is shown, with a note.
         </li>
       </ul>
       <p>
-        {CARD_CHECK_GOOD} sits above the worst good Card in that test and below most broken ones. It
-        will be set again on real Photos (the Photo of a real Page, and a follow-up check of the
-        Card check itself).
+        <b>
+          The lines are {CARD_CHECK_GOOD} and {CARD_CHECK_CAUTION}, and they are provisional.
+        </b>{" "}
+        They were set on simulated Photos only, from fine to broken:
+      </p>
+      <ul className="grid list-disc gap-1 pl-5">
+        <li>
+          A clean ColorChecker from an ideal simulated camera scored 0.5 to 0.8, and up to 2.1 under
+          a 20% light gradient.
+        </li>
+        <li>
+          A clean one from a simulated real sensor (Nikon D5100 sensitivities, measured ColorChecker
+          reflectances) scored 2.0 to 3.1, and up to 3.5 under a 20% gradient. Daylight is the best
+          of them, tungsten the worst.
+        </li>
+        <li>
+          Cards with damage that moved the Reading by more than a Chip (a dirty patch, a shadow
+          over half the Card, glare on a patch, corners in the wrong order) scored 3.56 or more.
+        </li>
+      </ul>
+      <p>
+        {CARD_CHECK_CAUTION} sits in the narrow gap between the worst clean Card and the best broken
+        one, and {CARD_CHECK_GOOD} is the score below which no simulated real-sensor Reading was
+        more than a Chip off. Both will be set again on real Photos (the Photo of a real Page, and
+        a Photo of a ColorChecker).
       </p>
 
       <Sub>What passing does not tell you</Sub>
       <ul className="grid list-disc gap-1 pl-5">
         <li>
           <b>A pass is not a promise that the Reading is within one Chip.</b> A gray patch with a
-          film of soil on it scored 1.79 to 1.98 in a simulation while the Reading was more than one
-          Chip off, and a tinted black patch scored 1.6 while dark soils read two to five Chips
-          off. A dirty or tinted gray patch can pass.
+          film of soil on it, or a black patch gone gray, bends the curve of every channel while the
+          average over 24 patches hardly moves. The app now judges the gray steps against the
+          patches beside them and leaves a dirty one out, which it names. In 624 simulated Photos
+          of a ColorChecker with one dirty gray step it did so in 48, and 15 Readings were still
+          more than a Chip off, 2 of them with the check good and 13 in caution.
         </li>
         <li>
           <b>A failure is not proof the Reading is wrong.</b> A Card can fail and still give a good
           Reading, so the app shows the uncorrected Reading and says why, instead of hiding it.
         </li>
         <li>
-          <b>On a real camera the line may be too strict.</b> A simulation of a real sensor (Nikon
-          D5100 sensitivities) scored good Photos from 1.3 to 3.2, so 14 of 24 of them would fail
-          at {CARD_CHECK_GOOD}. A caution band between good and failed is planned for this (issue
-          #28).
+          <b>A real camera's clean Card is mostly caution.</b> The simulated real sensor scores 2.0
+          to 3.1, so a clean Card shows caution there, not good. Of Jon's four real Pages, 10YR
+          (2.13) and 2.5Y (2.20) show caution, 5Y (1.62) good, and 7.5YR fails on its row guard.
         </li>
       </ul>
     </Section>

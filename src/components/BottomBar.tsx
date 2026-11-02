@@ -30,7 +30,7 @@ function BarButton({
       type="button"
       className={cn(
         "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-xs font-medium",
-        "disabled:opacity-40",
+        "disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring md:flex-row md:gap-2 md:text-sm",
         primary ? "bg-primary text-primary-foreground" : "text-foreground active:bg-muted",
         className,
       )}

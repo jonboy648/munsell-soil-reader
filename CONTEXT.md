@@ -63,7 +63,7 @@ One color in the soil book, named by its notation (`10YR 4/3`) and its color nam
 _Avoid_: swatch, patch (patches belong to the card)
 
 **Card check**:
-How well the correction predicts each of the card's references when it is fitted without that reference (leave one out); either good or failed.
+How well the correction predicts each of the card's references when it is fitted without that reference (leave one out); good, caution or failed. Caution still shows the corrected reading, with the raw one beside it.
 _Avoid_: calibration score, fit quality
 
 **Neighbouring chip**:
@@ -95,6 +95,14 @@ _Avoid_: horizon, sample (when the depth range is meant)
 **Plot**:
 The vegetation plot at a sampling point: the plants of each stratum with their cover.
 _Avoid_: quadrat, transect
+
+**Dominant species**:
+A plant the 50/20 rule picks in its stratum: the most abundant plants that together pass half of the stratum's cover, and any plant that is a fifth of it alone. The Dominance Test counts them across strata, each equally.
+_Avoid_: most abundant, main species
+
+**Prevalence index**:
+The cover-weighted average wetland indicator status of every plant on the plot (OBL 1 to UPL 5). The supplement applies it only when the dominance test fails and hydric soil and wetland hydrology indicators are present; the user may apply it anyway, with a reason.
+_Avoid_: PI score
 
 **Indicator**:
 One named test from the regional supplement or the hydric soil field indicators (`A12 Thick Dark Surface`, `F3 Depleted Matrix`); the form has a box for each.

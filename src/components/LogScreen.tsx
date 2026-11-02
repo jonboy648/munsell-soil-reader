@@ -2,6 +2,7 @@
 // or a Sample or remove a Sample's location (after an in-page confirm), and export the lot as CSV.
 import * as React from "react"
 import { Button } from "@/components/ui/button"
+import { Confirm } from "@/components/Confirm"
 import { SampleForm } from "@/components/SampleForm"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/lib/log"
 import { downloadCsv } from "@/lib/logCsv"
 import { shownReading } from "@/lib/verdict"
+import { ReadingBookPage } from "./ReadingBookPage"
 
 interface Props {
   open: boolean
@@ -31,45 +33,11 @@ interface Props {
 const CARD_TEXT = { colorchecker: "ColorChecker", frame: "Frame", none: "No Card" }
 const cardText = ({ card }: SavedReading) =>
   card.kind === "page" ? `Page ${card.hue ?? ""}`.trim() : CARD_TEXT[card.kind]
-const CHECK_TEXT = { good: "Card check good", failed: "Card check failed", uncorrected: "Not corrected" }
+const CHECK_TEXT = { good: "Card check good", caution: "Card check caution", failed: "Card check failed", uncorrected: "Not corrected" }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 const when = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
-
-/** Asks "Delete this?" in the page, in place of the button that started it. */
-function Confirm({
-  verb,
-  what,
-  onYes,
-  onNo,
-}: {
-  verb: "Delete" | "Remove"
-  what: string
-  onYes: () => void
-  onNo: () => void
-}) {
-  const lower = verb.toLowerCase()
-  return (
-    <div
-      role="group"
-      aria-label={`Confirm: ${lower} ${what}`}
-      className="grid gap-2 rounded-md border-2 border-foreground p-3"
-    >
-      <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
-        {verb} {what}? This cannot be undone.
-      </p>
-      <div className="flex gap-2">
-        <Button variant="outline" className="h-11 flex-1 text-base" onClick={onNo}>
-          Keep
-        </Button>
-        <Button className="h-11 flex-1 text-base" onClick={onYes}>
-          Yes, {lower}
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 function Swatch({ rgb, label }: { rgb: [number, number, number]; label: string }) {
   return (
@@ -102,7 +70,8 @@ function ReadingItem({
             {main.chip.notation}
           </p>
           {main.chip.name && <p className="mt-1">{main.chip.name}</p>}
-          <p className="mt-1 font-mono text-xs text-muted-foreground">exact {main.exact}</p>
+          <ReadingBookPage chip={main.chip} />
+          <p className="mt-1 text-xs text-muted-foreground">Calculated estimate: <span className="font-mono">{main.exact}</span> — not a printed chip.</p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Swatch rgb={main.rgb} label="Soil color" />

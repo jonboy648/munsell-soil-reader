@@ -1,0 +1,76 @@
+name: Claude Code
+
+# Mention @claude in an issue or PR comment, assign an issue to "claude", or add the
+# "claude" label, and Claude works on it. Based on the VarietyVaultLLC setup (Segue,
+# PrintHUB.Bcc). The token is the repo secret CLAUDE_CODE_OAUTH_TOKEN. Started from
+# a PR comment, Claude commits to that PR's own branch.
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned, labeled]
+
+jobs:
+  ack:
+    if: |
+      github.event.sender.type != 'Bot' && (
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issues' && github.event.action == 'opened' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
+      (github.event_name == 'issues' && github.event.action == 'assigned' && github.event.assignee.login == 'claude') ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Acknowledge the trigger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >
+          gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments
+          -f body="Claude has this trigger: $RUN. One agent works on an issue or PR at a time.
+          If that run ends *cancelled*, a newer trigger replaced it while it waited; trigger again."
+
+  claude:
+    needs: ack   # skipped whenever ack is, so the trigger rules live in one place
+    concurrency:
+      group: claude-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read # lets Claude read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      # So Claude can run the typecheck and the engine tests before it commits.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1.0.235
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          assignee_trigger: claude
+          label_trigger: claude
+          use_commit_signing: true
+          additional_permissions: |
+            actions: read
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools "Bash(npm test:*),Bash(npm run typecheck:*),Bash(npx vitest:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh issue view:*)"
+            --append-system-prompt "Read CLAUDE.md and CONTEXT.md first and follow them. Save your work with the mcp__github_file_ops__commit_files tool: called from a pull request comment, it commits to that pull request's own branch, so open no new pull request; started from an issue, it commits to a new claude/ branch (never main), then open a pull request with gh pr create --head <that branch> --base main. Run npm run typecheck and npm test before every commit and fix what fails. The browser tests (Playwright) cannot run here; CI runs them on every push to the pull request. Keep each commit to one fix, and finish with a comment that lists what you changed and anything you left undone."

@@ -53,7 +53,7 @@ export function MeasureResults({ shots, summary, onDrop }: Props) {
               <span className="min-w-0 flex-1 truncate">
                 {shot.name}, {shot.swatches.length} swatches
               </span>
-              <CardCheckBadge verdict={shot.cardCheck.ok ? "good" : "failed"} cardCheck={shot.cardCheck} />
+              <CardCheckBadge verdict={shot.cardCheck.verdict} cardCheck={shot.cardCheck} />
               <Button
                 variant="ghost"
                 size="icon"
@@ -70,7 +70,7 @@ export function MeasureResults({ shots, summary, onDrop }: Props) {
       {summary.excluded.length > 0 && (
         <p className="rounded-sm border border-foreground/40 border-l-4 border-l-foreground py-2 pr-3 pl-3 text-sm" data-testid="excluded">
           <b className="font-semibold">Left out of the means:</b>{" "}
-          {summary.excluded.map((e) => `shot ${e.shot} (Card check failed, ${fmt(e.meanDE)})`).join("; ")}.
+          {summary.excluded.map((e) => `shot ${e.shot} (Card check ${shots[e.shot - 1].cardCheck.verdict}, ${fmt(e.meanDE)})`).join("; ")}.
         </p>
       )}
 

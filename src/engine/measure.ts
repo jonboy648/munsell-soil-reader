@@ -1,10 +1,10 @@
 // Measurement mode: the color of printed swatches, measured against a ColorChecker. Each shot is
-// corrected with the normal correction and judged by the normal Card check, the swatches are
+// corrected with a curve per channel (see fitChannelCurves) and judged by the normal Card check, the swatches are
 // read from it, and the shots that pass are averaged. The result is the batch file (#49 reads
 // it): per swatch, the mean CIELAB under D50, its spread across shots and the number of shots.
 import { linearToLabD50, type Vec3 } from "./color"
 import { patchSites } from "./colorchecker"
-import { fitCorrection } from "./correction"
+import { fitChannelCurves } from "./correction"
 import { BATCH_METHOD_CAMERA, swatchSlot, type BatchRow } from "./batchFile"
 import { fitCard } from "./readPhoto"
 import { medianLinear } from "./sampling"
@@ -43,7 +43,7 @@ export interface ShotMeasurement {
 
 /** Corrects a Photo of swatches beside a ColorChecker and reads each swatch as CIELAB under D50. */
 export function measureShot(pixels: Pixels, corners: Corners, taps: SwatchTap[]): ShotMeasurement {
-  const { correct, check } = fitCard(pixels, corners, fitCorrection)
+  const { correct, check } = fitCard(pixels, corners, fitChannelCurves)
   return {
     cardCheck: check,
     swatches: taps.map(({ id, at }) => ({

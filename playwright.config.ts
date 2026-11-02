@@ -39,7 +39,7 @@ export default defineConfig({
   // A test that passes only on its retry is flaky. It keeps its trace, and the run still fails.
   failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI
-    ? [["list"], ["html", { open: "never" }], ["json", { outputFile: "e2e-results.json" }]]
+    ? [["list"], ["html", { open: "never" }], ["json", { outputFile: process.env.E2E_RESULTS ?? "e2e-results.json" }]]
     : "list",
   use: {
     baseURL: `http://localhost:${PORT}`,

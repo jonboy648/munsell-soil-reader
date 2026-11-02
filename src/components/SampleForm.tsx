@@ -32,7 +32,7 @@ export function SampleForm({ draft, onChange, idPrefix }: Props) {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor={id("top")}>Depth top (cm)</Label>
+          <Label htmlFor={id("top")}>Depth top (in)</Label>
           <Input
             id={id("top")}
             className={INPUT}
@@ -45,7 +45,7 @@ export function SampleForm({ draft, onChange, idPrefix }: Props) {
           />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor={id("bottom")}>Depth bottom (cm)</Label>
+          <Label htmlFor={id("bottom")}>Depth bottom (in)</Label>
           <Input
             id={id("bottom")}
             className={INPUT}

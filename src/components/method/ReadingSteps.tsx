@@ -1,6 +1,6 @@
 // How a Reading is made, step by step, in plain words. The numbers come from the engine's own
 // constants, so this page cannot drift from what the app does.
-import { CARD_CHECK_GOOD } from "@/engine"
+import { CARD_CHECK_CAUTION, CARD_CHECK_GOOD } from "@/engine"
 import { MAX_SIDE } from "@/lib/photo"
 import { Section } from "./parts"
 
@@ -15,7 +15,7 @@ const STEPS: { name: string; body: string }[] = [
   },
   {
     name: "Card check",
-    body: `Before you trust the corrected color, the app tests the fix on the Card itself. It leaves one patch (or, on a Page, one Chip) out, fits the correction to the others, and sees how close the left-out one comes to its true color. It does that for every one and averages. Below ${CARD_CHECK_GOOD} the check is good. At ${CARD_CHECK_GOOD} or more it has failed, and the app shows the uncorrected Reading with a note instead.`,
+    body: `Before you trust the corrected color, the app tests the fix on the Card itself. It leaves one patch (or, on a Page, one Chip) out, fits the correction to the others, and sees how close the left-out one comes to its true color. It does that for every one and averages. Below ${CARD_CHECK_GOOD} the check is good. From ${CARD_CHECK_GOOD} up to ${CARD_CHECK_CAUTION} it is caution: the corrected Reading is still the answer, with the uncorrected one beside it. Above ${CARD_CHECK_CAUTION} it has failed, and the app shows the uncorrected Reading with a note instead.`,
   },
   {
     name: "Munsell conversion",

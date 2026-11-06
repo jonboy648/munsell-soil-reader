@@ -140,7 +140,7 @@ export function App() {
         </div>
         <UpdateNotice hasPhoto={session.photo !== null} status={serviceWorker} />
       </header>
-      <div className={`reader-nav-wrap px-4 pt-3${session.photo ? " hidden lg:block" : ""}`}>
+      <div className="reader-nav-wrap px-4 pt-3">
         <ProjectNavigation page="reader" />
       </div>
 
@@ -170,11 +170,6 @@ export function App() {
           onTap={(point: XY) => dispatch({ type: "tap", point })}
         />
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">Keep the Card and soil in the same light. Use the neutral surround to compare colors.</p>
-        {session.photo && (
-          <div className="reader-nav-wrap mt-3 lg:hidden">
-            <ProjectNavigation page="reader" />
-          </div>
-        )}
         </section>
 
         <aside className="reader-tools min-w-0" aria-label="Reading setup and field records">

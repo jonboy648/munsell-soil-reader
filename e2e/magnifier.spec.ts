@@ -287,6 +287,10 @@ for (const [name, from, to, least, most] of [
     await page.getByTestId("photo").evaluate((photo) => photo.scrollIntoView({ block: "start" }))
     const touch = await fingers(page)
     await pinch(page, touch, from, to)
+    // Chromium may pan back to the document origin while completing the pinch.
+    // Bring the Photo into the zoomed viewport before testing its touch targets.
+    await page.getByTestId("photo").evaluate((photo) => photo.scrollIntoView({ block: "start" }))
+    await settled(page)
     await expect.poll(async () => (await glassOf(page)).scale).toBeGreaterThan(least)
     expect((await glassOf(page)).scale).toBeLessThan(most)
     await expectLensClearOfFinger(page, touch, LENS - 1)

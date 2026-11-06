@@ -97,6 +97,10 @@ async function decide(card: Locator, answer: "yes" | "no", remark: string) {
   await card.getByLabel("Your answer", { exact: true }).selectOption(answer)
   await card.getByLabel("Remark explaining your decision").fill(remark)
   await card.getByRole("button", { name: "Confirm answer with remark" }).click()
+  // Confirmation writes the Log asynchronously. Export only after the UI reports
+  // the answer saved, rather than racing the transaction with the download click.
+  await expect(card).toHaveAttribute("data-answer", answer)
+  await expect(card.getByRole("button", { name: "Confirm answer with remark" })).toHaveCount(0)
 }
 
 test("JF-1 saved readings to plants, confirmed parameters and a complete, read-back summary PDF", async ({ page }, testInfo) => {

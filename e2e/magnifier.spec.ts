@@ -139,6 +139,9 @@ async function expectLensClearOfFinger(page: Page, touch: Fingers, smallest: num
   const top = Math.max(photo.top, 0) + 4
   const bottom = Math.min(photo.top + photo.height, glass.height) - 4
 
+  expect(right, "Photo has a visible horizontal touch area").toBeGreaterThan(left)
+  expect(bottom, "Photo has a visible vertical touch area").toBeGreaterThan(top)
+
   for (const y of [top, (top + bottom) / 2, bottom]) {
     for (const x of [left, (left + right) / 2, right]) {
       await touch.send("touchStart", { x: x / glass.scale, y: y / glass.scale })
@@ -279,8 +282,15 @@ for (const [name, from, to, least, most] of [
 ] as const) {
   test(`the magnifier keeps its size and place when the page is zoomed in ${name}`, async ({ page }) => {
     await pickExample(page, "Warm shop light")
+    // At 5x, header height can put the entire Photo below the visual viewport on
+    // Chromium/Linux. Start on the Photo before pinching; never send off-screen touches.
+    await page.getByTestId("photo").evaluate((photo) => photo.scrollIntoView({ block: "start" }))
     const touch = await fingers(page)
     await pinch(page, touch, from, to)
+    // Chromium may pan back to the document origin while completing the pinch.
+    // Bring the Photo into the zoomed viewport before testing its touch targets.
+    await page.getByTestId("photo").evaluate((photo) => photo.scrollIntoView({ block: "start" }))
+    await settled(page)
     await expect.poll(async () => (await glassOf(page)).scale).toBeGreaterThan(least)
     expect((await glassOf(page)).scale).toBeLessThan(most)
     await expectLensClearOfFinger(page, touch, LENS - 1)

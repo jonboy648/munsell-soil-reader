@@ -58,7 +58,8 @@ export function HeaderForm({ header, onSave, onCancel }: Props) {
   return (
     <form onSubmit={submit} noValidate className="grid gap-4 rounded-lg border border-border bg-card p-4">
       <p className="text-sm text-muted-foreground">
-        These lines are printed at the top of page 1 of every sampling point's form. Leave a line blank to leave it blank on the form.
+        These lines are printed at the top of page 1 of every sampling point's form. Leave a line blank to leave it blank on the form. A sampling point
+        can have its own Soil Map Unit Name and NWI classification (a look-up by location fills them); its own value prints instead of the one here.
       </p>
       {PROJECT_FIELDS.map(({ key, label, hint }) => (
         <div key={key} className="grid gap-1.5">

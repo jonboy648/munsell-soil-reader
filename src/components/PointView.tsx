@@ -114,6 +114,11 @@ export function PointView({ project, point, change, onBack }: Props) {
       points: p.points.map((pt) => {
         if (pt.id === point.id) {
           const edited = { ...pt, lat, long, datum, soilMapUnit: soilMapUnit.trim() || undefined, nwi: nwi.trim() || undefined, pair: pair ?? undefined }
+          for (const key of ["soilMapUnit", "nwi"] as const) {
+            if ((edited[key] ?? "") !== (pt[key] ?? "").trim()) {
+              edited.lookupOverrides = { ...edited.lookupOverrides, [key]: true }
+            }
+          }
           const moved = pt.lat.trim() !== lat.trim() || pt.long.trim() !== long.trim() || pt.datum.trim() !== datum.trim()
           if (!moved) return edited
           const applied = withoutStaleLookups(edited)

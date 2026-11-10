@@ -132,6 +132,8 @@ export interface SamplingPoint {
   nwi?: string
   /** What the last look-up wrote into those two, so a later one can tell a value the user changed. */
   lookedUp?: { soilMapUnit?: string; nwi?: string }
+  /** Explicit manual edits, including blanks, must survive subsequent lookups and moves. */
+  lookupOverrides?: { soilMapUnit?: boolean; nwi?: boolean }
 }
 
 export type YesNo = "" | "yes" | "no"

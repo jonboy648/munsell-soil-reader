@@ -126,7 +126,7 @@ export interface Applied {
 /** True while a line is still exactly what the last look-up wrote, so the user has not made it their own. */
 const writtenByLookup = (point: SamplingPoint, key: LookupKey): boolean => {
   const current = (point[key] ?? "").trim()
-  return current !== "" && current === point.lookedUp?.[key]
+  return !point.lookupOverrides?.[key] && current !== "" && current === point.lookedUp?.[key]
 }
 
 const without = (point: SamplingPoint, key: LookupKey): SamplingPoint => {
@@ -148,7 +148,7 @@ export function withLookups(point: SamplingPoint, lookups: Lookups): Applied {
     const outcome = lookups[key]
     const current = (point[key] ?? "").trim()
     if (outcome.state === "found") {
-      if (current !== "" && !writtenByLookup(point, key)) kept.push(key)
+      if (point.lookupOverrides?.[key] || (current !== "" && !writtenByLookup(point, key))) kept.push(key)
       else out = { ...out, [key]: outcome.value, lookedUp: { ...out.lookedUp, [key]: outcome.value } }
     } else if (outcome.state === "none" && writtenByLookup(point, key)) {
       out = without(out, key)

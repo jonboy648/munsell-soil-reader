@@ -37,7 +37,7 @@ export function LocationLookup({ project, point, change, onBusy }: Props) {
     )
   }
 
-  const typed = typedPosition(point.lat, point.long)
+  const typed = typedPosition(point.lat, point.long, point.datum)
 
   /** Writes into the point, but only while the project still has location on. False when it no longer does. */
   const write = async (work: (pt: SamplingPoint) => SamplingPoint, signal: AbortSignal): Promise<boolean> => {

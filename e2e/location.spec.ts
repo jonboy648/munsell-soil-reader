@@ -81,6 +81,35 @@ function watchOutside(page: Page, baseURL: string | undefined) {
 const projectsSheet = (page: Page) => page.getByRole("dialog", { name: "Projects", exact: true })
 const LOCATION = /Use this phone's location in this project/
 
+test("manual lookup edits remain owned after clearing or restoring the earlier answer", async ({ page, context }) => {
+  await watchPosition(context)
+  await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await sheet.getByRole("button", { name: "Use my location" }).click()
+  await expect(printed(sheet, "nwi")).toHaveText("PEM1A")
+  await editDetails(sheet, { "NWI classification": "PFO1C" })
+  await editDetails(sheet, { "NWI classification": "PEM1A", "Soil Map Unit Name": "" })
+  await sheet.getByRole("button", { name: "Look up this position" }).click()
+  await expect(sheet.getByTestId("location-note")).toContainText("Kept what you typed")
+  await expect(printed(sheet, "soilMapUnit")).toHaveCount(0)
+  await editDetails(sheet, { Lat: String(BARE.latitude), Long: String(BARE.longitude) })
+  await sheet.getByRole("button", { name: "Look up this position" }).click()
+  await expect(sheet.getByTestId("location-note")).toContainText("No NWI wetland")
+  await expect(printed(sheet, "nwi")).toHaveText("PEM1A")
+})
+
+test("typed coordinates with an unsupported datum are never sent as WGS84", async ({ page, context }) => {
+  const asked = await mockServices(context)
+  const sheet = await openPoint(page, { locationOn: true })
+  await editDetails(sheet, { Lat: "41.5", Long: "-93.6", Datum: "NAD27" })
+  await expect(sheet.getByTestId("position-problem")).toContainText("WGS84")
+  await expect(sheet.getByRole("button", { name: "Look up this position" })).toHaveCount(0)
+  expect(asked).toEqual([])
+  await editDetails(sheet, { Datum: "WGS 84" })
+  await sheet.getByRole("button", { name: "Look up this position" }).click()
+  await expect(printed(sheet, "nwi")).toHaveText("PEM1A")
+})
+
 test("manually moving a point clears lookup values from the old position", async ({ page, context }) => {
   await watchPosition(context)
   await mockServices(context)
@@ -382,7 +411,7 @@ test("a longitude typed without its minus is caught and nothing is sent; the Lon
   await expect(sheet.getByTestId("position-problem")).toContainText("Nothing to look up yet")
   expect(asked).toEqual([])
 
-  await editDetails(sheet, { Lat: "41.5", Long: "-93.6" })
+  await editDetails(sheet, { Lat: "41.5", Long: "-93.6", Datum: "WGS84" })
   await expect(sheet.getByTestId("position-problem")).toHaveCount(0)
   await sheet.getByRole("button", { name: "Look up this position" }).click()
   await expect(sheet.getByTestId("point-lookups")).toContainText("NWI: PEM1A")

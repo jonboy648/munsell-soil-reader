@@ -14,7 +14,7 @@ export const written = (degrees: number): string => degrees.toFixed(6)
 export type TypedPosition = { position: Position } | { problem: string } | null
 
 /** The position typed in the Lat and Long boxes, or the plain reason it cannot be looked up. */
-export function typedPosition(lat: string, long: string): TypedPosition {
+export function typedPosition(lat: string, long: string, datum = "WGS84"): TypedPosition {
   if (lat.trim() === "" && long.trim() === "") return null
   const parse = (text: string, limit: number) => {
     const n = text.trim() === "" ? NaN : Number(text)
@@ -25,5 +25,6 @@ export function typedPosition(lat: string, long: string): TypedPosition {
   if (a === null || b === null) return { problem: "Nothing to look up yet: Lat must be a number from -90 to 90 and Long a number from -180 to 180." }
   // Both services cover the United States, where every longitude is west, and a phone's number keypad can lack a minus.
   if (a > 0 && b > 0) return { problem: "West longitudes are negative, like -93.6. Check the sign of Long. Nothing was sent." }
+  if (!/^WGS\s*84$/i.test(datum.trim())) return { problem: "Lookups require WGS84 coordinates. Confirm the coordinate source and enter its datum, or use this phone's location. Nothing was sent." }
   return { position: { lat: a, long: b } }
 }

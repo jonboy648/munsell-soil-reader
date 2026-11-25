@@ -8,6 +8,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { chromium, devices, expect, test as base, type BrowserContext, type Locator, type Page } from "@playwright/test"
 import type { XY } from "../src/engine"
+import { recordFirstInstall } from "./swDiagnostics"
 import { SIM_CORNERS, SIM_HEIGHT, SIM_SPOT, SIM_WIDTH } from "../src/engine/simulate"
 
 /** A stand-in for soil.joncackler.com that can publish new versions of the app. */
@@ -25,6 +26,8 @@ type Site = {
   precacheFailures: () => number
   /** Make a precached file slow, so the first install finishes this many ms late. */
   delayPrecache: (ms: number) => void
+  /** Refuse the worker script at the HTTP server, across all browser engines. */
+  refuseWorker: () => void
 }
 
 // Playwright cannot swap files mid-test, so the app is served through a small proxy to the
@@ -57,8 +60,13 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
     let failPrecache = false
     let failures = 0
     let delay = 0
+    let refuseWorker = false
     const proxy = createServer(async (req, res) => {
       const target = new URL(req.url ?? "/", baseURL)
+      if (refuseWorker && target.pathname === "/sw.js") {
+        res.writeHead(503).end()
+        return
+      }
       if (delay && target.pathname === "/icon-512.png") await new Promise((r) => setTimeout(r, delay))
       if (failPrecache && target.pathname === "/icon-512.png") {
         failures++
@@ -98,6 +106,7 @@ const test = base.extend<{ site: Site; fullChromium: BrowserContext }>({
       delayPrecache: (ms) => {
         delay = ms
       },
+      refuseWorker: () => { refuseWorker = true },
     })
     proxy.close()
   },
@@ -109,14 +118,43 @@ test.use({ serviceWorkers: "allow" })
 
 /** Open the app and wait for the first install to finish; the page is not controlled yet. */
 async function openFirstVisit(page: Page, url = "/") {
-  await page.goto(url)
-  await expect(page.getByTestId("offline-notice")).toBeVisible()
+  const capture = await recordFirstInstall(page, test.info())
+  try {
+    await page.goto(url)
+    await expect(page.getByTestId("offline-notice")).toBeVisible()
+  } finally {
+    await capture()
+  }
 }
+
+test("diagnostic control: rejected worker is captured", async ({ page, site }, info) => {
+  const capture = await recordFirstInstall(page, info)
+  site.refuseWorker()
+  try {
+    await page.goto(site.url)
+    await expect.poll(() => page.evaluate(() =>
+      (window as Window & { __firstInstallEvents?: { event: string }[] }).__firstInstallEvents
+        ?.some((entry) => entry.event === "register-rejected"),
+    )).toBe(true)
+    await expect(page.getByTestId("offline-notice")).not.toBeVisible()
+  } finally {
+    await capture()
+  }
+})
 
 /** Open the app, let its service worker install, then reload so the page is one it controls. */
 async function openControlled(page: Page, url = "/") {
+  const capture = await recordFirstInstall(page, test.info(), "controlled-page-ready-lifecycle")
   await page.goto(url)
-  await page.evaluate(() => navigator.serviceWorker.ready)
+  // Capture a stalled install while the page is available, before the test timeout closes it.
+  let snapshot: Promise<void> | undefined
+  const timer = setTimeout(() => { snapshot = capture() }, 10_000)
+  try {
+    await page.evaluate(() => navigator.serviceWorker.ready)
+  } finally {
+    clearTimeout(timer)
+    await snapshot
+  }
   await page.reload()
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))

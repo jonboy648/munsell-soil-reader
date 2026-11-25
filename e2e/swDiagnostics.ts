@@ -1,7 +1,11 @@
 import type { Page, TestInfo } from "@playwright/test"
 
 /** Test-only, bounded evidence for first-install failures; never wait for worker readiness. */
-export async function recordFirstInstall(page: Page, info: TestInfo): Promise<() => Promise<void>> {
+export async function recordFirstInstall(
+  page: Page,
+  info: TestInfo,
+  attachmentName = "first-install-lifecycle",
+): Promise<() => Promise<void>> {
   await page.addInitScript(() => {
     const events: { event: string; state?: string; ms: number }[] = []
     Object.assign(window, { __firstInstallEvents: events })
@@ -49,7 +53,7 @@ export async function recordFirstInstall(page: Page, info: TestInfo): Promise<()
         })).catch(() => ({ unavailable: "page snapshot failed" })),
         new Promise((resolve) => { timer = setTimeout(() => resolve({ unavailable: "snapshot timed out" }), 1000) }),
       ])
-      await info.attach("first-install-lifecycle", {
+      await info.attach(attachmentName, {
         body: JSON.stringify(evidence), contentType: "application/json",
       })
     } catch {

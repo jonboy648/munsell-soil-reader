@@ -144,8 +144,17 @@ test("diagnostic control: rejected worker is captured", async ({ page, site }, i
 
 /** Open the app, let its service worker install, then reload so the page is one it controls. */
 async function openControlled(page: Page, url = "/") {
+  const capture = await recordFirstInstall(page, test.info(), "controlled-page-ready-lifecycle")
   await page.goto(url)
-  await page.evaluate(() => navigator.serviceWorker.ready)
+  // Capture a stalled install while the page is available, before the test timeout closes it.
+  let snapshot: Promise<void> | undefined
+  const timer = setTimeout(() => { snapshot = capture() }, 10_000)
+  try {
+    await page.evaluate(() => navigator.serviceWorker.ready)
+  } finally {
+    clearTimeout(timer)
+    await snapshot
+  }
   await page.reload()
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
